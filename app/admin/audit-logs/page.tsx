@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Activity,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AuditLogTimeline } from "@/components/admin/AuditLogTimeline";
 
 interface AuditLog {
@@ -55,14 +56,54 @@ export default function AuditLogsPage() {
         params.append("entityType", entityTypeFilter);
 
       const res = await fetch(`/api/admin/audit-logs?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Failed to fetch audit logs:", errorData);
+
+        // Set empty data if fetch fails
+        setLogs([]);
+        setGroupedLogs({});
+        setStats({
+          totalLogs: 0,
+          todayLogs: 0,
+          productEvents: 0,
+          orderEvents: 0,
+          stockEvents: 0,
+        });
+
+        toast.error(
+          "Không thể tải audit logs. Vui lòng chạy database/audit_logs_schema.sql trong Supabase.",
+        );
+        return;
+      }
 
       const data = await res.json();
-      setLogs(data.logs);
-      setGroupedLogs(data.groupedLogs);
-      setStats(data.stats);
+      setLogs(data.logs || []);
+      setGroupedLogs(data.groupedLogs || {});
+      setStats(
+        data.stats || {
+          totalLogs: 0,
+          todayLogs: 0,
+          productEvents: 0,
+          orderEvents: 0,
+          stockEvents: 0,
+        },
+      );
     } catch (error) {
       console.error("Error fetching audit logs:", error);
+      toast.error("Đã xảy ra lỗi khi tải audit logs");
+
+      // Set empty data on error
+      setLogs([]);
+      setGroupedLogs({});
+      setStats({
+        totalLogs: 0,
+        todayLogs: 0,
+        productEvents: 0,
+        orderEvents: 0,
+        stockEvents: 0,
+      });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

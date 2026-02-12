@@ -11,8 +11,12 @@ import {
   FileText,
   X,
   ChevronDown,
+  LogOut,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { logout } from "@/actions/auth";
+import { toast } from "sonner";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface NavItem {
   label: string;
@@ -33,6 +37,8 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     "Tổng quan",
     "Bán hàng",
@@ -103,6 +109,21 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       return pathname === href;
     }
     return pathname.startsWith(href);
+  };
+
+  const handleLogout = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const confirmLogout = () => {
+    startTransition(async () => {
+      try {
+        await logout();
+        toast.success("Đã đăng xuất thành công");
+      } catch (error) {
+        toast.error("Có lỗi xảy ra khi đăng xuất");
+      }
+    });
   };
 
   return (
@@ -217,7 +238,20 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-200 space-y-3">
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            disabled={isPending}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm font-medium">
+              {isPending ? "Đang đăng xuất..." : "Đăng xuất"}
+            </span>
+          </button>
+
+          {/* Version Info */}
           <div className="px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
             <p className="text-xs font-medium text-gray-700 mb-1">
               Phiên bản 1.0
@@ -226,6 +260,19 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           </div>
         </div>
       </aside>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
+        onConfirm={confirmLogout}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?"
+        confirmText="Đăng xuất"
+        cancelText="Hủy"
+        isDangerous={true}
+        isLoading={isPending}
+      />
     </>
   );
 }
