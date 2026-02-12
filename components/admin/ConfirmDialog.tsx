@@ -49,9 +49,7 @@ export function ConfirmDialog({
         {/* Icon */}
         <div
           className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
-            isDangerous
-              ? "bg-red-100"
-              : "bg-blue-100"
+            isDangerous ? "bg-red-100" : "bg-blue-100"
           }`}
         >
           <AlertTriangle

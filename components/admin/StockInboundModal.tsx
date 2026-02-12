@@ -2,16 +2,29 @@
 
 import { useState, useEffect } from "react";
 import {
-  X,
-  Package,
-  DollarSign,
-  Truck,
-  FileText,
-  Calculator,
-} from "lucide-react";
+  Modal,
+  Form,
+  Select,
+  InputNumber,
+  Input,
+  Card,
+  Statistic,
+  Row,
+  Col,
+  Button,
+  message,
+} from "antd";
+import {
+  InboxOutlined,
+  DollarOutlined,
+  TruckOutlined,
+  FileTextOutlined,
+  CalculatorOutlined,
+} from "@ant-design/icons";
 import { formatCurrency } from "@/lib/utils";
-import { toast } from "sonner";
 import type { Product } from "@/types/database";
+
+const { TextArea } = Input;
 
 interface StockInboundModalProps {
   isOpen: boolean;
@@ -26,15 +39,17 @@ export function StockInboundModal({
   product: initialProduct,
   onSuccess,
 }: StockInboundModalProps) {
+  const [form] = Form.useForm();
+  const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(
     initialProduct || null,
   );
-  const [quantityAdded, setQuantityAdded] = useState("");
-  const [costPriceAtTime, setCostPriceAtTime] = useState("");
-  const [supplier, setSupplier] = useState("");
-  const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Watch form values for preview calculation
+  const quantityAdded = Form.useWatch("quantityAdded", form);
+  const costPriceAtTime = Form.useWatch("costPriceAtTime", form);
 
   useEffect(() => {
     if (isOpen && !initialProduct) {
@@ -45,8 +60,9 @@ export function StockInboundModal({
   useEffect(() => {
     if (initialProduct) {
       setSelectedProduct(initialProduct);
+      form.setFieldValue("costPriceAtTime", initialProduct.cost_price);
     }
-  }, [initialProduct]);
+  }, [initialProduct, form]);
 
   const fetchProducts = async () => {
     try {
@@ -60,28 +76,17 @@ export function StockInboundModal({
     }
   };
 
-  if (!isOpen) return null;
-
-  const product = selectedProduct;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!product) {
-      toast.error("Vui lòng chọn sản phẩm");
-      return;
+  const handleProductChange = (productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    setSelectedProduct(product || null);
+    if (product) {
+      form.setFieldValue("costPriceAtTime", product.cost_price);
     }
+  };
 
-    const qty = parseInt(quantityAdded);
-    const cost = parseFloat(costPriceAtTime);
-
-    if (qty <= 0) {
-      toast.warning("Số lượng nhập phải lớn hơn 0");
-      return;
-    }
-
-    if (cost < 0) {
-      toast.warning("Giá vốn không được âm");
+  const handleSubmit = async (values: any) => {
+    if (!selectedProduct) {
+      messageApi.error("Vui lòng chọn sản phẩm");
       return;
     }
 
@@ -92,11 +97,11 @@ export function StockInboundModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: product.id,
-          quantityAdded: qty,
-          costPriceAtTime: cost,
-          supplier: supplier.trim() || null,
-          notes: notes.trim() || null,
+          productId: selectedProduct.id,
+          quantityAdded: values.quantityAdded,
+          costPriceAtTime: values.costPriceAtTime,
+          supplier: values.supplier?.trim() || null,
+          notes: values.notes?.trim() || null,
         }),
       });
 
@@ -106,24 +111,18 @@ export function StockInboundModal({
         throw new Error(result.error || "Không thể nhập hàng");
       }
 
-      toast.success(
-        `Đã nhập ${qty} ${product?.name}. Tồn kho mới: ${result.data.new_stock_quantity}`,
-        {
-          description: `Giá vốn BQ mới: ${formatCurrency(result.data.new_weighted_avg_cost)}`,
-        },
+      messageApi.success(
+        `Đã nhập ${values.quantityAdded} ${selectedProduct.name}. Tồn kho mới: ${result.data.new_stock_quantity}`,
       );
 
       // Reset form
-      setQuantityAdded("");
-      setCostPriceAtTime("");
-      setSupplier("");
-      setNotes("");
+      form.resetFields();
       setSelectedProduct(null);
 
       if (onSuccess) onSuccess();
       onClose();
     } catch (error: any) {
-      toast.error(error.message || "Đã xảy ra lỗi khi nhập hàng");
+      messageApi.error(error.message || "Đã xảy ra lỗi khi nhập hàng");
     } finally {
       setIsSubmitting(false);
     }
@@ -131,264 +130,270 @@ export function StockInboundModal({
 
   const handleClose = () => {
     if (!isSubmitting) {
-      setQuantityAdded("");
-      setCostPriceAtTime("");
-      setSupplier("");
-      setNotes("");
+      form.resetFields();
       setSelectedProduct(null);
       onClose();
     }
   };
 
-  // Tính preview giá vốn bình quân
+  // Calculate preview
   const calculatePreviewAvgCost = () => {
-    if (!product) return null;
+    if (!selectedProduct || !quantityAdded || !costPriceAtTime) return null;
 
-    const qty = parseInt(quantityAdded);
-    const cost = parseFloat(costPriceAtTime);
+    const qty = quantityAdded;
+    const cost = costPriceAtTime;
 
-    if (!qty || !cost || qty <= 0 || cost < 0) return null;
+    if (qty <= 0 || cost < 0) return null;
 
-    const currentQty = product.stock_quantity || 0;
-    const currentCost = product.cost_price || 0;
+    const currentQty = selectedProduct.stock_quantity || 0;
+    const currentCost = selectedProduct.cost_price || 0;
 
     if (currentQty === 0) return cost;
 
     const newAvgCost =
       (currentQty * currentCost + qty * cost) / (currentQty + qty);
-
     return newAvgCost;
   };
 
   const previewAvgCost = calculatePreviewAvgCost();
-  const totalValue =
-    parseInt(quantityAdded || "0") * parseFloat(costPriceAtTime || "0");
+  const totalValue = (quantityAdded || 0) * (costPriceAtTime || 0);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={handleClose}
-      />
-
-      {/* Modal */}
-      <div className="relative min-h-screen flex items-center justify-center p-4">
-        <div className="relative bg-white rounded-xl shadow-2xl max-w-2xl w-full">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 rounded-t-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg backdrop-blur">
-                  <Package className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">
-                    Nhập hàng vào kho
-                  </h2>
-                  <p className="text-sm text-blue-100">Ghi nhận lô hàng mới</p>
-                </div>
-              </div>
-              <button
-                onClick={handleClose}
-                disabled={isSubmitting}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+    <>
+      {contextHolder}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <InboxOutlined style={{ fontSize: 20 }} />
+            <div>
+              <div>Nhập hàng vào kho</div>
+              <div
+                style={{ fontSize: 12, fontWeight: "normal", color: "#8c8c8c" }}
               >
-                <X className="w-5 h-5 text-white" />
-              </button>
+                Ghi nhận lô hàng mới
+              </div>
             </div>
           </div>
-
-          {/* Product Info or Selection */}
-          {product ? (
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <div className="flex items-center gap-4">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-16 h-16 object-cover rounded-lg shadow-sm"
-                  />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                    📦
-                  </div>
-                )}
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">
-                    {product.name}
-                  </h3>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                    <span>
-                      Tồn kho: <strong>{product.stock_quantity}</strong>
-                    </span>
-                    <span>
-                      Giá vốn:{" "}
-                      <strong>{formatCurrency(product.cost_price)}</strong>
-                    </span>
-                  </div>
+        }
+        open={isOpen}
+        onCancel={handleClose}
+        width={700}
+        footer={null}
+        destroyOnHidden
+      >
+        {/* Product Info or Selection */}
+        {selectedProduct ? (
+          <Card
+            size="small"
+            style={{ marginBottom: 16, backgroundColor: "#f5f5f5" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {selectedProduct.image_url ? (
+                <img
+                  src={selectedProduct.image_url}
+                  alt={selectedProduct.name}
+                  style={{
+                    width: 64,
+                    height: 64,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    backgroundColor: "#e0e0e0",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 32,
+                  }}
+                >
+                  📦
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 16 }}>
+                  {selectedProduct.name}
+                </div>
+                <div style={{ fontSize: 14, color: "#8c8c8c", marginTop: 4 }}>
+                  Tồn kho: <strong>{selectedProduct.stock_quantity}</strong> ·
+                  Giá vốn:{" "}
+                  <strong>{formatCurrency(selectedProduct.cost_price)}</strong>
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Chọn sản phẩm <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={selectedProduct?.id || ""}
-                onChange={(e) => {
-                  const product = products.find((p) => p.id === e.target.value);
-                  setSelectedProduct(product || null);
-                  setCostPriceAtTime(product?.cost_price?.toString() || "");
-                }}
-                required
-                className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium"
-              >
-                <option value="">-- Chọn sản phẩm --</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} (Tồn: {p.stock_quantity})
-                  </option>
-                ))}
-              </select>
-            </div>
+          </Card>
+        ) : null}
+
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          autoComplete="off"
+        >
+          {!initialProduct && (
+            <Form.Item
+              name="productId"
+              label="Chọn sản phẩm"
+              rules={[{ required: true, message: "Vui lòng chọn sản phẩm" }]}
+            >
+              <Select
+                placeholder="-- Chọn sản phẩm --"
+                showSearch
+                optionFilterProp="children"
+                onChange={handleProductChange}
+                options={products.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} (Tồn: ${p.stock_quantity})`,
+                }))}
+              />
+            </Form.Item>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {/* Quantity & Cost Price */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Package className="w-4 h-4 inline mr-1" />
-                  Số lượng nhập <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={quantityAdded}
-                  onChange={(e) => setQuantityAdded(e.target.value)}
-                  min="1"
-                  required
-                  className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-600 font-medium"
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="quantityAdded"
+                label={
+                  <>
+                    <InboxOutlined /> Số lượng nhập
+                  </>
+                }
+                rules={[
+                  { required: true, message: "Vui lòng nhập số lượng" },
+                  {
+                    type: "number",
+                    min: 1,
+                    message: "Số lượng phải lớn hơn 0",
+                  },
+                ]}
+              >
+                <InputNumber
                   placeholder="Nhập số lượng"
+                  style={{ width: "100%" }}
+                  min={1}
                 />
-              </div>
+              </Form.Item>
+            </Col>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <DollarSign className="w-4 h-4 inline mr-1" />
-                  Giá vốn/sản phẩm <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={costPriceAtTime}
-                  onChange={(e) => setCostPriceAtTime(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  required
-                  className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-600 font-medium"
+            <Col span={12}>
+              <Form.Item
+                name="costPriceAtTime"
+                label={
+                  <>
+                    <DollarOutlined /> Giá vốn/sản phẩm
+                  </>
+                }
+                rules={[
+                  { required: true, message: "Vui lòng nhập giá vốn" },
+                  { type: "number", min: 0, message: "Giá vốn không được âm" },
+                ]}
+              >
+                <InputNumber
                   placeholder="Nhập giá vốn"
+                  style={{ width: "100%" }}
+                  min={0}
+                  formatter={(value) =>
+                    `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                  }
+                  parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
                 />
-              </div>
-            </div>
+              </Form.Item>
+            </Col>
+          </Row>
 
-            {/* Supplier */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Truck className="w-4 h-4 inline mr-1" />
-                Nhà cung cấp
-              </label>
-              <input
-                type="text"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-600 font-medium"
-                placeholder="Tên nhà cung cấp (không bắt buộc)"
-              />
-            </div>
+          <Form.Item
+            name="supplier"
+            label={
+              <>
+                <TruckOutlined /> Nhà cung cấp
+              </>
+            }
+          >
+            <Input placeholder="Tên nhà cung cấp (không bắt buộc)" />
+          </Form.Item>
 
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <FileText className="w-4 h-4 inline mr-1" />
-                Ghi chú
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-600 font-medium"
-                placeholder="Ghi chú về lô hàng (không bắt buộc)"
-              />
-            </div>
+          <Form.Item
+            name="notes"
+            label={
+              <>
+                <FileTextOutlined /> Ghi chú
+              </>
+            }
+          >
+            <TextArea
+              rows={3}
+              placeholder="Ghi chú về lô hàng (không bắt buộc)"
+            />
+          </Form.Item>
 
-            {/* Preview Calculation */}
-            {previewAvgCost !== null && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Calculator className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-blue-900 mb-2">
-                      Dự tính sau khi nhập
-                    </h4>
-                    <div className="grid grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <p className="text-blue-600 mb-1">Tồn kho mới</p>
-                        <p className="font-bold text-blue-900">
-                          {(product.stock_quantity || 0) +
-                            parseInt(quantityAdded || "0")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-blue-600 mb-1">Giá vốn BQ mới</p>
-                        <p className="font-bold text-blue-900">
-                          {formatCurrency(previewAvgCost)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-blue-600 mb-1">Tổng giá trị nhập</p>
-                        <p className="font-bold text-blue-900">
-                          {formatCurrency(totalValue)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+          {/* Preview Calculation */}
+          {previewAvgCost !== null && selectedProduct && (
+            <Card
+              size="small"
+              style={{
+                marginBottom: 16,
+                backgroundColor: "#e6f7ff",
+                borderColor: "#91d5ff",
+              }}
+              title={
+                <div style={{ fontSize: 14 }}>
+                  <CalculatorOutlined /> Dự tính sau khi nhập
                 </div>
-              </div>
-            )}
+              }
+            >
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Statistic
+                    title="Tồn kho mới"
+                    value={
+                      (selectedProduct.stock_quantity || 0) +
+                      (quantityAdded || 0)
+                    }
+                    valueStyle={{ fontSize: 20, color: "#1890ff" }}
+                  />
+                </Col>
+                <Col span={8}>
+                  <Statistic
+                    title="Giá vốn BQ mới"
+                    value={formatCurrency(previewAvgCost)}
+                    valueStyle={{ fontSize: 20, color: "#1890ff" }}
+                  />
+                </Col>
+                <Col span={8}>
+                  <Statistic
+                    title="Tổng giá trị nhập"
+                    value={formatCurrency(totalValue)}
+                    valueStyle={{ fontSize: 20, color: "#52c41a" }}
+                  />
+                </Col>
+              </Row>
+            </Card>
+          )}
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang xử lý...
-                  </>
-                ) : (
-                  <>
-                    <Package className="w-4 h-4" />
-                    Xác nhận nhập hàng
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
+            <Button
+              onClick={handleClose}
+              disabled={isSubmitting}
+              style={{ marginRight: 8 }}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={isSubmitting}
+              icon={<InboxOutlined />}
+            >
+              Xác nhận nhập hàng
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 }

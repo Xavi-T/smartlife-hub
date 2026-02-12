@@ -2,13 +2,27 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  RefreshCw,
-  ShoppingBag,
-  DollarSign,
-  TrendingUp,
-  Search,
-} from "lucide-react";
-import { OrdersTable } from "@/components/admin/OrdersTable";
+  Card,
+  Table,
+  Tag,
+  Button,
+  Space,
+  Input,
+  Statistic,
+  Row,
+  Col,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
+import {
+  ShoppingOutlined,
+  DollarOutlined,
+  ClockCircleOutlined,
+  RocketOutlined,
+  EyeOutlined,
+  EditOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import { OrderDetailModal } from "@/components/admin/OrderDetailModal";
 import { formatCurrency } from "@/lib/utils";
 
@@ -44,7 +58,6 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
 
   const fetchOrders = async () => {
     try {
@@ -74,21 +87,6 @@ export default function OrdersPage() {
     setIsDetailModalOpen(true);
   };
 
-  // Filter orders
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesSearch =
-        order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customer_phone.includes(searchQuery) ||
-        order.id.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus =
-        statusFilter === "all" || order.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchQuery, statusFilter]);
-
   // Stats
   const stats = useMemo(() => {
     const totalOrders = orders.length;
@@ -111,144 +109,241 @@ export default function OrdersPage() {
     };
   }, [orders]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Đang tải dữ liệu...</p>
+  // Status tag config
+  const getStatusTag = (status: Order["status"]) => {
+    const statusConfig = {
+      pending: { color: "gold", text: "Chờ xác nhận" },
+      processing: { color: "processing", text: "Đang giao" },
+      delivered: { color: "success", text: "Đã giao" },
+      cancelled: { color: "error", text: "Đã hủy" },
+    };
+    const config = statusConfig[status];
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
+  // Table columns
+  const columns: ColumnsType<Order> = [
+    {
+      title: "Mã đơn",
+      dataIndex: "id",
+      key: "id",
+      width: 120,
+      fixed: "left",
+      render: (id: string) => (
+        <span style={{ fontFamily: "monospace", fontSize: 12 }}>
+          #{id.slice(0, 8)}
+        </span>
+      ),
+    },
+    {
+      title: "Khách hàng",
+      dataIndex: "customer_name",
+      key: "customer_name",
+      width: 200,
+      filterDropdown: ({
+        setSelectedKeys,
+        selectedKeys,
+        confirm,
+        clearFilters,
+      }) => (
+        <div style={{ padding: 8 }}>
+          <Input
+            placeholder="Tìm tên khách hàng"
+            value={selectedKeys[0]}
+            onChange={(e) =>
+              setSelectedKeys(e.target.value ? [e.target.value] : [])
+            }
+            onPressEnter={() => confirm()}
+            style={{ marginBottom: 8, display: "block" }}
+          />
+          <Space>
+            <Button
+              type="primary"
+              onClick={() => confirm()}
+              icon={<SearchOutlined />}
+              size="small"
+              style={{ width: 90 }}
+            >
+              Tìm
+            </Button>
+            <Button
+              onClick={() => clearFilters?.()}
+              size="small"
+              style={{ width: 90 }}
+            >
+              Reset
+            </Button>
+          </Space>
         </div>
-      </div>
-    );
-  }
+      ),
+      onFilter: (value, record) =>
+        record.customer_name
+          .toLowerCase()
+          .includes((value as string).toLowerCase()),
+      render: (name: string, record: Order) => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{name}</div>
+          <div style={{ fontSize: 12, color: "#8c8c8c" }}>
+            {record.customer_phone}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 150,
+      filters: [
+        { text: "Chờ xác nhận", value: "pending" },
+        { text: "Đang giao", value: "processing" },
+        { text: "Đã giao", value: "delivered" },
+        { text: "Đã hủy", value: "cancelled" },
+      ],
+      onFilter: (value, record) => record.status === value,
+      render: (status: Order["status"]) => getStatusTag(status),
+    },
+    {
+      title: "Tổng tiền",
+      dataIndex: "total_amount",
+      key: "total_amount",
+      width: 150,
+      sorter: (a, b) => a.total_amount - b.total_amount,
+      render: (amount: number) => (
+        <span style={{ fontWeight: 600, color: "#52c41a" }}>
+          {formatCurrency(amount)}
+        </span>
+      ),
+    },
+    {
+      title: "Ngày đặt",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 180,
+      sorter: (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      defaultSortOrder: "descend",
+      render: (date: string) => new Date(date).toLocaleString("vi-VN"),
+    },
+    {
+      title: "Địa chỉ",
+      dataIndex: "customer_address",
+      key: "customer_address",
+      ellipsis: true,
+      width: 250,
+    },
+    {
+      title: "Thao tác",
+      key: "actions",
+      fixed: "right",
+      width: 150,
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleOrderClick(record)}
+          >
+            Chi tiết
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => {
+              // TODO: Quick edit functionality
+              console.log("Edit order:", record.id);
+            }}
+          >
+            Sửa
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Quản lý Đơn hàng
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Theo dõi và xử lý đơn hàng của khách
-              </p>
+    <div style={{ background: "#f5f5f5", minHeight: "100vh" }}>
+      {/* Stats Cards */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Tổng đơn hàng"
+              value={stats.totalOrders}
+              prefix={<ShoppingOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Doanh thu"
+              value={stats.totalRevenue}
+              prefix={<DollarOutlined />}
+              styles={{ content: { color: "#52c41a" } }}
+              formatter={(value) => formatCurrency(value as number)}
+            />
+            <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
+              Đơn đã giao
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              Làm mới
-            </button>
-          </div>
-        </div>
-      </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Chờ xử lý"
+              value={stats.pending}
+              prefix={<ClockCircleOutlined />}
+              styles={{ content: { color: "#faad14" } }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Đang giao"
+              value={stats.processing}
+              prefix={<RocketOutlined />}
+              styles={{ content: { color: "#1890ff" } }}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Tổng đơn hàng</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {stats.totalOrders}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <ShoppingBag className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Doanh thu</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(stats.totalRevenue)}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Đơn đã giao</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Chờ xử lý</p>
-                <p className="text-3xl font-bold text-yellow-600">
-                  {stats.pending}
-                </p>
-              </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <ShoppingBag className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Đang giao</p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {stats.processing}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm theo tên, SĐT, mã đơn..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="pending">Chờ xác nhận</option>
-              <option value="processing">Đang giao</option>
-              <option value="delivered">Đã giao</option>
-              <option value="cancelled">Đã hủy</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Orders Table */}
-        <OrdersTable
-          orders={filteredOrders}
-          onOrderClick={handleOrderClick}
-          onRefresh={handleRefresh}
+      {/* Orders Table */}
+      <Card
+        title={
+          <Space>
+            <ShoppingOutlined />
+            <span>Danh sách đơn hàng</span>
+          </Space>
+        }
+        extra={
+          <Button
+            icon={<ReloadOutlined spin={isRefreshing} />}
+            onClick={handleRefresh}
+            loading={isRefreshing}
+          >
+            Làm mới
+          </Button>
+        }
+      >
+        <Table
+          columns={columns}
+          dataSource={orders}
+          rowKey="id"
+          loading={isLoading}
+          scroll={{ x: 1200 }}
+          pagination={{
+            pageSize: 20,
+            showSizeChanger: true,
+            showTotal: (total) => `Tổng ${total} đơn hàng`,
+            pageSizeOptions: ["10", "20", "50", "100"],
+          }}
         />
-      </div>
+      </Card>
 
       {/* Order Detail Modal */}
       <OrderDetailModal

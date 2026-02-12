@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card, Row, Col, Statistic, Button, Alert, Spin, Space } from "antd";
 import {
-  DollarSign,
-  TrendingUp,
-  ShoppingCart,
-  AlertTriangle,
-  RefreshCw,
-  Wallet,
-} from "lucide-react";
-import { AdminStatsCard } from "@/components/admin/AdminStatsCard";
+  DollarOutlined,
+  RiseOutlined,
+  ShoppingCartOutlined,
+  ReloadOutlined,
+  WalletOutlined,
+  WarningOutlined,
+} from "@ant-design/icons";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { ProductTable } from "@/components/admin/ProductTable";
 import { QuickStockForm } from "@/components/admin/QuickStockForm";
@@ -75,127 +75,154 @@ export default function AdminDashboard() {
     fetchData();
   };
 
+  const lowStockProducts = products.filter(
+    (p) => p.stock_quantity < 5 && p.is_active,
+  );
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Đang tải dữ liệu...</p>
-        </div>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f5f5f5",
+        }}
+      >
+        <Space orientation="vertical" align="center">
+          <Spin size="large" />
+          <div style={{ color: "#8c8c8c" }}>Đang tải dữ liệu...</div>
+        </Space>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Admin Dashboard
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Quản lý sản phẩm và theo dõi doanh thu
-              </p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+    <div style={{ background: "#f5f5f5", minHeight: "100vh" }}>
+      {/* Header with Refresh Button */}
+      <div
+        style={{
+          marginBottom: 24,
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <Button
+          icon={<ReloadOutlined spin={isRefreshing} />}
+          onClick={handleRefresh}
+          loading={isRefreshing}
+          type="default"
+        >
+          Làm mới
+        </Button>
+      </div>
+
+      {/* Statistics Cards */}
+      {stats && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Col xs={24} sm={12} lg={8}>
+            <Card>
+              <Statistic
+                title="Tổng doanh thu"
+                value={stats.totalRevenue}
+                precision={0}
+                prefix={<DollarOutlined style={{ color: "#1890ff" }} />}
+                suffix="VNĐ"
+                styles={{ content: { color: "#1890ff" } }}
               />
-              Làm mới
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Statistics Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <AdminStatsCard
-              title="Tổng doanh thu"
-              value={stats.totalRevenue}
-              icon={<DollarSign className="w-6 h-6 text-blue-600" />}
-              isCurrency
-              subtitle="Từ đơn hàng đã giao"
-            />
-            <AdminStatsCard
-              title="Tổng lợi nhuận"
-              value={stats.totalProfit}
-              icon={<Wallet className="w-6 h-6 text-green-600" />}
-              isCurrency
-              subtitle="Giá bán - Giá vốn"
-            />
-            <AdminStatsCard
-              title="Doanh thu tháng này"
-              value={stats.monthlyRevenue}
-              icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
-              isCurrency
-              growth={stats.growthRate}
-              subtitle={`So với tháng trước: ${stats.growthRate >= 0 ? "+" : ""}${stats.growthRate.toFixed(1)}%`}
-            />
-          </div>
-        )}
-
-        {/* Revenue Chart */}
-        {chartData.length > 0 && (
-          <div className="mb-8">
-            <RevenueChart data={chartData} />
-          </div>
-        )}
-
-        {/* Top Selling Products */}
-        <div className="mb-8">
-          <TopSellingProducts />
-        </div>
-
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Product Table - 2 columns */}
-          <div className="lg:col-span-2">
-            <ProductTable products={products} />
-          </div>
-
-          {/* Quick Stock Form - 1 column */}
-          <div className="lg:col-span-1">
-            <QuickStockForm
-              products={products}
-              onStockUpdated={handleRefresh}
-            />
-          </div>
-        </div>
-
-        {/* Low Stock Alert */}
-        {products.filter((p) => p.stock_quantity < 5 && p.is_active).length >
-          0 && (
-          <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-semibold text-red-900">
-                  Cảnh báo tồn kho thấp
-                </h3>
-                <p className="text-sm text-red-700 mt-1">
-                  Có{" "}
-                  {
-                    products.filter((p) => p.stock_quantity < 5 && p.is_active)
-                      .length
-                  }{" "}
-                  sản phẩm có số lượng tồn kho dưới 5. Vui lòng nhập hàng để
-                  tránh thiếu hàng.
-                </p>
+              <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 8 }}>
+                Từ đơn hàng đã giao
               </div>
-            </div>
-          </div>
-        )}
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={12} lg={8}>
+            <Card>
+              <Statistic
+                title="Tổng lợi nhuận"
+                value={stats.totalProfit}
+                precision={0}
+                prefix={<WalletOutlined style={{ color: "#52c41a" }} />}
+                suffix="VNĐ"
+                styles={{ content: { color: "#52c41a" } }}
+              />
+              <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 8 }}>
+                Giá bán - Giá vốn
+              </div>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={24} lg={8}>
+            <Card>
+              <Statistic
+                title="Doanh thu tháng này"
+                value={stats.monthlyRevenue}
+                precision={0}
+                prefix={<RiseOutlined style={{ color: "#722ed1" }} />}
+                suffix="VNĐ"
+                styles={{ content: { color: "#722ed1" } }}
+              />
+              <div
+                style={{
+                  fontSize: 12,
+                  color: stats.growthRate >= 0 ? "#52c41a" : "#ff4d4f",
+                  marginTop: 8,
+                  fontWeight: 500,
+                }}
+              >
+                {stats.growthRate >= 0 ? "↑" : "↓"}{" "}
+                {Math.abs(stats.growthRate).toFixed(1)}% so với tháng trước
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {/* Revenue Chart */}
+      {chartData.length > 0 && (
+        <Card
+          title={
+            <Space>
+              <ShoppingCartOutlined />
+              <span>Biểu đồ doanh thu</span>
+            </Space>
+          }
+          style={{ marginBottom: 24 }}
+        >
+          <RevenueChart data={chartData} />
+        </Card>
+      )}
+
+      {/* Top Selling Products */}
+      <div style={{ marginBottom: 24 }}>
+        <TopSellingProducts />
       </div>
+
+      {/* Two Column Layout */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {/* Product Table - 2 columns on large screens */}
+        <Col xs={24} lg={16}>
+          <ProductTable products={products} />
+        </Col>
+
+        {/* Quick Stock Form - 1 column on large screens */}
+        <Col xs={24} lg={8}>
+          <QuickStockForm products={products} onStockUpdated={handleRefresh} />
+        </Col>
+      </Row>
+
+      {/* Low Stock Alert */}
+      {lowStockProducts.length > 0 && (
+        <Alert
+          message="Cảnh báo tồn kho thấp"
+          description={`Có ${lowStockProducts.length} sản phẩm có số lượng tồn kho dưới 5. Vui lòng nhập hàng để tránh thiếu hàng.`}
+          type="error"
+          icon={<WarningOutlined />}
+          showIcon
+          closable
+        />
+      )}
     </div>
   );
 }
