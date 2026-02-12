@@ -7,36 +7,57 @@ import {
   ShoppingCart,
   AlertTriangle,
   RefreshCw,
+  Wallet,
 } from "lucide-react";
-import { StatsCard } from "@/components/admin/StatsCard";
+import { AdminStatsCard } from "@/components/admin/AdminStatsCard";
+import { RevenueChart } from "@/components/admin/RevenueChart";
 import { ProductTable } from "@/components/admin/ProductTable";
 import { QuickStockForm } from "@/components/admin/QuickStockForm";
-import type { Product, DashboardStats } from "@/types/database";
+import { TopSellingProducts } from "@/components/admin/TopSellingProducts";
+import type { Product } from "@/types/database";
+
+interface AdminStats {
+  totalRevenue: number;
+  totalProfit: number;
+  growthRate: number;
+  monthlyRevenue: number;
+  previousMonthRevenue: number;
+}
+
+interface ChartData {
+  date: string;
+  revenue: number;
+  orders: number;
+}
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [productsRes, statsRes] = await Promise.all([
+      const [productsRes, statsRes, chartRes] = await Promise.all([
         fetch("/api/products"),
-        fetch("/api/stats"),
+        fetch("/api/admin/stats"),
+        fetch("/api/admin/chart"),
       ]);
 
-      if (!productsRes.ok || !statsRes.ok) {
+      if (!productsRes.ok || !statsRes.ok || !chartRes.ok) {
         throw new Error("Failed to fetch data");
       }
 
-      const [productsData, statsData] = await Promise.all([
+      const [productsData, statsData, chartDataRes] = await Promise.all([
         productsRes.json(),
         statsRes.json(),
+        chartRes.json(),
       ]);
 
       setProducts(productsData);
       setStats(statsData);
+      setChartData(chartDataRes);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -97,39 +118,43 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatsCard
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <AdminStatsCard
               title="Tổng doanh thu"
               value={stats.totalRevenue}
-              icon={DollarSign}
-              iconColor="text-green-600"
-              bgColor="bg-green-100"
+              icon={<DollarSign className="w-6 h-6 text-blue-600" />}
               isCurrency
+              subtitle="Từ đơn hàng đã giao"
             />
-            <StatsCard
+            <AdminStatsCard
               title="Tổng lợi nhuận"
               value={stats.totalProfit}
-              icon={TrendingUp}
-              iconColor="text-blue-600"
-              bgColor="bg-blue-100"
+              icon={<Wallet className="w-6 h-6 text-green-600" />}
               isCurrency
+              subtitle="Giá bán - Giá vốn"
             />
-            <StatsCard
-              title="Đơn hàng tháng này"
-              value={stats.monthlyOrders}
-              icon={ShoppingCart}
-              iconColor="text-purple-600"
-              bgColor="bg-purple-100"
-            />
-            <StatsCard
-              title="Sản phẩm sắp hết"
-              value={stats.lowStockProducts}
-              icon={AlertTriangle}
-              iconColor="text-red-600"
-              bgColor="bg-red-100"
+            <AdminStatsCard
+              title="Doanh thu tháng này"
+              value={stats.monthlyRevenue}
+              icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+              isCurrency
+              growth={stats.growthRate}
+              subtitle={`So với tháng trước: ${stats.growthRate >= 0 ? "+" : ""}${stats.growthRate.toFixed(1)}%`}
             />
           </div>
         )}
+
+        {/* Revenue Chart */}
+        {chartData.length > 0 && (
+          <div className="mb-8">
+            <RevenueChart data={chartData} />
+          </div>
+        )}
+
+        {/* Top Selling Products */}
+        <div className="mb-8">
+          <TopSellingProducts />
+        </div>
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -148,7 +173,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Low Stock Alert */}
-        {stats && stats.lowStockProducts > 0 && (
+        {products.filter((p) => p.stock_quantity < 5 && p.is_active).length >
+          0 && (
           <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
@@ -157,8 +183,13 @@ export default function AdminDashboard() {
                   Cảnh báo tồn kho thấp
                 </h3>
                 <p className="text-sm text-red-700 mt-1">
-                  Có {stats.lowStockProducts} sản phẩm có số lượng tồn kho dưới
-                  5. Vui lòng nhập hàng để tránh thiếu hàng.
+                  Có{" "}
+                  {
+                    products.filter((p) => p.stock_quantity < 5 && p.is_active)
+                      .length
+                  }{" "}
+                  sản phẩm có số lượng tồn kho dưới 5. Vui lòng nhập hàng để
+                  tránh thiếu hàng.
                 </p>
               </div>
             </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { supabase } from "@/lib/supabase";
+import { AuditLogger } from "@/lib/auditLogger";
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
@@ -103,6 +104,14 @@ export async function createOrder(
         message: result?.message || "Không thể tạo đơn hàng",
       };
     }
+
+    // Log audit event
+    await AuditLogger.orderCreated(
+      result.order_id,
+      request.customer.name,
+      parseFloat(result.total_amount),
+      request.items.length,
+    );
 
     return {
       success: true,
