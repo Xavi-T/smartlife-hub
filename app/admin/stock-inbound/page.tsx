@@ -112,9 +112,7 @@ export default function StockInboundPage() {
       title: "Sản phẩm",
       dataIndex: "product_name",
       key: "product_name",
-      render: (name: string) => (
-        <div style={{ fontWeight: 500 }}>{name}</div>
-      ),
+      render: (name: string) => <div style={{ fontWeight: 500 }}>{name}</div>,
     },
     {
       title: "Số lượng",
@@ -143,7 +141,8 @@ export default function StockInboundPage() {
             {formatCurrency(record.cost_price_at_time)}/sp
           </div>
           <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
-            Tổng: {formatCurrency(record.quantity_added * record.cost_price_at_time)}
+            Tổng:{" "}
+            {formatCurrency(record.quantity_added * record.cost_price_at_time)}
           </div>
         </div>
       ),
@@ -182,7 +181,12 @@ export default function StockInboundPage() {
       key: "notes",
       ellipsis: true,
       render: (notes: string | null) => (
-        <div style={{ color: notes ? "#595959" : "#bfbfbf", fontStyle: notes ? "normal" : "italic" }}>
+        <div
+          style={{
+            color: notes ? "#595959" : "#bfbfbf",
+            fontStyle: notes ? "normal" : "italic",
+          }}
+        >
           {notes || "Không có"}
         </div>
       ),
