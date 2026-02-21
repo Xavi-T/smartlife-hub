@@ -19,7 +19,6 @@ import {
   UserOutlined,
   InboxOutlined,
   AppstoreOutlined,
-  PictureOutlined,
   TagsOutlined,
   LogoutOutlined,
   MenuUnfoldOutlined,
@@ -97,11 +96,6 @@ const menuItems: MenuProps["items"] = [
     label: "Lịch sử kho",
   },
   {
-    key: "/admin/media",
-    icon: <PictureOutlined />,
-    label: "Thư viện media",
-  },
-  {
     type: "divider",
   },
   {
@@ -174,7 +168,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       inventory: "Kho hàng",
       "stock-inbound": "Nhập kho",
       "stock-history": "Lịch sử kho",
-      media: "Thư viện media",
       "audit-logs": "Nhật ký hoạt động",
     };
 

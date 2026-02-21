@@ -226,7 +226,7 @@ export default function AdminDashboard() {
       {/* Low Stock Alert */}
       {lowStockProducts.length > 0 && (
         <Alert
-          message="Cảnh báo tồn kho thấp"
+          title="Cảnh báo tồn kho thấp"
           description={`Có ${lowStockProducts.length} sản phẩm có số lượng tồn kho dưới 5. Vui lòng nhập hàng để tránh thiếu hàng.`}
           type="error"
           icon={<WarningOutlined />}

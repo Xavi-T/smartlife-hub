@@ -37,18 +37,6 @@ async function shouldSetAsCover(
   return !hasAnyImage;
 }
 
-function normalizeStoragePath(path: string): string {
-  const normalized = path.trim().replace(/^\/+/, "");
-  if (!normalized) return normalized;
-  if (
-    normalized.startsWith("media-library/") ||
-    normalized.startsWith("products/")
-  ) {
-    return normalized;
-  }
-  return `media-library/${normalized}`;
-}
-
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -146,7 +134,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Upload media mới hoặc gắn media từ thư viện vào sản phẩm
+// POST: Upload media mới cho sản phẩm
 export async function POST(request: NextRequest) {
   try {
     const authClient = await createApiSupabaseClient();
@@ -170,68 +158,12 @@ export async function POST(request: NextRequest) {
     const heightRaw = formData.get("height");
     const width = widthRaw ? parseInt(String(widthRaw), 10) : NaN;
     const height = heightRaw ? parseInt(String(heightRaw), 10) : NaN;
-    const mediaUrl = String(formData.get("mediaUrl") || "").trim();
-    const storagePathRaw = String(formData.get("storagePath") || "").trim();
-    const source = String(formData.get("source") || "upload");
 
     if (!productId) {
       return NextResponse.json(
         { error: "Product ID là bắt buộc" },
         { status: 400 },
       );
-    }
-
-    if (source === "library") {
-      if (!mediaUrl || !storagePathRaw) {
-        return NextResponse.json(
-          { error: "Thiếu mediaUrl hoặc storagePath để gắn từ thư viện" },
-          { status: 400 },
-        );
-      }
-
-      const storagePath = normalizeStoragePath(storagePathRaw);
-      const isImageMedia = !isVideoUrl(mediaUrl);
-      const effectiveIsCover = await shouldSetAsCover(
-        authClient,
-        productId,
-        isCover,
-        isImageMedia,
-      );
-
-      const { data: imageRecord, error: dbError } = await authClient
-        .from("product_images")
-        .insert({
-          product_id: productId,
-          image_url: mediaUrl,
-          storage_path: storagePath,
-          is_cover: effectiveIsCover,
-          file_size: null,
-          width: null,
-          height: null,
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      if (effectiveIsCover && isImageMedia) {
-        const { error: productCoverError } = await authClient
-          .from("products")
-          .update({ image_url: mediaUrl })
-          .eq("id", productId);
-
-        if (productCoverError) {
-          console.error(
-            "Error syncing product cover image:",
-            productCoverError,
-          );
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        image: imageRecord,
-      });
     }
 
     if (!file) {

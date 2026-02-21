@@ -18,35 +18,6 @@ interface ProductImage {
   media_type?: "image" | "video";
 }
 
-interface MediaFile {
-  name: string;
-  path: string;
-  url: string;
-  size: number;
-  mimeType: string | null;
-}
-
-interface MediaFolder {
-  name: string;
-  path: string;
-}
-
-interface MediaListResponse {
-  currentPath: string;
-  parentPath: string | null;
-  folders: MediaFolder[];
-  files: MediaFile[];
-}
-
-function isVideoFile(file: {
-  mimeType?: string | null;
-  url?: string;
-}): boolean {
-  if (file.mimeType?.startsWith("video/")) return true;
-  const normalizedUrl = (file.url || "").toLowerCase();
-  return /\.(mp4|webm|mov|m4v)(\?|#|$)/.test(normalizedUrl);
-}
-
 export default function ProductMediaPage() {
   const params = useParams();
   const router = useRouter();
@@ -56,16 +27,6 @@ export default function ProductMediaPage() {
   const [images, setImages] = useState<ProductImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [libraryPath, setLibraryPath] = useState("");
-  const [libraryParentPath, setLibraryParentPath] = useState<string | null>(
-    null,
-  );
-  const [libraryFolders, setLibraryFolders] = useState<MediaFolder[]>([]);
-  const [libraryFiles, setLibraryFiles] = useState<MediaFile[]>([]);
-  const [librarySearch, setLibrarySearch] = useState("");
-  const [isLibraryLoading, setIsLibraryLoading] = useState(false);
-  const [attachingPath, setAttachingPath] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -99,83 +60,6 @@ export default function ProductMediaPage() {
     setIsRefreshing(true);
     fetchData();
   };
-
-  const fetchLibrary = async (targetPath = "") => {
-    setIsLibraryLoading(true);
-    try {
-      const query = targetPath ? `?path=${encodeURIComponent(targetPath)}` : "";
-      const response = await fetch(`/api/admin/media${query}`);
-      const result = (await response.json()) as MediaListResponse & {
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(result.error || "Không thể tải thư viện media");
-      }
-
-      setLibraryPath(result.currentPath || "");
-      setLibraryParentPath(result.parentPath || null);
-      setLibraryFolders(result.folders || []);
-      setLibraryFiles(result.files || []);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Không thể tải thư viện media";
-      alert(`❌ ${message}`);
-    } finally {
-      setIsLibraryLoading(false);
-    }
-  };
-
-  const openLibraryPicker = async () => {
-    setIsLibraryOpen(true);
-    setLibrarySearch("");
-    await fetchLibrary("");
-  };
-
-  const attachFromLibrary = async (file: MediaFile, asCover = false) => {
-    setAttachingPath(file.path);
-    try {
-      const formData = new FormData();
-      formData.append("productId", productId);
-      formData.append("source", "library");
-      formData.append("mediaUrl", file.url);
-      formData.append("storagePath", file.path);
-      formData.append(
-        "isCover",
-        asCover || images.length === 0 ? "true" : "false",
-      );
-
-      const response = await fetch("/api/admin/product-images", {
-        method: "POST",
-        body: formData,
-      });
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Không thể gắn media");
-      }
-
-      await fetchData();
-      alert(
-        asCover
-          ? "✅ Đã gắn media và đặt làm ảnh đại diện"
-          : "✅ Đã gắn media vào sản phẩm",
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Không thể gắn media";
-      alert(`❌ ${message}`);
-    } finally {
-      setAttachingPath(null);
-    }
-  };
-
-  const filteredLibraryFolders = libraryFolders.filter((folder) =>
-    folder.name.toLowerCase().includes(librarySearch.toLowerCase()),
-  );
-  const filteredLibraryFiles = libraryFiles.filter((file) =>
-    file.name.toLowerCase().includes(librarySearch.toLowerCase()),
-  );
 
   if (isLoading) {
     return (
@@ -259,13 +143,6 @@ export default function ProductMediaPage() {
                 onUploadSuccess={handleRefresh}
                 maxFiles={10}
               />
-
-              <button
-                onClick={openLibraryPicker}
-                className="mt-4 w-full px-4 py-2 border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                Chọn nhanh từ Thư viện media
-              </button>
             </div>
           </div>
 
@@ -277,179 +154,6 @@ export default function ProductMediaPage() {
           </div>
         </div>
       </div>
-
-      {isLibraryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-6xl max-h-[90vh] overflow-hidden bg-white rounded-xl shadow-2xl flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  Chọn media từ thư viện
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Click vào file để gắn vào sản phẩm
-                </p>
-              </div>
-              <button
-                onClick={() => setIsLibraryOpen(false)}
-                className="px-3 py-1.5 text-sm border border-gray-300 hover:bg-gray-50 rounded-lg"
-              >
-                Đóng
-              </button>
-            </div>
-
-            <div className="px-6 py-4 border-b border-gray-100 flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <button
-                  onClick={() => fetchLibrary("")}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  Media
-                </button>
-                {libraryPath
-                  .split("/")
-                  .filter(Boolean)
-                  .map((segment, index, allSegments) => {
-                    const path = allSegments.slice(0, index + 1).join("/");
-                    return (
-                      <span key={path} className="flex items-center gap-2">
-                        <span>/</span>
-                        <button
-                          onClick={() => fetchLibrary(path)}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          {segment}
-                        </button>
-                      </span>
-                    );
-                  })}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <input
-                  value={librarySearch}
-                  onChange={(event) => setLibrarySearch(event.target.value)}
-                  placeholder="Tìm folder / file..."
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                {libraryParentPath && (
-                  <button
-                    onClick={() => fetchLibrary(libraryParentPath)}
-                    className="px-3 py-2 text-sm border border-gray-300 hover:bg-gray-50 rounded-lg"
-                  >
-                    Lên thư mục cha
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto">
-              {isLibraryLoading ? (
-                <div className="py-16 text-center text-gray-500">
-                  Đang tải...
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {filteredLibraryFolders.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                        Folders
-                      </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                        {filteredLibraryFolders.map((folder) => (
-                          <button
-                            key={folder.path}
-                            onClick={() => fetchLibrary(folder.path)}
-                            className="text-left border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                          >
-                            <div className="text-2xl">📁</div>
-                            <div className="text-sm font-medium text-gray-800 truncate mt-1">
-                              {folder.name}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                      Files
-                    </h4>
-                    {filteredLibraryFiles.length === 0 ? (
-                      <div className="py-12 text-center text-gray-500 border border-dashed border-gray-300 rounded-lg">
-                        Không có file phù hợp
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {filteredLibraryFiles.map((file) => {
-                          const isVideo = isVideoFile({
-                            mimeType: file.mimeType,
-                            url: file.url,
-                          });
-
-                          return (
-                            <div
-                              key={file.path}
-                              className="text-left border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all"
-                            >
-                              <div className="aspect-square rounded-md bg-gray-100 overflow-hidden relative">
-                                {isVideo ? (
-                                  <video
-                                    src={file.url}
-                                    className="w-full h-full object-cover"
-                                    muted
-                                  />
-                                ) : (
-                                  <img
-                                    src={file.url}
-                                    alt={file.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                )}
-                                {isVideo && (
-                                  <span className="absolute bottom-2 left-2 text-[10px] px-2 py-1 rounded-full bg-black/65 text-white">
-                                    VIDEO
-                                  </span>
-                                )}
-                              </div>
-                              <div className="mt-2 text-xs text-gray-800 truncate">
-                                {file.name}
-                              </div>
-                              <div className="mt-2 grid grid-cols-1 gap-1.5">
-                                <button
-                                  onClick={() => attachFromLibrary(file)}
-                                  disabled={attachingPath === file.path}
-                                  className="w-full text-[11px] px-2 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
-                                >
-                                  {attachingPath === file.path
-                                    ? "Đang gắn..."
-                                    : "Gắn vào sản phẩm"}
-                                </button>
-                                <button
-                                  onClick={() => attachFromLibrary(file, true)}
-                                  disabled={
-                                    attachingPath === file.path || isVideo
-                                  }
-                                  className="w-full text-[11px] px-2 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
-                                >
-                                  {isVideo
-                                    ? "Video không làm ảnh đại diện"
-                                    : "Gắn và đặt làm ảnh đại diện"}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
