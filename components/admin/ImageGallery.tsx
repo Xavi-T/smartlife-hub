@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { message, Modal } from "antd";
 import {
   GripVertical,
   Trash2,
   Star,
   Image as ImageIcon,
+  Video,
   Loader2,
 } from "lucide-react";
 
@@ -19,10 +21,15 @@ interface ProductImage {
   file_size: number | null;
   width: number | null;
   height: number | null;
+  media_type?: "image" | "video";
+}
+
+function detectMediaType(url: string): "image" | "video" {
+  const normalized = url.toLowerCase();
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/.test(normalized) ? "video" : "image";
 }
 
 interface ImageGalleryProps {
-  productId: string;
   images: ProductImage[];
   onImagesChange: () => void;
 }
@@ -44,7 +51,9 @@ const DraggableImage = ({
   onSetCover,
   isDeleting,
 }: DraggableImageProps) => {
-  const [{ isDragging }, drag, preview] = useDrag({
+  const mediaType = image.media_type || detectMediaType(image.image_url);
+
+  const [{ isDragging }, drag] = useDrag({
     type: "image",
     item: { index },
     collect: (monitor) => ({
@@ -67,7 +76,9 @@ const DraggableImage = ({
 
   return (
     <div
-      ref={(node) => drag(drop(node))}
+      ref={(node) => {
+        drag(drop(node));
+      }}
       className={`relative group bg-white border-2 rounded-lg overflow-hidden transition-all ${
         isDragging ? "opacity-50 scale-95" : ""
       } ${isOver ? "border-blue-500 shadow-lg" : "border-gray-200"} ${
@@ -91,13 +102,26 @@ const DraggableImage = ({
         </div>
       </div>
 
-      {/* Image */}
+      {/* Media */}
       <div className="aspect-square relative">
-        <img
-          src={image.image_url}
-          alt="Product"
-          className="w-full h-full object-cover"
-        />
+        {mediaType === "video" ? (
+          <video src={image.image_url} className="w-full h-full object-cover" />
+        ) : (
+          <img
+            src={image.image_url}
+            alt="Product"
+            className="w-full h-full object-cover"
+          />
+        )}
+
+        {mediaType === "video" && (
+          <div className="absolute bottom-2 left-2 z-10">
+            <div className="flex items-center gap-1 px-2 py-1 bg-black/65 text-white text-xs rounded-full">
+              <Video className="w-3 h-3" />
+              Video
+            </div>
+          </div>
+        )}
 
         {/* Overlay with actions */}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -115,7 +139,7 @@ const DraggableImage = ({
             onClick={() => onDelete(image.id)}
             disabled={isDeleting}
             className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            title="Xóa ảnh"
+            title="Xóa media"
           >
             {isDeleting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -140,14 +164,16 @@ const DraggableImage = ({
   );
 };
 
-function ImageGalleryContent({
-  productId,
-  images,
-  onImagesChange,
-}: ImageGalleryProps) {
+function ImageGalleryContent({ images, onImagesChange }: ImageGalleryProps) {
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [modal, modalContextHolder] = Modal.useModal();
   const [localImages, setLocalImages] = useState<ProductImage[]>(images);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalImages(images);
+  }, [images]);
 
   const moveImage = useCallback((dragIndex: number, hoverIndex: number) => {
     setLocalImages((prevImages) => {
@@ -180,17 +206,29 @@ function ImageGalleryContent({
 
       if (!response.ok) throw new Error("Failed to save order");
 
-      alert("✅ Đã lưu thứ tự ảnh");
+      messageApi.success("Đã lưu thứ tự media");
       onImagesChange();
-    } catch (error) {
-      alert("❌ Không thể lưu thứ tự ảnh");
+    } catch {
+      messageApi.error("Không thể lưu thứ tự media");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (imageId: string) => {
-    if (!confirm("Xác nhận xóa ảnh này?")) return;
+    const isConfirmed = await new Promise<boolean>((resolve) => {
+      modal.confirm({
+        title: "Xóa media",
+        content: "Bạn có chắc chắn muốn xóa media này không?",
+        okText: "Xóa",
+        cancelText: "Hủy",
+        okButtonProps: { danger: true },
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+
+    if (!isConfirmed) return;
 
     setDeletingId(imageId);
     try {
@@ -204,28 +242,29 @@ function ImageGalleryContent({
       if (!response.ok) throw new Error("Failed to delete");
 
       setLocalImages((prev) => prev.filter((img) => img.id !== imageId));
+      messageApi.success("Đã xóa media");
       onImagesChange();
-    } catch (error) {
-      alert("❌ Không thể xóa ảnh");
+    } catch {
+      messageApi.error("Không thể xóa media");
     } finally {
       setDeletingId(null);
     }
   };
 
   const handleSetCover = async (imageId: string) => {
-    setLocalImages((prev) =>
-      prev.map((img) => ({
-        ...img,
-        is_cover: img.id === imageId,
-      })),
-    );
+    const updatedImages = localImages.map((img) => ({
+      ...img,
+      is_cover: img.id === imageId,
+    }));
+
+    setLocalImages(updatedImages);
 
     try {
       const response = await fetch("/api/admin/product-images/reorder", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          images: localImages.map((img) => ({
+          images: updatedImages.map((img) => ({
             id: img.id,
             display_order: img.display_order,
             is_cover: img.id === imageId,
@@ -235,10 +274,10 @@ function ImageGalleryContent({
 
       if (!response.ok) throw new Error("Failed to set cover");
 
-      alert("✅ Đã đặt ảnh bìa");
+      messageApi.success("Đã đặt media bìa");
       onImagesChange();
-    } catch (error) {
-      alert("❌ Không thể đặt ảnh bìa");
+    } catch {
+      messageApi.error("Không thể đặt media bìa");
     }
   };
 
@@ -246,12 +285,15 @@ function ImageGalleryContent({
 
   return (
     <div className="space-y-4">
+      {messageContextHolder}
+      {modalContextHolder}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ImageIcon className="w-5 h-5 text-blue-600" />
           <h3 className="font-semibold text-gray-900">
-            Gallery ({localImages.length} ảnh)
+            Gallery ({localImages.length} media)
           </h3>
         </div>
 
@@ -291,7 +333,7 @@ function ImageGalleryContent({
       ) : (
         <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
           <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <p>Chưa có ảnh nào</p>
+          <p>Chưa có media nào</p>
         </div>
       )}
 
@@ -299,8 +341,8 @@ function ImageGalleryContent({
       {localImages.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-900">
-            💡 <strong>Hướng dẫn:</strong> Kéo thả để sắp xếp thứ tự ảnh • Click
-            ⭐ để đặt ảnh bìa • Click 🗑️ để xóa
+            💡 <strong>Hướng dẫn:</strong> Kéo thả để sắp xếp thứ tự media •
+            Click ⭐ để đặt media bìa • Click 🗑️ để xóa
           </p>
         </div>
       )}

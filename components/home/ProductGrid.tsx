@@ -6,9 +6,14 @@ import type { Product } from "@/types/database";
 interface ProductGridProps {
   products: Product[];
   onAddToCart: (product: Product) => void;
+  onViewDetail: (product: Product) => void;
 }
 
-export function ProductGrid({ products, onAddToCart }: ProductGridProps) {
+export function ProductGrid({
+  products,
+  onAddToCart,
+  onViewDetail,
+}: ProductGridProps) {
   if (products.length === 0) {
     return (
       <div className="text-center py-16">
@@ -24,6 +29,7 @@ export function ProductGrid({ products, onAddToCart }: ProductGridProps) {
           key={product.id}
           product={product}
           onAddToCart={onAddToCart}
+          onViewDetail={onViewDetail}
         />
       ))}
     </div>

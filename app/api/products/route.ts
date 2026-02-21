@@ -212,6 +212,7 @@ export async function POST(request: NextRequest) {
       name,
       description,
       price,
+      discount_percent,
       cost_price,
       stock_quantity,
       category,
@@ -244,6 +245,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Giá không được âm" }, { status: 400 });
     }
 
+    if (
+      discount_percent !== undefined &&
+      discount_percent !== null &&
+      (discount_percent < 0 || discount_percent > 100)
+    ) {
+      return NextResponse.json(
+        { error: "Giảm giá phải nằm trong khoảng 0-100%" },
+        { status: 400 },
+      );
+    }
+
     if (price < cost_price) {
       return NextResponse.json(
         { error: "Giá bán phải lớn hơn hoặc bằng giá vốn" },
@@ -264,6 +276,10 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         description: description?.trim() || null,
         price,
+        discount_percent:
+          discount_percent !== undefined && discount_percent !== null
+            ? discount_percent
+            : 0,
         cost_price,
         stock_quantity: stock_quantity || 0,
         category: normalizedCategoryNames[0],
@@ -327,6 +343,7 @@ export async function PATCH(request: NextRequest) {
       name,
       description,
       price,
+      discount_percent,
       cost_price,
       stock_quantity,
       category,
@@ -372,6 +389,16 @@ export async function PATCH(request: NextRequest) {
         );
       }
       updates.price = price;
+    }
+
+    if (discount_percent !== undefined) {
+      if (discount_percent < 0 || discount_percent > 100) {
+        return NextResponse.json(
+          { error: "Giảm giá phải nằm trong khoảng 0-100%" },
+          { status: 400 },
+        );
+      }
+      updates.discount_percent = discount_percent;
     }
 
     if (cost_price !== undefined) {

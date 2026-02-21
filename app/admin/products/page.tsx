@@ -30,7 +30,7 @@ import {
 } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { ProductFormModal } from "@/components/admin/ProductFormModal";
-import { formatCurrency } from "@/lib/utils";
+import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 function getProductCategoryNames(product: Product): string[] {
@@ -237,19 +237,50 @@ export default function ProductsPage() {
       ),
     },
     {
+      title: "Giảm giá",
+      dataIndex: "discount_percent",
+      key: "discount_percent",
+      width: 100,
+      align: "center" as const,
+      render: (value: number | null) => {
+        const discount = value || 0;
+        return discount > 0 ? (
+          <Tag color="red">-{discount}%</Tag>
+        ) : (
+          <Tag>0%</Tag>
+        );
+      },
+    },
+    {
       title: "Giá bán",
       dataIndex: "price",
       key: "price",
       width: 130,
       align: "right" as const,
       render: (value: number, record: Product) => {
-        const profit = value - record.cost_price;
-        const margin = ((profit / value) * 100).toFixed(0);
+        const finalPrice = calculateDiscountedPrice(
+          value,
+          record.discount_percent,
+        );
+        const profit = finalPrice - record.cost_price;
+        const margin =
+          finalPrice > 0 ? ((profit / finalPrice) * 100).toFixed(0) : "0";
         return (
           <div>
             <div style={{ fontWeight: 600, color: "#52c41a" }}>
-              {formatCurrency(value)}
+              {formatCurrency(finalPrice)}
             </div>
+            {(record.discount_percent || 0) > 0 && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#8c8c8c",
+                  textDecoration: "line-through",
+                }}
+              >
+                {formatCurrency(value)}
+              </div>
+            )}
             <div style={{ fontSize: 11, color: "#8c8c8c" }}>Lãi: {margin}%</div>
           </div>
         );

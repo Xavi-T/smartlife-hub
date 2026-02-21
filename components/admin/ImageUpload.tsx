@@ -29,6 +29,37 @@ interface UploadingFile {
   preview: string;
   originalSize: number;
   compressedSize?: number;
+  mediaType: "image" | "video";
+}
+
+function getMediaType(file: File): "image" | "video" | null {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  return null;
+}
+
+function validateMediaFile(file: File): { valid: boolean; error?: string } {
+  const mediaType = getMediaType(file);
+  if (!mediaType) {
+    return {
+      valid: false,
+      error: "Chỉ hỗ trợ ảnh hoặc video (JPG, PNG, WEBP, MP4, MOV, WEBM)",
+    };
+  }
+
+  if (mediaType === "image") {
+    return validateImageFile(file);
+  }
+
+  const maxVideoSize = 100 * 1024 * 1024;
+  if (file.size > maxVideoSize) {
+    return {
+      valid: false,
+      error: "Video không được vượt quá 100MB",
+    };
+  }
+
+  return { valid: true };
 }
 
 export function ImageUpload({
@@ -46,8 +77,9 @@ export function ImageUpload({
 
     // Validate files
     const validatedFiles = fileArray.map((file) => {
-      const validation = validateImageFile(file);
-      return { file, validation };
+      const validation = validateMediaFile(file);
+      const mediaType = getMediaType(file);
+      return { file, validation, mediaType };
     });
 
     const invalidFiles = validatedFiles.filter((f) => !f.validation.valid);
@@ -59,35 +91,45 @@ export function ImageUpload({
     }
 
     // Create preview and upload
-    for (const { file } of validatedFiles) {
+    for (const { file, mediaType } of validatedFiles) {
+      if (!mediaType) continue;
+
       const preview = URL.createObjectURL(file);
       const uploadFile: UploadingFile = {
         file,
         progress: 0,
-        status: "compressing",
+        status: mediaType === "image" ? "compressing" : "uploading",
         preview,
         originalSize: file.size,
+        mediaType,
       };
 
       setUploadingFiles((prev) => [...prev, uploadFile]);
 
       try {
-        // Compress image
-        const compressed = await compressImage(file, 1200, 1200, 0.85);
-        const dimensions = await getImageDimensions(compressed);
+        let uploadTargetFile: File = file;
+        let dimensions: { width: number; height: number } | null = null;
 
-        uploadFile.compressedSize = compressed.size;
-        uploadFile.status = "uploading";
-        uploadFile.progress = 50;
-        setUploadingFiles((prev) => [...prev]);
+        if (mediaType === "image") {
+          const compressed = await compressImage(file, 1200, 1200, 0.85);
+          dimensions = await getImageDimensions(compressed);
+
+          uploadTargetFile = compressed;
+          uploadFile.compressedSize = compressed.size;
+          uploadFile.status = "uploading";
+          uploadFile.progress = 50;
+          setUploadingFiles((prev) => [...prev]);
+        }
 
         // Upload to server
         const formData = new FormData();
-        formData.append("file", compressed);
+        formData.append("file", uploadTargetFile);
         formData.append("productId", productId);
         formData.append("isCover", "false");
-        formData.append("width", dimensions.width.toString());
-        formData.append("height", dimensions.height.toString());
+        if (dimensions) {
+          formData.append("width", dimensions.width.toString());
+          formData.append("height", dimensions.height.toString());
+        }
 
         const response = await fetch("/api/admin/product-images", {
           method: "POST",
@@ -109,9 +151,10 @@ export function ImageUpload({
           URL.revokeObjectURL(preview);
           onUploadSuccess();
         }, 2000);
-      } catch (error: any) {
+      } catch (error: unknown) {
         uploadFile.status = "error";
-        uploadFile.error = error.message;
+        uploadFile.error =
+          error instanceof Error ? error.message : "Upload thất bại";
         setUploadingFiles((prev) => [...prev]);
       }
     }
@@ -133,7 +176,7 @@ export function ImageUpload({
       setIsDragging(false);
       handleFiles(e.dataTransfer.files);
     },
-    [productId],
+    [handleFiles],
   );
 
   const removeFile = (file: UploadingFile) => {
@@ -158,7 +201,7 @@ export function ImageUpload({
           type="file"
           id="image-upload"
           className="hidden"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
+          accept="image/jpeg,image/jpg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
           multiple
           onChange={(e) => handleFiles(e.target.files)}
         />
@@ -172,13 +215,14 @@ export function ImageUpload({
           </div>
           <div>
             <p className="text-lg font-semibold text-gray-900">
-              Kéo thả ảnh vào đây hoặc click để chọn
+              Kéo thả ảnh/video vào đây hoặc click để chọn
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              JPG, PNG, WEBP (tối đa 10MB) • Tối đa {maxFiles} ảnh
+              JPG, PNG, WEBP (≤10MB) • MP4, MOV, WEBM (≤100MB) • Tối đa{" "}
+              {maxFiles} file
             </p>
             <p className="text-xs text-blue-600 mt-2">
-              ✨ Ảnh sẽ tự động nén và tối ưu hóa
+              ✨ Ảnh sẽ tự động nén và tối ưu hóa, video giữ nguyên chất lượng
             </p>
           </div>
         </label>
@@ -194,11 +238,19 @@ export function ImageUpload({
             >
               <div className="flex items-start gap-4">
                 {/* Preview */}
-                <img
-                  src={file.preview}
-                  alt="Preview"
-                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-                />
+                {file.mediaType === "image" ? (
+                  <img
+                    src={file.preview}
+                    alt="Preview"
+                    className="w-16 h-16 object-cover rounded-lg shrink-0"
+                  />
+                ) : (
+                  <video
+                    src={file.preview}
+                    className="w-16 h-16 object-cover rounded-lg shrink-0"
+                    muted
+                  />
+                )}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
@@ -262,7 +314,10 @@ export function ImageUpload({
                   {file.status === "done" && (
                     <div className="flex items-center gap-2 text-sm text-green-600">
                       <ImageIcon className="w-4 h-4" />
-                      <span>Upload thành công!</span>
+                      <span>
+                        Upload {file.mediaType === "video" ? "video" : "ảnh"}{" "}
+                        thành công!
+                      </span>
                     </div>
                   )}
 

@@ -1,19 +1,23 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Header } from '@/components/home/Header';
-import { ProductGrid } from '@/components/home/ProductGrid';
-import { CartModal } from '@/components/home/CartModal';
-import { CheckoutModal } from '@/components/home/CheckoutModal';
-import { useCart } from '@/hooks/useCart';
-import type { Product } from '@/types/database';
+import { useEffect, useState } from "react";
+import { Header } from "@/components/home/Header";
+import { ProductGrid } from "@/components/home/ProductGrid";
+import { CartModal } from "@/components/home/CartModal";
+import { CheckoutModal } from "@/components/home/CheckoutModal";
+import { useCart } from "@/hooks/useCart";
+import type { Product } from "@/types/database";
+import { message } from "antd";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+  const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  
+
   const {
     cart,
     addToCart,
@@ -32,13 +36,13 @@ export default function Home() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products');
-      if (!res.ok) throw new Error('Failed to fetch products');
+      const res = await fetch("/api/products");
+      if (!res.ok) throw new Error("Failed to fetch products");
       const data = await res.json();
       // Chỉ hiển thị sản phẩm đang hoạt động
       setProducts(data.filter((p: Product) => p.is_active));
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error("Error fetching products:", error);
     } finally {
       setIsLoading(false);
     }
@@ -46,12 +50,16 @@ export default function Home() {
 
   const handleAddToCart = (product: Product) => {
     addToCart(product);
-    // Optional: Show toast notification
+    messageApi.success(`${product.name} đã được thêm vào giỏ hàng`);
   };
 
   const handleCheckout = () => {
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
+  };
+
+  const handleViewDetail = (product: Product) => {
+    router.push(`/products/${product.id}`);
   };
 
   const handleOrderSuccess = () => {
@@ -72,6 +80,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {contextHolder}
+
       {/* Header */}
       <Header
         cartItemsCount={getTotalItems()}
@@ -91,7 +101,11 @@ export default function Home() {
         </div>
 
         {/* Product Grid */}
-        <ProductGrid products={products} onAddToCart={handleAddToCart} />
+        <ProductGrid
+          products={products}
+          onAddToCart={handleAddToCart}
+          onViewDetail={handleViewDetail}
+        />
 
         {/* Empty State */}
         {products.length === 0 && (

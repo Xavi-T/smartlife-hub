@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Product } from "@/types/database";
+import { calculateDiscountedPrice } from "@/lib/utils";
 
 export interface CartItem {
   product: Product;
@@ -14,15 +15,19 @@ export function useCart() {
 
   // Load cart from localStorage
   useEffect(() => {
-    const savedCart = localStorage.getItem("smartlife-cart");
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (error) {
-        console.error("Error loading cart:", error);
+    const timer = window.setTimeout(() => {
+      const savedCart = localStorage.getItem("smartlife-cart");
+      if (savedCart) {
+        try {
+          setCart(JSON.parse(savedCart));
+        } catch (error) {
+          console.error("Error loading cart:", error);
+        }
       }
-    }
-    setIsLoaded(true);
+      setIsLoaded(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Save cart to localStorage whenever it changes
@@ -32,17 +37,25 @@ export function useCart() {
     }
   }, [cart, isLoaded]);
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, quantity: number = 1) => {
+    const safeQuantity = Math.max(1, Math.floor(quantity));
+    const normalizedProduct: Product = {
+      ...product,
+      price: calculateDiscountedPrice(product.price, product.discount_percent),
+    };
+
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find(
+        (item) => item.product.id === normalizedProduct.id,
+      );
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+          item.product.id === normalizedProduct.id
+            ? { ...item, quantity: item.quantity + safeQuantity }
             : item,
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product: normalizedProduct, quantity: safeQuantity }];
     });
   };
 

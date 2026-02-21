@@ -1,13 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Empty, Input, Modal, Space, message, Image } from "antd";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Button,
+  Card,
+  Empty,
+  Input,
+  Modal,
+  Space,
+  message,
+  Image,
+  Breadcrumb,
+  Typography,
+} from "antd";
 import {
   UploadOutlined,
   ReloadOutlined,
   DeleteOutlined,
   CopyOutlined,
   SearchOutlined,
+  FolderAddOutlined,
+  FolderOpenOutlined,
+  EditOutlined,
+  FolderOutlined,
 } from "@ant-design/icons";
 
 interface MediaFile {
@@ -19,6 +34,28 @@ interface MediaFile {
   createdAt: string | null;
   updatedAt: string | null;
 }
+
+interface MediaFolder {
+  name: string;
+  path: string;
+}
+
+interface MediaListResponse {
+  currentPath: string;
+  parentPath: string | null;
+  folders: MediaFolder[];
+  files: MediaFile[];
+}
+
+type RenameTarget =
+  | { type: "file"; item: MediaFile }
+  | { type: "folder"; item: MediaFolder }
+  | null;
+
+type DeleteTarget =
+  | { type: "file"; item: MediaFile }
+  | { type: "folder"; item: MediaFolder }
+  | null;
 
 function formatBytes(bytes: number): string {
   if (!bytes) return "0 B";
@@ -33,30 +70,52 @@ function formatBytes(bytes: number): string {
 
 export default function MediaPage() {
   const [messageApi, contextHolder] = message.useMessage();
+  const [currentPath, setCurrentPath] = useState("");
+  const [parentPath, setParentPath] = useState<string | null>(null);
+  const [folders, setFolders] = useState<MediaFolder[]>([]);
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFile, setSelectedFile] = useState<MediaFile | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<MediaFile | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [renameTarget, setRenameTarget] = useState<RenameTarget>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const fetchFiles = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/media");
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Không thể tải media");
-      setFiles(result.files || []);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Không thể tải media";
-      messageApi.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [messageApi]);
+  const fetchFiles = useCallback(
+    async (targetPath: string) => {
+      try {
+        const pathQuery = targetPath
+          ? `?path=${encodeURIComponent(targetPath)}`
+          : "";
+        const res = await fetch(`/api/admin/media${pathQuery}`);
+        const result = (await res.json()) as MediaListResponse & {
+          error?: string;
+        };
+        if (!res.ok) {
+          throw new Error(result.error || "Không thể tải media");
+        }
+
+        setCurrentPath(result.currentPath || "");
+        setParentPath(result.parentPath || null);
+        setFolders(result.folders || []);
+        setFiles(result.files || []);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Không thể tải media";
+        messageApi.error(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [messageApi],
+  );
 
   useEffect(() => {
-    fetchFiles();
+    fetchFiles("");
   }, [fetchFiles]);
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +126,9 @@ export default function MediaPage() {
     try {
       for (const file of Array.from(targetFiles)) {
         const formData = new FormData();
+        formData.append("action", "upload");
         formData.append("file", file);
+        formData.append("folderPath", currentPath);
 
         const res = await fetch("/api/admin/media", {
           method: "POST",
@@ -81,7 +142,7 @@ export default function MediaPage() {
       }
 
       messageApi.success("Upload media thành công");
-      await fetchFiles();
+      await fetchFiles(currentPath);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Không thể upload media";
@@ -92,12 +153,51 @@ export default function MediaPage() {
     }
   };
 
+  const openFilePicker = () => {
+    if (uploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleCreateFolder = async () => {
+    const folderName = newFolderName.trim();
+    if (!folderName) {
+      messageApi.error("Vui lòng nhập tên folder");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("action", "create-folder");
+      formData.append("folderName", folderName);
+      formData.append("parentPath", currentPath);
+
+      const res = await fetch("/api/admin/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Không thể tạo folder");
+      }
+
+      setNewFolderName("");
+      setIsCreateFolderOpen(false);
+      messageApi.success("Tạo folder thành công");
+      await fetchFiles(currentPath);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Không thể tạo folder";
+      messageApi.error(errorMessage);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
 
     try {
       const res = await fetch(
-        `/api/admin/media?path=${encodeURIComponent(deleteTarget.path)}`,
+        `/api/admin/media?path=${encodeURIComponent(deleteTarget.item.path)}&type=${deleteTarget.type}`,
         {
           method: "DELETE",
         },
@@ -105,15 +205,59 @@ export default function MediaPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Không thể xóa file");
 
-      messageApi.success("Đã xóa file media");
+      messageApi.success(
+        deleteTarget.type === "folder" ? "Đã xóa folder" : "Đã xóa file media",
+      );
       setDeleteTarget(null);
-      if (selectedFile?.path === deleteTarget.path) {
+      if (
+        deleteTarget.type === "file" &&
+        selectedFile?.path === deleteTarget.item.path
+      ) {
         setSelectedFile(null);
       }
-      await fetchFiles();
+      await fetchFiles(currentPath);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Không thể xóa file";
+      messageApi.error(errorMessage);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!renameTarget) return;
+
+    const newName = renameValue.trim();
+    if (!newName) {
+      messageApi.error("Tên mới không được để trống");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/media", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action:
+            renameTarget.type === "folder" ? "rename-folder" : "rename-file",
+          path: renameTarget.item.path,
+          newName,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Không thể đổi tên");
+      }
+
+      setRenameTarget(null);
+      setRenameValue("");
+      messageApi.success("Đổi tên thành công");
+      await fetchFiles(currentPath);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Không thể đổi tên";
       messageApi.error(errorMessage);
     }
   };
@@ -130,6 +274,42 @@ export default function MediaPage() {
   const filteredFiles = files.filter((file) =>
     file.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  const filteredFolders = folders.filter((folder) =>
+    folder.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const breadcrumbItems = [
+    {
+      title: (
+        <a
+          onClick={(event) => {
+            event.preventDefault();
+            fetchFiles("");
+          }}
+        >
+          Media
+        </a>
+      ),
+    },
+    ...currentPath
+      .split("/")
+      .filter(Boolean)
+      .map((segment, index, arr) => {
+        const path = arr.slice(0, index + 1).join("/");
+        return {
+          title: (
+            <a
+              onClick={(event) => {
+                event.preventDefault();
+                fetchFiles(path);
+              }}
+            >
+              {segment}
+            </a>
+          ),
+        };
+      }),
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5f5", padding: 24 }}>
@@ -153,32 +333,57 @@ export default function MediaPage() {
         </div>
 
         <Space>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleUpload}
+            style={{ display: "none" }}
+            disabled={uploading}
+          />
+
           <Button
             icon={<ReloadOutlined />}
-            onClick={fetchFiles}
+            onClick={() => fetchFiles(currentPath)}
             loading={loading}
           >
             Làm mới
           </Button>
-          <label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleUpload}
-              style={{ display: "none" }}
-              disabled={uploading}
-            />
-            <Button
-              type="primary"
-              icon={<UploadOutlined />}
-              loading={uploading}
-            >
-              Upload ảnh
-            </Button>
-          </label>
+          <Button
+            icon={<FolderAddOutlined />}
+            onClick={() => setIsCreateFolderOpen(true)}
+          >
+            Tạo folder
+          </Button>
+          <Button
+            type="primary"
+            icon={<UploadOutlined />}
+            loading={uploading}
+            onClick={openFilePicker}
+            disabled={uploading}
+          >
+            Upload ảnh
+          </Button>
         </Space>
       </div>
+
+      <Card style={{ marginBottom: 16 }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
+          <Breadcrumb items={breadcrumbItems} />
+          <Space>
+            <Typography.Text type="secondary">Đường dẫn:</Typography.Text>
+            <Typography.Text code>
+              {currentPath || "media-library"}
+            </Typography.Text>
+            {parentPath && (
+              <Button size="small" onClick={() => fetchFiles(parentPath)}>
+                Lên thư mục cha
+              </Button>
+            )}
+          </Space>
+        </Space>
+      </Card>
 
       <Card style={{ marginBottom: 16 }}>
         <Input
@@ -190,69 +395,136 @@ export default function MediaPage() {
         />
       </Card>
 
-      {filteredFiles.length === 0 ? (
+      {filteredFolders.length === 0 && filteredFiles.length === 0 ? (
         <Card>
           <Empty description={loading ? "Đang tải..." : "Chưa có ảnh nào"} />
         </Card>
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 16,
-          }}
-        >
-          {filteredFiles.map((file) => (
-            <Card
-              key={file.path}
-              hoverable
-              cover={
-                <div
-                  style={{
-                    height: 180,
-                    overflow: "hidden",
-                    background: "#fafafa",
-                  }}
-                >
-                  <Image
-                    src={file.url}
-                    alt={file.name}
-                    width="100%"
-                    height={180}
-                    style={{ objectFit: "cover" }}
-                    preview={false}
-                  />
-                </div>
-              }
-              actions={[
-                <CopyOutlined
-                  key="copy"
-                  onClick={() => handleCopyUrl(file.url)}
-                />,
-                <DeleteOutlined
-                  key="delete"
-                  onClick={() => setDeleteTarget(file)}
-                />,
-              ]}
-              onClick={() => setSelectedFile(file)}
-            >
+        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+          {filteredFolders.length > 0 && (
+            <Card title="Folders">
               <div
                 style={{
-                  fontWeight: 600,
-                  marginBottom: 4,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 16,
                 }}
               >
-                {file.name}
-              </div>
-              <div style={{ color: "#8c8c8c", fontSize: 12 }}>
-                {formatBytes(file.size)}
+                {filteredFolders.map((folder) => (
+                  <Card
+                    key={folder.path}
+                    hoverable
+                    actions={[
+                      <EditOutlined
+                        key="rename-folder"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setRenameTarget({ type: "folder", item: folder });
+                          setRenameValue(folder.name);
+                        }}
+                      />,
+                      <DeleteOutlined
+                        key="delete-folder"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleteTarget({ type: "folder", item: folder });
+                        }}
+                      />,
+                    ]}
+                    onClick={() => fetchFiles(folder.path)}
+                  >
+                    <Space align="center">
+                      <FolderOpenOutlined
+                        style={{ color: "#1677ff", fontSize: 20 }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{folder.name}</div>
+                        <div style={{ color: "#8c8c8c", fontSize: 12 }}>
+                          {folder.path}
+                        </div>
+                      </div>
+                    </Space>
+                  </Card>
+                ))}
               </div>
             </Card>
-          ))}
-        </div>
+          )}
+
+          {filteredFiles.length > 0 && (
+            <Card title="Files">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 16,
+                }}
+              >
+                {filteredFiles.map((file) => (
+                  <Card
+                    key={file.path}
+                    hoverable
+                    cover={
+                      <div
+                        style={{
+                          height: 180,
+                          overflow: "hidden",
+                          background: "#fafafa",
+                        }}
+                      >
+                        <Image
+                          src={file.url}
+                          alt={file.name}
+                          width="100%"
+                          height={180}
+                          style={{ objectFit: "cover" }}
+                          preview={false}
+                        />
+                      </div>
+                    }
+                    actions={[
+                      <CopyOutlined
+                        key="copy"
+                        onClick={() => handleCopyUrl(file.url)}
+                      />,
+                      <EditOutlined
+                        key="rename"
+                        onClick={() => {
+                          setRenameTarget({ type: "file", item: file });
+                          setRenameValue(file.name);
+                        }}
+                      />,
+                      <DeleteOutlined
+                        key="delete"
+                        onClick={() =>
+                          setDeleteTarget({ type: "file", item: file })
+                        }
+                      />,
+                    ]}
+                    onClick={() => setSelectedFile(file)}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        marginBottom: 4,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      <FolderOutlined
+                        style={{ marginRight: 6, color: "#1677ff" }}
+                      />
+                      {file.name}
+                    </div>
+                    <div style={{ color: "#8c8c8c", fontSize: 12 }}>
+                      {formatBytes(file.size)}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Card>
+          )}
+        </Space>
       )}
 
       <Modal
@@ -277,7 +549,7 @@ export default function MediaPage() {
         }
       >
         {selectedFile && (
-          <Space direction="vertical" style={{ width: "100%" }} size="middle">
+          <Space orientation="vertical" style={{ width: "100%" }} size="middle">
             <Image
               src={selectedFile.url}
               alt={selectedFile.name}
@@ -307,8 +579,46 @@ export default function MediaPage() {
         cancelText="Hủy"
       >
         {deleteTarget && (
-          <p>Bạn chắc chắn muốn xóa file {deleteTarget.name}?</p>
+          <p>
+            Bạn chắc chắn muốn xóa
+            {deleteTarget.type === "folder" ? " folder " : " file "}
+            <strong>{deleteTarget.item.name}</strong>?
+          </p>
         )}
+      </Modal>
+
+      <Modal
+        title="Tạo folder mới"
+        open={isCreateFolderOpen}
+        onCancel={() => setIsCreateFolderOpen(false)}
+        onOk={handleCreateFolder}
+        okText="Tạo"
+        cancelText="Hủy"
+      >
+        <Input
+          value={newFolderName}
+          onChange={(e) => setNewFolderName(e.target.value)}
+          placeholder="Nhập tên folder"
+          onPressEnter={handleCreateFolder}
+        />
+      </Modal>
+
+      <Modal
+        title={
+          renameTarget?.type === "folder" ? "Đổi tên folder" : "Đổi tên file"
+        }
+        open={!!renameTarget}
+        onCancel={() => setRenameTarget(null)}
+        onOk={handleRename}
+        okText="Lưu"
+        cancelText="Hủy"
+      >
+        <Input
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          placeholder="Nhập tên mới"
+          onPressEnter={handleRename}
+        />
       </Modal>
     </div>
   );

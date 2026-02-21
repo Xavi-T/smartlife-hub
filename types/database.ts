@@ -5,6 +5,7 @@ export interface ProductRow {
   name: string;
   description: string | null;
   price: number;
+  discount_percent: number | null;
   cost_price: number;
   stock_quantity: number;
   image_url: string | null;

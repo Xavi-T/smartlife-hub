@@ -388,13 +388,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </Dropdown>
         </Header>
 
-        {/* Breadcrumb on Mobile */}
-        {isMobile && (
-          <div style={{ padding: "12px 24px", background: "#fff" }}>
-            <Breadcrumb items={getBreadcrumbItems()} />
-          </div>
-        )}
-
         {/* Content */}
         <Content
           style={{
