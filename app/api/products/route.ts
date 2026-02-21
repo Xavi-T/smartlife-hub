@@ -18,13 +18,64 @@ interface ProductCategoryRelation {
   categories: CategoryRow | null;
 }
 
+interface ProductImageRelation {
+  image_url: string;
+  is_cover: boolean;
+  display_order: number;
+  created_at: string;
+}
+
 type ProductWithRelations = Database["public"]["Tables"]["products"]["Row"] & {
   product_categories?: ProductCategoryRelation[];
+  product_images?: ProductImageRelation[];
 };
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
+}
+
+function resolveProductImageUrl(product: ProductWithRelations): string | null {
+  const mediaList = (product.product_images || []).filter(
+    (item) => item.image_url && !isVideoUrl(item.image_url),
+  );
+
+  const coverImage = mediaList.find((item) => item.is_cover);
+  if (coverImage?.image_url) return coverImage.image_url;
+
+  if (mediaList.length > 0) {
+    const sorted = [...mediaList].sort((first, second) => {
+      if (first.display_order !== second.display_order) {
+        return first.display_order - second.display_order;
+      }
+      return (
+        new Date(first.created_at).getTime() -
+        new Date(second.created_at).getTime()
+      );
+    });
+    return sorted[0]?.image_url || null;
+  }
+
+  return product.image_url;
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "Đã xảy ra lỗi";
+}
+
+function toOptionalNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function createApiSupabaseClient() {
@@ -155,6 +206,12 @@ export async function GET(request: NextRequest) {
               name,
               slug
             )
+          ),
+          product_images(
+            image_url,
+            is_cover,
+            display_order,
+            created_at
           )
         `,
     );
@@ -177,6 +234,7 @@ export async function GET(request: NextRequest) {
 
         return {
           ...product,
+          image_url: resolveProductImageUrl(product),
           categories,
         };
       },
@@ -217,7 +275,6 @@ export async function POST(request: NextRequest) {
       stock_quantity,
       category,
       categories,
-      image_url,
       is_active,
     } = body;
 
@@ -225,14 +282,16 @@ export async function POST(request: NextRequest) {
       categories,
       category,
     );
+    const normalizedPrice = toOptionalNumber(price);
+    const normalizedCostPrice = toOptionalNumber(cost_price);
+    const normalizedStockQuantity = toOptionalNumber(stock_quantity);
+    const normalizedDiscountPercent = toOptionalNumber(discount_percent);
 
     // Validation
     if (
       !name ||
-      price === undefined ||
-      price === null ||
-      cost_price === undefined ||
-      cost_price === null ||
+      normalizedPrice === null ||
+      normalizedCostPrice === null ||
       normalizedCategoryNames.length === 0
     ) {
       return NextResponse.json(
@@ -241,14 +300,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (price < 0 || cost_price < 0) {
+    if (normalizedPrice < 0 || normalizedCostPrice < 0) {
       return NextResponse.json({ error: "Giá không được âm" }, { status: 400 });
     }
 
     if (
-      discount_percent !== undefined &&
-      discount_percent !== null &&
-      (discount_percent < 0 || discount_percent > 100)
+      normalizedDiscountPercent !== null &&
+      (normalizedDiscountPercent < 0 || normalizedDiscountPercent > 100)
     ) {
       return NextResponse.json(
         { error: "Giảm giá phải nằm trong khoảng 0-100%" },
@@ -256,14 +314,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (price < cost_price) {
+    if (normalizedPrice < normalizedCostPrice) {
       return NextResponse.json(
         { error: "Giá bán phải lớn hơn hoặc bằng giá vốn" },
         { status: 400 },
       );
     }
 
-    if (stock_quantity && stock_quantity < 0) {
+    if (normalizedStockQuantity !== null && normalizedStockQuantity < 0) {
       return NextResponse.json(
         { error: "Tồn kho không được âm" },
         { status: 400 },
@@ -275,15 +333,13 @@ export async function POST(request: NextRequest) {
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
-        price,
+        price: normalizedPrice,
         discount_percent:
-          discount_percent !== undefined && discount_percent !== null
-            ? discount_percent
-            : 0,
-        cost_price,
-        stock_quantity: stock_quantity || 0,
+          normalizedDiscountPercent !== null ? normalizedDiscountPercent : 0,
+        cost_price: normalizedCostPrice,
+        stock_quantity: normalizedStockQuantity ?? 0,
         category: normalizedCategoryNames[0],
-        image_url: image_url?.trim() || null,
+        image_url: null,
         is_active: is_active !== undefined ? is_active : true,
       })
       .select()
@@ -348,7 +404,6 @@ export async function PATCH(request: NextRequest) {
       stock_quantity,
       category,
       categories,
-      image_url,
       is_active,
     } = body;
 
@@ -356,6 +411,10 @@ export async function PATCH(request: NextRequest) {
       categories,
       category,
     );
+    const normalizedPrice = toOptionalNumber(price);
+    const normalizedCostPrice = toOptionalNumber(cost_price);
+    const normalizedStockQuantity = toOptionalNumber(stock_quantity);
+    const normalizedDiscountPercent = toOptionalNumber(discount_percent);
 
     if (!id) {
       return NextResponse.json(
@@ -382,33 +441,37 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (price !== undefined) {
-      if (price < 0) {
+      if (normalizedPrice === null || normalizedPrice < 0) {
         return NextResponse.json(
           { error: "Giá bán không được âm" },
           { status: 400 },
         );
       }
-      updates.price = price;
+      updates.price = normalizedPrice;
     }
 
     if (discount_percent !== undefined) {
-      if (discount_percent < 0 || discount_percent > 100) {
+      if (
+        normalizedDiscountPercent === null ||
+        normalizedDiscountPercent < 0 ||
+        normalizedDiscountPercent > 100
+      ) {
         return NextResponse.json(
           { error: "Giảm giá phải nằm trong khoảng 0-100%" },
           { status: 400 },
         );
       }
-      updates.discount_percent = discount_percent;
+      updates.discount_percent = normalizedDiscountPercent;
     }
 
     if (cost_price !== undefined) {
-      if (cost_price < 0) {
+      if (normalizedCostPrice === null || normalizedCostPrice < 0) {
         return NextResponse.json(
           { error: "Giá vốn không được âm" },
           { status: 400 },
         );
       }
-      updates.cost_price = cost_price;
+      updates.cost_price = normalizedCostPrice;
     }
 
     let currentPrice: number | null = null;
@@ -433,8 +496,9 @@ export async function PATCH(request: NextRequest) {
       currentCostPrice = currentProduct.cost_price;
     }
 
-    const finalPrice = price !== undefined ? price : currentPrice;
-    const finalCost = cost_price !== undefined ? cost_price : currentCostPrice;
+    const finalPrice = price !== undefined ? normalizedPrice : currentPrice;
+    const finalCost =
+      cost_price !== undefined ? normalizedCostPrice : currentCostPrice;
 
     if (
       finalPrice !== null &&
@@ -450,13 +514,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (stock_quantity !== undefined) {
-      if (stock_quantity < 0) {
+      if (normalizedStockQuantity === null || normalizedStockQuantity < 0) {
         return NextResponse.json(
           { error: "Tồn kho không được âm" },
           { status: 400 },
         );
       }
-      updates.stock_quantity = stock_quantity;
+      updates.stock_quantity = normalizedStockQuantity;
     }
 
     if (category !== undefined || categories !== undefined) {
@@ -467,10 +531,6 @@ export async function PATCH(request: NextRequest) {
         );
       }
       updates.category = normalizedCategoryNames[0];
-    }
-
-    if (image_url !== undefined) {
-      updates.image_url = image_url?.trim() || null;
     }
 
     if (is_active !== undefined) {

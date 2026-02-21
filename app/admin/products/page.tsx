@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Button,
   Table,
@@ -28,7 +29,6 @@ import {
   DollarOutlined,
   AppstoreOutlined,
 } from "@ant-design/icons";
-import { useRouter } from "next/navigation";
 import { ProductFormModal } from "@/components/admin/ProductFormModal";
 import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
@@ -151,10 +151,6 @@ export default function ProductsPage() {
         error instanceof Error ? error.message : "Không thể xóa sản phẩm";
       messageApi.error(errorMessage);
     }
-  };
-
-  const handleManageImages = (productId: string) => {
-    router.push(`/admin/products/${productId}/media`);
   };
 
   const columns = [
@@ -317,7 +313,7 @@ export default function ProductsPage() {
     {
       title: "Hành động",
       key: "actions",
-      width: 180,
+      width: 240,
       align: "center" as const,
       render: (_: unknown, record: Product) => (
         <Space size="small">
@@ -325,9 +321,10 @@ export default function ProductsPage() {
             type="link"
             size="small"
             icon={<PictureOutlined />}
-            onClick={() => handleManageImages(record.id)}
-            title="Quản lý ảnh"
-          />
+            onClick={() => router.push(`/admin/products/${record.id}/media`)}
+          >
+            Media
+          </Button>
           <Button
             type="link"
             size="small"

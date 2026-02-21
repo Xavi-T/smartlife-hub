@@ -132,7 +132,7 @@ export default function ProductMediaPage() {
     await fetchLibrary("");
   };
 
-  const attachFromLibrary = async (file: MediaFile) => {
+  const attachFromLibrary = async (file: MediaFile, asCover = false) => {
     setAttachingPath(file.path);
     try {
       const formData = new FormData();
@@ -140,7 +140,10 @@ export default function ProductMediaPage() {
       formData.append("source", "library");
       formData.append("mediaUrl", file.url);
       formData.append("storagePath", file.path);
-      formData.append("isCover", images.length === 0 ? "true" : "false");
+      formData.append(
+        "isCover",
+        asCover || images.length === 0 ? "true" : "false",
+      );
 
       const response = await fetch("/api/admin/product-images", {
         method: "POST",
@@ -153,7 +156,11 @@ export default function ProductMediaPage() {
       }
 
       await fetchData();
-      alert("✅ Đã gắn media vào sản phẩm");
+      alert(
+        asCover
+          ? "✅ Đã gắn media và đặt làm ảnh đại diện"
+          : "✅ Đã gắn media vào sản phẩm",
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Không thể gắn media";
@@ -382,11 +389,9 @@ export default function ProductMediaPage() {
                           });
 
                           return (
-                            <button
+                            <div
                               key={file.path}
-                              onClick={() => attachFromLibrary(file)}
-                              disabled={attachingPath === file.path}
-                              className="text-left border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all disabled:opacity-60"
+                              className="text-left border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all"
                             >
                               <div className="aspect-square rounded-md bg-gray-100 overflow-hidden relative">
                                 {isVideo ? (
@@ -411,12 +416,29 @@ export default function ProductMediaPage() {
                               <div className="mt-2 text-xs text-gray-800 truncate">
                                 {file.name}
                               </div>
-                              <div className="text-[11px] text-gray-500 truncate">
-                                {attachingPath === file.path
-                                  ? "Đang gắn..."
-                                  : "Click để gắn vào sản phẩm"}
+                              <div className="mt-2 grid grid-cols-1 gap-1.5">
+                                <button
+                                  onClick={() => attachFromLibrary(file)}
+                                  disabled={attachingPath === file.path}
+                                  className="w-full text-[11px] px-2 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
+                                >
+                                  {attachingPath === file.path
+                                    ? "Đang gắn..."
+                                    : "Gắn vào sản phẩm"}
+                                </button>
+                                <button
+                                  onClick={() => attachFromLibrary(file, true)}
+                                  disabled={
+                                    attachingPath === file.path || isVideo
+                                  }
+                                  className="w-full text-[11px] px-2 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                                >
+                                  {isVideo
+                                    ? "Video không làm ảnh đại diện"
+                                    : "Gắn và đặt làm ảnh đại diện"}
+                                </button>
                               </div>
-                            </button>
+                            </div>
                           );
                         })}
                       </div>

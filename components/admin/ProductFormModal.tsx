@@ -9,19 +9,9 @@ import {
   Select,
   Switch,
   message,
-  Button,
-  Image,
   Card,
-  Space,
-  Breadcrumb,
   Typography,
 } from "antd";
-import {
-  PictureOutlined,
-  CopyOutlined,
-  FolderOpenOutlined,
-  FolderOutlined,
-} from "@ant-design/icons";
 import type { Product } from "@/types/database";
 
 const { TextArea } = Input;
@@ -41,30 +31,7 @@ interface ProductFormValues {
   cost_price: number;
   stock_quantity?: number;
   categories: string[];
-  image_url?: string;
   is_active?: boolean;
-}
-
-interface MediaFile {
-  name: string;
-  path: string;
-  url: string;
-  size: number;
-  mimeType: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-interface MediaFolder {
-  name: string;
-  path: string;
-}
-
-interface MediaListResponse {
-  currentPath: string;
-  parentPath: string | null;
-  folders: MediaFolder[];
-  files: MediaFile[];
 }
 
 interface CategoryOption {
@@ -84,13 +51,6 @@ export function ProductFormModal({
     | undefined;
   const [messageApi, contextHolder] = message.useMessage();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [mediaFolders, setMediaFolders] = useState<MediaFolder[]>([]);
-  const [mediaCurrentPath, setMediaCurrentPath] = useState("");
-  const [mediaParentPath, setMediaParentPath] = useState<string | null>(null);
-  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
-  const [mediaSearchQuery, setMediaSearchQuery] = useState("");
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
 
   const isEditMode = !!product;
@@ -108,7 +68,6 @@ export function ProductFormModal({
           product.categories && product.categories.length > 0
             ? product.categories.map((item) => item.name)
             : [product.category],
-        image_url: product.image_url,
         is_active: product.is_active,
       });
     } else if (isOpen && !product) {
@@ -159,6 +118,11 @@ export function ProductFormModal({
 
       const payload = {
         ...values,
+        discount_percent:
+          values.discount_percent === undefined ||
+          values.discount_percent === null
+            ? 0
+            : Number(values.discount_percent),
         categories: normalizedCategories,
         category: normalizedCategories[0] || null,
       };
@@ -201,83 +165,6 @@ export function ProductFormModal({
       onClose();
     }
   };
-
-  const fetchMediaFiles = async (targetPath = "") => {
-    setIsLoadingMedia(true);
-    try {
-      const query = targetPath ? `?path=${encodeURIComponent(targetPath)}` : "";
-      const response = await fetch(`/api/admin/media${query}`);
-      const result = (await response.json()) as MediaListResponse & {
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(result.error || "Không thể tải thư viện media");
-      }
-      setMediaCurrentPath(result.currentPath || "");
-      setMediaParentPath(result.parentPath || null);
-      setMediaFolders(result.folders || []);
-      setMediaFiles(result.files || []);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Không thể tải thư viện media";
-      messageApi.error(errorMessage);
-    } finally {
-      setIsLoadingMedia(false);
-    }
-  };
-
-  const openMediaPicker = async () => {
-    setIsMediaModalOpen(true);
-    setMediaSearchQuery("");
-    await fetchMediaFiles("");
-  };
-
-  const handlePickMedia = (url: string) => {
-    form.setFieldValue("image_url", url);
-    messageApi.success("Đã chọn ảnh từ thư viện media");
-    setIsMediaModalOpen(false);
-  };
-
-  const filteredFolders = mediaFolders.filter((folder) =>
-    folder.name.toLowerCase().includes(mediaSearchQuery.toLowerCase()),
-  );
-
-  const filteredFiles = mediaFiles.filter((file) =>
-    file.name.toLowerCase().includes(mediaSearchQuery.toLowerCase()),
-  );
-
-  const mediaBreadcrumbItems = [
-    {
-      title: (
-        <a
-          onClick={(event) => {
-            event.preventDefault();
-            fetchMediaFiles("");
-          }}
-        >
-          Media
-        </a>
-      ),
-    },
-    ...mediaCurrentPath
-      .split("/")
-      .filter(Boolean)
-      .map((segment, index, arr) => {
-        const path = arr.slice(0, index + 1).join("/");
-        return {
-          title: (
-            <a
-              onClick={(event) => {
-                event.preventDefault();
-                fetchMediaFiles(path);
-              }}
-            >
-              {segment}
-            </a>
-          ),
-        };
-      }),
-  ];
 
   return (
     <>
@@ -406,6 +293,14 @@ export function ProductFormModal({
               tooltip="Nhập từ 0 đến 100. Giá hiển thị cho khách sẽ tự tính sau giảm giá."
               rules={[
                 {
+                  transform: (value) =>
+                    value === "" || value === null || value === undefined
+                      ? 0
+                      : Number(value),
+                  type: "number",
+                  message: "Giảm giá phải là số",
+                },
+                {
                   type: "number",
                   min: 0,
                   max: 100,
@@ -413,15 +308,14 @@ export function ProductFormModal({
                 },
               ]}
             >
-              <Space.Compact>
-                <InputNumber
-                  style={{ width: "100%" }}
-                  placeholder="0"
-                  min={0}
-                  max={100}
-                />
-                %
-              </Space.Compact>
+              <InputNumber<number>
+                style={{ width: "100%" }}
+                placeholder="0"
+                min={0}
+                max={100}
+                precision={0}
+                step={1}
+              />
             </Form.Item>
           </div>
 
@@ -464,35 +358,13 @@ export function ProductFormModal({
             </Form.Item>
           </div>
 
-          <Form.Item
-            label="URL ảnh đại diện"
-            name="image_url"
-            tooltip="Để quản lý nhiều ảnh, vào trang chi tiết sản phẩm sau khi tạo"
+          <Typography.Text
+            type="secondary"
+            style={{ display: "block", marginBottom: 16 }}
           >
-            <Input placeholder="https://..." />
-          </Form.Item>
-
-          <div style={{ marginTop: -8, marginBottom: 16 }}>
-            <Space>
-              <Button icon={<PictureOutlined />} onClick={openMediaPicker}>
-                Chọn từ thư viện media
-              </Button>
-              <Button
-                icon={<CopyOutlined />}
-                onClick={async () => {
-                  const currentUrl = form.getFieldValue("image_url");
-                  if (!currentUrl) {
-                    messageApi.error("Chưa có URL ảnh để copy");
-                    return;
-                  }
-                  await navigator.clipboard.writeText(currentUrl);
-                  messageApi.success("Đã copy URL ảnh");
-                }}
-              >
-                Copy URL
-              </Button>
-            </Space>
-          </div>
+            Sản phẩm mới mặc định chưa có ảnh đại diện. Sau khi tạo, vào phần
+            media của sản phẩm để upload và đặt ảnh cover.
+          </Typography.Text>
 
           <Form.Item
             label="Trạng thái"
@@ -502,116 +374,6 @@ export function ProductFormModal({
             <Switch checkedChildren="Hiển thị" unCheckedChildren="Ẩn" />
           </Form.Item>
         </Form>
-      </Modal>
-
-      <Modal
-        title="Chọn ảnh từ thư viện media"
-        open={isMediaModalOpen}
-        onCancel={() => setIsMediaModalOpen(false)}
-        footer={null}
-        width={900}
-      >
-        {isLoadingMedia ? (
-          <div style={{ textAlign: "center", padding: 32 }}>Đang tải...</div>
-        ) : mediaFolders.length === 0 && mediaFiles.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 32, color: "#8c8c8c" }}>
-            Chưa có ảnh trong thư viện. Vào mục Thư viện media để upload ảnh
-            trước.
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <Space orientation="vertical" style={{ width: "100%" }}>
-              <Breadcrumb items={mediaBreadcrumbItems} />
-              <Space>
-                <Typography.Text type="secondary">Thư mục:</Typography.Text>
-                <Typography.Text code>
-                  {mediaCurrentPath || "media-library"}
-                </Typography.Text>
-                {mediaParentPath && (
-                  <Button
-                    size="small"
-                    onClick={() => fetchMediaFiles(mediaParentPath)}
-                  >
-                    Lên thư mục cha
-                  </Button>
-                )}
-              </Space>
-              <Input
-                placeholder="Tìm folder / file..."
-                value={mediaSearchQuery}
-                onChange={(event) => setMediaSearchQuery(event.target.value)}
-                allowClear
-              />
-            </Space>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-                gap: 12,
-                maxHeight: 500,
-                overflowY: "auto",
-              }}
-            >
-              {filteredFolders.map((folder) => (
-                <Card
-                  key={folder.path}
-                  hoverable
-                  onClick={() => fetchMediaFiles(folder.path)}
-                  style={{ padding: 12 }}
-                >
-                  <Space>
-                    <FolderOpenOutlined
-                      style={{ fontSize: 18, color: "#1677ff" }}
-                    />
-                    <div
-                      style={{
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {folder.name}
-                    </div>
-                  </Space>
-                </Card>
-              ))}
-
-              {filteredFiles.map((file) => (
-                <Card
-                  key={file.path}
-                  hoverable
-                  onClick={() => handlePickMedia(file.url)}
-                  style={{ padding: 8 }}
-                >
-                  <Image
-                    src={file.url}
-                    alt={file.name}
-                    width="100%"
-                    height={120}
-                    style={{ objectFit: "cover", borderRadius: 6 }}
-                    preview={false}
-                  />
-                  <div
-                    style={{
-                      marginTop: 8,
-                      fontSize: 12,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    <FolderOutlined
-                      style={{ marginRight: 6, color: "#8c8c8c" }}
-                    />
-                    {file.name}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
       </Modal>
     </>
   );

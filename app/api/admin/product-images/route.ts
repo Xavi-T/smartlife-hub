@@ -10,6 +10,33 @@ function isVideoMimeType(mimeType: string): boolean {
   return mimeType.startsWith("video/");
 }
 
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
+}
+
+async function shouldSetAsCover(
+  authClient: Awaited<ReturnType<typeof createApiSupabaseClient>>,
+  productId: string,
+  explicitCover: boolean,
+  isImageMedia: boolean,
+): Promise<boolean> {
+  if (!isImageMedia) return false;
+  if (explicitCover) return true;
+
+  const { data, error } = await authClient
+    .from("product_images")
+    .select("image_url")
+    .eq("product_id", productId);
+
+  if (error) throw error;
+
+  const hasAnyImage = (data || []).some(
+    (item) => item.image_url && !isVideoUrl(item.image_url),
+  );
+
+  return !hasAnyImage;
+}
+
 function normalizeStoragePath(path: string): string {
   const normalized = path.trim().replace(/^\/+/, "");
   if (!normalized) return normalized;
@@ -163,6 +190,13 @@ export async function POST(request: NextRequest) {
       }
 
       const storagePath = normalizeStoragePath(storagePathRaw);
+      const isImageMedia = !isVideoUrl(mediaUrl);
+      const effectiveIsCover = await shouldSetAsCover(
+        authClient,
+        productId,
+        isCover,
+        isImageMedia,
+      );
 
       const { data: imageRecord, error: dbError } = await authClient
         .from("product_images")
@@ -170,7 +204,7 @@ export async function POST(request: NextRequest) {
           product_id: productId,
           image_url: mediaUrl,
           storage_path: storagePath,
-          is_cover: isCover,
+          is_cover: effectiveIsCover,
           file_size: null,
           width: null,
           height: null,
@@ -179,6 +213,20 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (dbError) throw dbError;
+
+      if (effectiveIsCover && isImageMedia) {
+        const { error: productCoverError } = await authClient
+          .from("products")
+          .update({ image_url: mediaUrl })
+          .eq("id", productId);
+
+        if (productCoverError) {
+          console.error(
+            "Error syncing product cover image:",
+            productCoverError,
+          );
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -236,6 +284,14 @@ export async function POST(request: NextRequest) {
       .from("product-images")
       .getPublicUrl(filePath);
 
+    const isImageMedia = !isVideoMimeType(file.type);
+    const effectiveIsCover = await shouldSetAsCover(
+      authClient,
+      productId,
+      isCover,
+      isImageMedia,
+    );
+
     // Save to database
     const { data: imageRecord, error: dbError } = await authClient
       .from("product_images")
@@ -243,7 +299,7 @@ export async function POST(request: NextRequest) {
         product_id: productId,
         image_url: urlData.publicUrl,
         storage_path: filePath,
-        is_cover: isCover,
+        is_cover: effectiveIsCover,
         file_size: file.size,
         width: Number.isFinite(width) ? width : null,
         height: Number.isFinite(height) ? height : null,
@@ -252,6 +308,17 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (dbError) throw dbError;
+
+    if (effectiveIsCover && isImageMedia) {
+      const { error: productCoverError } = await authClient
+        .from("products")
+        .update({ image_url: urlData.publicUrl })
+        .eq("id", productId);
+
+      if (productCoverError) {
+        console.error("Error syncing product cover image:", productCoverError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

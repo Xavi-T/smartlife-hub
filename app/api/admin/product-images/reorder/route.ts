@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+interface ReorderItem {
+  id: string;
+  display_order: number;
+  is_cover?: boolean;
+}
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
+}
+
 // PATCH: Cập nhật thứ tự ảnh
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { images } = body; // Array of { id, display_order, is_cover }
+    const { images } = body as { images?: ReorderItem[] }; // Array of { id, display_order, is_cover }
 
     if (!images || !Array.isArray(images)) {
       return NextResponse.json(
@@ -15,7 +25,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update each image
-    const updatePromises = images.map((img: any) =>
+    const updatePromises = images.map((img) =>
       supabase
         .from("product_images")
         .update({
@@ -33,14 +43,44 @@ export async function PATCH(request: NextRequest) {
       throw new Error("Có lỗi khi cập nhật thứ tự ảnh");
     }
 
+    const coverImage = images.find((img) => img.is_cover);
+    if (coverImage) {
+      const { data: coverRow, error: coverFetchError } = await supabase
+        .from("product_images")
+        .select("product_id, image_url")
+        .eq("id", coverImage.id)
+        .single();
+
+      if (!coverFetchError && coverRow?.product_id && coverRow?.image_url) {
+        if (!isVideoUrl(coverRow.image_url)) {
+          const { error: productUpdateError } = await supabase
+            .from("products")
+            .update({ image_url: coverRow.image_url })
+            .eq("id", coverRow.product_id);
+
+          if (productUpdateError) {
+            console.error(
+              "Error syncing product cover image after reorder:",
+              productUpdateError,
+            );
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Đã cập nhật thứ tự ảnh",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error reordering images:", error);
     return NextResponse.json(
-      { error: error.message || "Không thể cập nhật thứ tự ảnh" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Không thể cập nhật thứ tự ảnh",
+      },
       { status: 500 },
     );
   }

@@ -40,6 +40,7 @@ interface DraggableImageProps {
   moveImage: (dragIndex: number, hoverIndex: number) => void;
   onDelete: (imageId: string) => void;
   onSetCover: (imageId: string) => void;
+  canSetCover: boolean;
   isDeleting: boolean;
 }
 
@@ -49,6 +50,7 @@ const DraggableImage = ({
   moveImage,
   onDelete,
   onSetCover,
+  canSetCover,
   isDeleting,
 }: DraggableImageProps) => {
   const mediaType = image.media_type || detectMediaType(image.image_url);
@@ -125,7 +127,7 @@ const DraggableImage = ({
 
         {/* Overlay with actions */}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-          {!image.is_cover && (
+          {!image.is_cover && canSetCover && (
             <button
               onClick={() => onSetCover(image.id)}
               className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
@@ -152,11 +154,29 @@ const DraggableImage = ({
 
       {/* Info */}
       <div className="p-2 bg-gray-50 border-t border-gray-200">
-        <div className="text-xs text-gray-600 text-center">
+        <div className="text-xs text-gray-600 text-center space-y-1">
           {image.width && image.height && (
             <span>
               {image.width} × {image.height}
             </span>
+          )}
+          {!image.is_cover && canSetCover && (
+            <div>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSetCover(image.id);
+                }}
+                className="text-[11px] px-2 py-1 rounded border border-purple-300 text-purple-700 hover:bg-purple-50"
+              >
+                Đặt làm ảnh đại diện
+              </button>
+            </div>
+          )}
+          {mediaType === "video" && (
+            <div className="text-[11px] text-gray-400">
+              Video không làm ảnh đại diện
+            </div>
           )}
         </div>
       </div>
@@ -326,6 +346,10 @@ function ImageGalleryContent({ images, onImagesChange }: ImageGalleryProps) {
               moveImage={moveImage}
               onDelete={handleDelete}
               onSetCover={handleSetCover}
+              canSetCover={
+                (image.media_type || detectMediaType(image.image_url)) ===
+                "image"
+              }
               isDeleting={deletingId === image.id}
             />
           ))}
@@ -341,8 +365,8 @@ function ImageGalleryContent({ images, onImagesChange }: ImageGalleryProps) {
       {localImages.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-900">
-            💡 <strong>Hướng dẫn:</strong> Kéo thả để sắp xếp thứ tự media •
-            Click ⭐ để đặt media bìa • Click 🗑️ để xóa
+            💡 <strong>Hướng dẫn:</strong> Kéo thả để sắp xếp thứ tự media • Nút
+            Đặt làm ảnh đại diện để chọn ảnh bìa • Click 🗑️ để xóa
           </p>
         </div>
       )}
