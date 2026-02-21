@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, Row, Col, Statistic, Button, Alert, Spin, Space } from "antd";
 import {
   DollarOutlined,
@@ -9,6 +10,7 @@ import {
   ReloadOutlined,
   WalletOutlined,
   WarningOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { ProductTable } from "@/components/admin/ProductTable";
@@ -31,6 +33,7 @@ interface ChartData {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -105,9 +108,17 @@ export default function AdminDashboard() {
         style={{
           marginBottom: 24,
           display: "flex",
+          gap: 8,
           justifyContent: "flex-end",
         }}
       >
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => router.push("/admin/products")}
+        >
+          Thêm sản phẩm
+        </Button>
         <Button
           icon={<ReloadOutlined spin={isRefreshing} />}
           onClick={handleRefresh}

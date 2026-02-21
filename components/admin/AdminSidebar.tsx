@@ -3,7 +3,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Package,
   ShoppingCart,
   Users,
   TrendingUp,
@@ -12,6 +11,8 @@ import {
   X,
   ChevronDown,
   LogOut,
+  Box,
+  Warehouse,
 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
@@ -41,6 +42,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     "Tổng quan",
+    "Sản phẩm",
     "Bán hàng",
     "Kho bãi",
   ]);
@@ -53,6 +55,16 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           label: "Dashboard",
           href: "/admin",
           icon: LayoutDashboard,
+        },
+      ],
+    },
+    {
+      title: "Sản phẩm",
+      items: [
+        {
+          label: "Quản lý sản phẩm",
+          href: "/admin/products",
+          icon: Box,
         },
       ],
     },
@@ -77,7 +89,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         {
           label: "Quản lý kho",
           href: "/admin/inventory",
-          icon: Package,
+          icon: Warehouse,
         },
         {
           label: "Lịch sử nhập",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Filter,
@@ -14,6 +15,7 @@ import { StockInboundModal } from "@/components/admin/StockInboundModal";
 import type { Product } from "@/types/database";
 
 export default function InventoryPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -117,16 +119,25 @@ export default function InventoryPage() {
                 Theo dõi tồn kho và nhập hàng nhanh chóng
               </p>
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              Làm mới
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push("/admin/products")}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+              >
+                <Package className="w-4 h-4" />
+                Thêm sản phẩm
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+                Làm mới
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -218,7 +229,7 @@ export default function InventoryPage() {
               <span className="text-sm text-gray-600">Lọc:</span>
               {searchQuery && (
                 <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                  Tìm: "{searchQuery}"
+                  Tìm: &quot;{searchQuery}&quot;
                   <button
                     onClick={() => setSearchQuery("")}
                     className="hover:bg-blue-200 rounded-full p-0.5"

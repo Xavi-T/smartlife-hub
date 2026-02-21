@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Layout, Menu, Breadcrumb, Avatar, Dropdown, Grid } from "antd";
+import {
+  Layout,
+  Menu,
+  Breadcrumb,
+  Avatar,
+  Dropdown,
+  Grid,
+  Badge,
+  Space,
+} from "antd";
 import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
@@ -10,9 +19,13 @@ import {
   UserOutlined,
   InboxOutlined,
   AppstoreOutlined,
+  PictureOutlined,
+  TagsOutlined,
   LogoutOutlined,
-  MenuFoldOutlined,
   MenuUnfoldOutlined,
+  HistoryOutlined,
+  AuditOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -59,14 +72,47 @@ const menuItems: MenuProps["items"] = [
     type: "group",
   },
   {
-    key: "/admin/inventory",
+    key: "/admin/products",
     icon: <AppstoreOutlined />,
     label: "Sản phẩm",
+  },
+  {
+    key: "/admin/categories",
+    icon: <TagsOutlined />,
+    label: "Danh mục",
+  },
+  {
+    key: "/admin/inventory",
+    icon: <InboxOutlined />,
+    label: "Kho hàng",
   },
   {
     key: "/admin/stock-inbound",
     icon: <InboxOutlined />,
     label: "Nhập kho",
+  },
+  {
+    key: "/admin/stock-history",
+    icon: <HistoryOutlined />,
+    label: "Lịch sử kho",
+  },
+  {
+    key: "/admin/media",
+    icon: <PictureOutlined />,
+    label: "Thư viện media",
+  },
+  {
+    type: "divider",
+  },
+  {
+    key: "system",
+    label: "Hệ thống",
+    type: "group",
+  },
+  {
+    key: "/admin/audit-logs",
+    icon: <AuditOutlined />,
+    label: "Nhật ký hoạt động",
   },
 ];
 
@@ -74,22 +120,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const screens = useBreakpoint();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-
-  // Auto-collapse sidebar on mobile only
-  useEffect(() => {
-    if (screens.xs || screens.sm) {
-      setCollapsed(true);
-    }
-  }, [screens]);
-
-  // Close mobile drawer when route changes
-  useEffect(() => {
-    if (screens.xs || screens.sm) {
-      setMobileDrawerOpen(false);
-    }
-  }, [pathname, screens]);
 
   const isMobile = screens.xs || screens.sm;
 
@@ -101,13 +132,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   // Handle logout
   const handleLogout = async () => {
     try {
-      const result = await logout();
-      if (result.success) {
-        toast.success("Đã đăng xuất thành công");
-        router.push("/login");
-      } else {
-        toast.error(result.error || "Có lỗi xảy ra khi đăng xuất");
-      }
+      await logout();
+      toast.success("Đã đăng xuất thành công");
+      router.push("/login");
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Có lỗi xảy ra khi đăng xuất");
@@ -117,10 +144,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   // Dropdown menu for user avatar
   const userMenuItems: MenuProps["items"] = [
     {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Thông tin cá nhân",
+      disabled: true,
+    },
+    {
+      type: "divider",
+    },
+    {
       key: "logout",
       icon: <LogoutOutlined />,
       label: "Đăng xuất",
       onClick: handleLogout,
+      danger: true,
     },
   ];
 
@@ -130,10 +167,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
     const breadcrumbNameMap: Record<string, string> = {
       admin: "Tổng quan",
+      products: "Sản phẩm",
+      categories: "Danh mục",
       orders: "Đơn hàng",
       customers: "Khách hàng",
-      inventory: "Sản phẩm",
+      inventory: "Kho hàng",
       "stock-inbound": "Nhập kho",
+      "stock-history": "Lịch sử kho",
+      media: "Thư viện media",
+      "audit-logs": "Nhật ký hoạt động",
     };
 
     return pathSegments.map((segment, index) => {
@@ -154,19 +196,30 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          borderBottom: "1px solid rgba(5, 5, 5, 0.06)",
+          gap: 12,
+          padding: "0 16px",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
         }}
       >
+        <img
+          src="/logo.png"
+          alt="SmartLife Logo"
+          style={{
+            height: 40,
+            width: 40,
+            objectFit: "contain",
+            borderRadius: "10%",
+          }}
+        />
         <h1
           style={{
             color: "#fff",
-            fontSize: collapsed ? 18 : 20,
+            fontSize: 20,
             fontWeight: "bold",
             margin: 0,
-            transition: "all 0.3s",
           }}
         >
-          {collapsed ? "SL" : "SmartLife"}
+          SmartLife
         </h1>
       </div>
 
@@ -187,10 +240,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Sidebar - Desktop */}
       {!isMobile && (
         <Sider
-          collapsible
-          collapsed={collapsed}
-          onCollapse={setCollapsed}
-          breakpoint="lg"
           theme="dark"
           width={240}
           style={{
@@ -245,58 +294,96 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main Layout */}
       <Layout
         style={{
-          marginLeft: isMobile ? 0 : collapsed ? 80 : 240,
-          transition: "margin-left 0.3s",
+          marginLeft: isMobile ? 0 : 240,
         }}
       >
         {/* Header */}
         <Header
           style={{
             background: "#fff",
-            padding: "0 24px",
+            padding: "0 32px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderBottom: "1px solid rgba(5, 5, 5, 0.06)",
+            borderBottom: "1px solid #f0f0f0",
             position: "sticky",
             top: 0,
             zIndex: 100,
+            boxShadow: "0 1px 4px rgba(0,21,41,.08)",
           }}
         >
-          {/* Left: Toggle Button + Breadcrumb */}
+          {/* Left: Breadcrumb */}
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {isMobile ? (
+            {isMobile && (
               <MenuUnfoldOutlined
-                style={{ fontSize: 20, cursor: "pointer" }}
+                style={{ fontSize: 20, cursor: "pointer", color: "#1890ff" }}
                 onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
               />
-            ) : (
-              <div
-                style={{ fontSize: 20, cursor: "pointer" }}
-                onClick={() => setCollapsed(!collapsed)}
-              >
-                {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              </div>
             )}
 
-            {!isMobile && <Breadcrumb items={getBreadcrumbItems()} />}
+            <Breadcrumb items={getBreadcrumbItems()} />
           </div>
 
           {/* Right: Admin Info */}
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+          <Dropdown
+            menu={{ items: userMenuItems }}
+            placement="bottomRight"
+            trigger={["click"]}
+          >
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 12,
                 cursor: "pointer",
+                padding: "6px 16px",
+                borderRadius: 8,
+                transition: "all 0.2s",
+                border: "1px solid transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#f5f5f5";
+                e.currentTarget.style.borderColor = "#d9d9d9";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "transparent";
               }}
             >
-              <Avatar
-                icon={<UserOutlined />}
-                style={{ backgroundColor: "#1890ff" }}
-              />
-              {!isMobile && <span style={{ fontWeight: 500 }}>Admin</span>}
+              <Badge dot status="success" offset={[-4, 36]}>
+                <Avatar
+                  icon={<UserOutlined />}
+                  size={40}
+                  style={{
+                    backgroundColor: "#1890ff",
+                    border: "2px solid #e6f7ff",
+                  }}
+                />
+              </Badge>
+              {!isMobile && (
+                <Space orientation="vertical" size={0}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 14,
+                      color: "#262626",
+                      lineHeight: "20px",
+                    }}
+                  >
+                    Administrator
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#8c8c8c",
+                      lineHeight: "18px",
+                    }}
+                  >
+                    admin@smartlife.com
+                  </div>
+                </Space>
+              )}
+              <DownOutlined style={{ fontSize: 10, color: "#8c8c8c" }} />
             </div>
           </Dropdown>
         </Header>

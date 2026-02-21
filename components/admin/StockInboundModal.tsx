@@ -354,21 +354,21 @@ export function StockInboundModal({
                       (selectedProduct.stock_quantity || 0) +
                       (quantityAdded || 0)
                     }
-                    valueStyle={{ fontSize: 20, color: "#1890ff" }}
+                    style={{ fontSize: 20, color: "#1890ff" }}
                   />
                 </Col>
                 <Col span={8}>
                   <Statistic
                     title="Giá vốn BQ mới"
                     value={formatCurrency(previewAvgCost)}
-                    valueStyle={{ fontSize: 20, color: "#1890ff" }}
+                    style={{ fontSize: 20, color: "#1890ff" }}
                   />
                 </Col>
                 <Col span={8}>
                   <Statistic
                     title="Tổng giá trị nhập"
                     value={formatCurrency(totalValue)}
-                    valueStyle={{ fontSize: 20, color: "#52c41a" }}
+                    style={{ fontSize: 20, color: "#52c41a" }}
                   />
                 </Col>
               </Row>

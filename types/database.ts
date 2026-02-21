@@ -1,6 +1,6 @@
 export type OrderStatus = "pending" | "processing" | "delivered" | "cancelled";
 
-export interface Product {
+export interface ProductRow {
   id: string;
   name: string;
   description: string | null;
@@ -12,6 +12,26 @@ export interface Product {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Product extends ProductRow {
+  categories?: Category[];
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductCategory {
+  id: string;
+  product_id: string;
+  category_id: string;
+  created_at: string;
 }
 
 export interface Order {
@@ -60,9 +80,9 @@ export interface Database {
   public: {
     Tables: {
       products: {
-        Row: Product;
-        Insert: Omit<Product, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<Product, "id" | "created_at" | "updated_at">>;
+        Row: ProductRow;
+        Insert: Omit<ProductRow, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<ProductRow, "id" | "created_at" | "updated_at">>;
       };
       orders: {
         Row: Order;
@@ -73,6 +93,16 @@ export interface Database {
         Row: OrderItem;
         Insert: Omit<OrderItem, "id" | "created_at">;
         Update: Partial<Omit<OrderItem, "id" | "created_at">>;
+      };
+      categories: {
+        Row: Category;
+        Insert: Omit<Category, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<Category, "id" | "created_at" | "updated_at">>;
+      };
+      product_categories: {
+        Row: ProductCategory;
+        Insert: Omit<ProductCategory, "id" | "created_at">;
+        Update: Partial<Omit<ProductCategory, "id" | "created_at">>;
       };
     };
     Views: {

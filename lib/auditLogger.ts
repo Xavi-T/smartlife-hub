@@ -115,6 +115,34 @@ export const AuditLogger = {
       description: `Đã xóa sản phẩm: ${productName}`,
     }),
 
+  // Simple helpers
+  createProduct: (productId: string, productName: string) =>
+    logAudit({
+      eventType: "product.created",
+      entityType: "product",
+      entityId: productId,
+      action: "create",
+      description: `Đã tạo sản phẩm mới: ${productName}`,
+    }),
+
+  updateProduct: (productId: string, productName: string) =>
+    logAudit({
+      eventType: "product.updated",
+      entityType: "product",
+      entityId: productId,
+      action: "update",
+      description: `Đã cập nhật sản phẩm: ${productName}`,
+    }),
+
+  deleteProduct: (productId: string, productName: string) =>
+    logAudit({
+      eventType: "product.deleted",
+      entityType: "product",
+      entityId: productId,
+      action: "delete",
+      description: `Đã xóa sản phẩm: ${productName}`,
+    }),
+
   // Order events
   orderCreated: (
     orderId: string,

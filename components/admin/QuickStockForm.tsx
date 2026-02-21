@@ -1,8 +1,10 @@
 "use client";
 
-import { Card, Form, Select, InputNumber, Button, message } from "antd";
+import { useEffect, useState } from "react";
+import { Card, Form, Select, InputNumber, Button, message, Alert } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import type { Product } from "@/types/database";
+import { formatCurrency } from "@/lib/utils";
 
 interface QuickStockFormProps {
   products: Product[];
@@ -15,30 +17,50 @@ export function QuickStockForm({
 }: QuickStockFormProps) {
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Watch selected product
+  const selectedProductId = Form.useWatch("productId", form);
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+
+  // Set default cost price when product changes
+  useEffect(() => {
+    if (selectedProduct) {
+      form.setFieldValue("costPriceAtTime", selectedProduct.cost_price);
+    }
+  }, [selectedProduct, form]);
 
   const handleSubmit = async (values: {
     productId: string;
-    quantity: number;
+    quantityAdded: number;
+    costPriceAtTime: number;
   }) => {
+    setIsSubmitting(true);
+
     try {
-      const response = await fetch("/api/products/stock", {
-        method: "PATCH",
+      const response = await fetch("/api/admin/stock-inbound", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           productId: values.productId,
-          quantity: values.quantity,
+          quantityAdded: values.quantityAdded,
+          costPriceAtTime: values.costPriceAtTime,
+          supplier: null,
+          notes: "Nhập nhanh từ Dashboard",
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update stock");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update stock");
       }
 
-      const selectedProduct = products.find((p) => p.id === values.productId);
+      const result = await response.json();
+
       messageApi.success(
-        `Đã nhập thêm ${values.quantity} ${selectedProduct?.name || "sản phẩm"} vào kho!`,
+        `Đã nhập ${values.quantityAdded} ${selectedProduct?.name}. Tồn kho mới: ${result.data.new_stock_quantity}`,
       );
 
       // Reset form
@@ -46,9 +68,13 @@ export function QuickStockForm({
 
       // Refresh data
       onStockUpdated();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error updating stock:", error);
-      messageApi.error("Có lỗi xảy ra khi cập nhật kho");
+      const errorMessage =
+        error instanceof Error ? error.message : "Có lỗi xảy ra khi nhập hàng";
+      messageApi.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -63,11 +89,20 @@ export function QuickStockForm({
           </div>
         }
       >
+        <Alert
+          message="Nhập hàng đầy đủ"
+          description="Để nhập hàng với đầy đủ thông tin (nhà cung cấp, ghi chú), vui lòng vào trang Quản lý Kho."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
           autoComplete="off"
+          disabled={isSubmitting}
         >
           <Form.Item
             name="productId"
@@ -92,8 +127,22 @@ export function QuickStockForm({
             />
           </Form.Item>
 
+          {selectedProduct && (
+            <Card
+              size="small"
+              style={{ marginBottom: 16, background: "#fafafa" }}
+            >
+              <div style={{ fontSize: 12, color: "#8c8c8c", marginBottom: 4 }}>
+                Giá vốn hiện tại
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                {formatCurrency(selectedProduct.cost_price)}
+              </div>
+            </Card>
+          )}
+
           <Form.Item
-            name="quantity"
+            name="quantityAdded"
             label="Số lượng nhập thêm"
             rules={[
               { required: true, message: "Vui lòng nhập số lượng" },
@@ -107,11 +156,36 @@ export function QuickStockForm({
             />
           </Form.Item>
 
+          <Form.Item
+            name="costPriceAtTime"
+            label="Giá vốn lô hàng này (VNĐ)"
+            rules={[
+              { required: true, message: "Vui lòng nhập giá vốn" },
+              {
+                type: "number",
+                min: 0,
+                message: "Giá vốn phải lớn hơn hoặc bằng 0",
+              },
+            ]}
+            tooltip="Giá vốn của lô hàng đang nhập. Hệ thống sẽ tính giá vốn bình quân gia quyền."
+          >
+            <InputNumber
+              placeholder="Nhập giá vốn..."
+              style={{ width: "100%" }}
+              min={0}
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+              parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
+            />
+          </Form.Item>
+
           <Form.Item>
             <Button
               type="primary"
               htmlType="submit"
               icon={<InboxOutlined />}
+              loading={isSubmitting}
               block
             >
               Nhập hàng

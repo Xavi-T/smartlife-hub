@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return "Đã xảy ra lỗi";
+}
+
 // POST: Ghi nhận nhập hàng
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +14,13 @@ export async function POST(request: NextRequest) {
     const { productId, quantityAdded, costPriceAtTime, supplier, notes } = body;
 
     // Validation
-    if (!productId || !quantityAdded || !costPriceAtTime) {
+    if (
+      !productId ||
+      quantityAdded === undefined ||
+      quantityAdded === null ||
+      costPriceAtTime === undefined ||
+      costPriceAtTime === null
+    ) {
       return NextResponse.json(
         { error: "Product ID, số lượng và giá vốn là bắt buộc" },
         { status: 400 },
@@ -64,10 +75,10 @@ export async function POST(request: NextRequest) {
       message: "Nhập hàng thành công",
       data: data,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error processing stock inbound:", error);
     return NextResponse.json(
-      { error: error.message || "Không thể xử lý nhập hàng" },
+      { error: getErrorMessage(error) || "Không thể xử lý nhập hàng" },
       { status: 500 },
     );
   }
@@ -123,10 +134,10 @@ export async function GET(request: NextRequest) {
         totalValue,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching stock inbound history:", error);
     return NextResponse.json(
-      { error: error.message || "Không thể tải lịch sử nhập hàng" },
+      { error: getErrorMessage(error) || "Không thể tải lịch sử nhập hàng" },
       { status: 500 },
     );
   }
