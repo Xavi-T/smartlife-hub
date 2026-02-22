@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart } from "lucide-react";
+import { Badge, Button, Space, Typography } from "antd";
+import { ShoppingCartOutlined } from "@ant-design/icons";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -10,14 +11,43 @@ interface HeaderProps {
 
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <header
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        background: "#fff",
+        borderBottom: "1px solid #f0f0f0",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            minHeight: 64,
+          }}
+        >
           <Link
             href="/"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
           >
-            <div className="w-10 h-10 border-2 border-blue-500 rounded-lg flex items-center justify-center">
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                border: "2px solid #1677ff",
+                borderRadius: 8,
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
               <img
                 src="/logo.png"
                 alt="SmartLife Hub Logo"
@@ -25,31 +55,32 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">SmartLife Hub</h1>
-              <p className="text-xs text-gray-500">Đồ gia dụng thông minh</p>
+              <Typography.Title level={4} style={{ margin: 0 }}>
+                SmartLife Hub
+              </Typography.Title>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Đồ gia dụng thông minh
+              </Typography.Text>
             </div>
           </Link>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/orders/track"
-              className="text-sm font-medium text-gray-600 hover:text-blue-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              Tra cứu đơn
+          <Space size="small">
+            <Link href="/orders/track">
+              <Button type="text">Tra cứu đơn</Button>
             </Link>
-            <button
-              onClick={onCartClick}
-              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Giỏ hàng"
+            <Badge
+              count={cartItemsCount > 9 ? "9+" : cartItemsCount}
+              size="small"
             >
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
-              {cartItemsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {cartItemsCount > 9 ? "9+" : cartItemsCount}
-                </span>
-              )}
-            </button>
-          </div>
+              <Button
+                type="text"
+                shape="circle"
+                icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
+                onClick={onCartClick}
+                aria-label="Giỏ hàng"
+              />
+            </Badge>
+          </Space>
         </div>
       </div>
     </header>

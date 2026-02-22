@@ -147,7 +147,7 @@ export default function ProductDetailPage() {
         />
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Card>
-            <Space direction="vertical" size={16}>
+            <Space orientation="vertical" size={16}>
               <div className="text-lg font-semibold">
                 Không tìm thấy sản phẩm
               </div>

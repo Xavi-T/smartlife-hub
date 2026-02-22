@@ -1,6 +1,7 @@
 "use client";
 
-import { ShoppingCart } from "lucide-react";
+import { Button, Card, Image, Space, Tag, Typography } from "antd";
+import { ShoppingCartOutlined } from "@ant-design/icons";
 import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
@@ -20,12 +21,25 @@ export function ProductCard({
   const hasDiscount = discountPercent > 0;
   const finalPrice = calculateDiscountedPrice(product.price, discountPercent);
   const savingAmount = product.price - finalPrice;
+  const imageUrl = product.image_url || undefined;
 
   return (
-    <div
-      className={`bg-white rounded-lg shadow-md overflow-hidden transition-shadow duration-300 ${
-        isOutOfStock ? "cursor-pointer" : "cursor-pointer hover:shadow-xl"
-      }`}
+    <Card
+      hoverable={!isOutOfStock}
+      styles={{
+        body: {
+          padding: 12,
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+        },
+      }}
+      style={{
+        overflow: "hidden",
+        height: "100%",
+        width: "100%",
+        borderRadius: 12,
+      }}
       onClick={() => onViewDetail(product)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -35,91 +49,178 @@ export function ProductCard({
       }}
       role="button"
       tabIndex={0}
-      title="Xem chi tiết sản phẩm"
     >
-      {/* Image */}
-      <div className="relative aspect-square bg-gray-100">
-        {product.image_url ? (
-          <img
-            src={product.image_url}
+      <div
+        style={{
+          position: "relative",
+          aspectRatio: "1 / 1",
+          borderRadius: 10,
+          overflow: "hidden",
+          background: "#f5f5f5",
+          marginBottom: 10,
+        }}
+      >
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
             alt={product.name}
-            className="w-full h-full object-cover"
+            preview={false}
+            width="100%"
+            height="100%"
+            style={{ objectFit: "cover" }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            <span className="text-4xl">📦</span>
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "grid",
+              placeItems: "center",
+              color: "#8c8c8c",
+              fontSize: 40,
+            }}
+          >
+            📦
           </div>
         )}
 
         {product.stock_quantity < 5 && product.stock_quantity > 0 && (
-          <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded">
+          <Tag
+            color="warning"
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              margin: 0,
+              fontSize: 13,
+              fontWeight: 700,
+              paddingInline: 8,
+              paddingBlock: 2,
+            }}
+          >
             Còn {product.stock_quantity}
-          </div>
+          </Tag>
         )}
 
         {hasDiscount && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white text-sm font-bold px-2.5 py-1 rounded-full shadow">
+          <Tag
+            color="error"
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              margin: 0,
+              fontSize: 14,
+              fontWeight: 800,
+              paddingInline: 10,
+              paddingBlock: 2,
+            }}
+          >
             -{discountPercent}%
-          </div>
+          </Tag>
         )}
 
         {isOutOfStock && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <span className="bg-red-600 text-white font-bold px-4 py-2 rounded-lg">
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+              background: "rgba(0, 0, 0, 0.45)",
+            }}
+          >
+            <Tag
+              color="error"
+              style={{
+                margin: 0,
+                fontSize: 14,
+                paddingInline: 10,
+                paddingBlock: 2,
+              }}
+            >
               Hết hàng
-            </span>
+            </Tag>
           </div>
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="mb-2">
-          <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded">
+      <Space
+        orientation="vertical"
+        size={10}
+        style={{ width: "100%", flex: 1 }}
+      >
+        <div style={{ minHeight: 24 }}>
+          <Tag color="blue" style={{ margin: 0 }}>
             {product.category}
-          </span>
+          </Tag>
         </div>
 
-        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-12">
-          {product.name}
-        </h3>
+        <div style={{ minHeight: 44 }}>
+          <Typography.Text
+            strong
+            ellipsis={{ tooltip: product.name }}
+            style={{
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              fontSize: 15,
+              lineHeight: 1.35,
+            }}
+          >
+            {product.name}
+          </Typography.Text>
+        </div>
 
-        {product.description && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-            {product.description}
-          </p>
-        )}
-
-        <div className="flex items-end justify-between mt-auto">
-          <div>
-            <p className="text-3xl font-extrabold text-red-600 leading-none">
+        <div
+          style={{
+            marginTop: "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <div style={{ minHeight: 58 }}>
+            <Typography.Text
+              strong
+              style={{ color: "#ff4d4f", fontSize: 22, lineHeight: 1.05 }}
+            >
               {formatCurrency(finalPrice)}
-            </p>
+            </Typography.Text>
             {hasDiscount && (
-              <div className="mt-1 space-y-0.5">
-                <p className="text-sm text-gray-500 line-through leading-none">
+              <Space orientation="vertical" size={0} style={{ marginTop: 2 }}>
+                <Typography.Text
+                  delete
+                  type="secondary"
+                  style={{ fontSize: 12 }}
+                >
                   {formatCurrency(product.price)}
-                </p>
-                <p className="text-xs font-semibold text-red-500 leading-none">
+                </Typography.Text>
+                <Typography.Text
+                  style={{ fontSize: 14, fontWeight: 700, color: "#ff4d4f" }}
+                >
                   Tiết kiệm {formatCurrency(savingAmount)}
-                </p>
-              </div>
+                </Typography.Text>
+              </Space>
             )}
           </div>
 
-          <button
+          <Button
+            type="primary"
+            icon={<ShoppingCartOutlined />}
             onClick={(event) => {
               event.stopPropagation();
               onAddToCart(product);
             }}
             disabled={isOutOfStock}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            style={{ borderRadius: 8 }}
           >
-            <ShoppingCart className="w-4 h-4" />
-            <span className="hidden sm:inline">Thêm</span>
-          </button>
+            Thêm
+          </Button>
         </div>
-      </div>
-    </div>
+      </Space>
+    </Card>
   );
 }

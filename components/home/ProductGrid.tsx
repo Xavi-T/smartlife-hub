@@ -1,5 +1,6 @@
 "use client";
 
+import { Col, Empty, Row } from "antd";
 import { ProductCard } from "./ProductCard";
 import type { Product } from "@/types/database";
 
@@ -16,22 +17,30 @@ export function ProductGrid({
 }: ProductGridProps) {
   if (products.length === 0) {
     return (
-      <div className="text-center py-16">
-        <p className="text-gray-500 text-lg">Không có sản phẩm nào</p>
+      <div style={{ padding: "32px 0" }}>
+        <Empty description="Không có sản phẩm nào" />
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+    <Row gutter={[16, 16]} align="stretch">
       {products.map((product) => (
-        <ProductCard
+        <Col
           key={product.id}
-          product={product}
-          onAddToCart={onAddToCart}
-          onViewDetail={onViewDetail}
-        />
+          xs={12}
+          sm={12}
+          md={8}
+          lg={6}
+          style={{ display: "flex" }}
+        >
+          <ProductCard
+            product={product}
+            onAddToCart={onAddToCart}
+            onViewDetail={onViewDetail}
+          />
+        </Col>
       ))}
-    </div>
+    </Row>
   );
 }

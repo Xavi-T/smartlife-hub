@@ -6,7 +6,7 @@ import { ProductGrid } from "@/components/home/ProductGrid";
 import { CartModal } from "@/components/home/CartModal";
 import { useCart } from "@/hooks/useCart";
 import type { Product } from "@/types/database";
-import { message } from "antd";
+import { Button, Card, Empty, Space, Spin, Typography, message } from "antd";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
@@ -61,11 +61,13 @@ export default function Home() {
 
   if (isLoading || !isLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Đang tải sản phẩm...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <Space orientation="vertical" align="center" size="middle">
+          <Spin size="large" />
+          <Typography.Text type="secondary">
+            Đang tải sản phẩm...
+          </Typography.Text>
+        </Space>
       </div>
     );
   }
@@ -83,14 +85,14 @@ export default function Home() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+        <Card style={{ marginBottom: 24 }}>
+          <Typography.Title level={2} style={{ marginBottom: 8 }}>
             Sản phẩm gia dụng chất lượng
-          </h2>
-          <p className="text-gray-600">
+          </Typography.Title>
+          <Typography.Text type="secondary">
             Khám phá bộ sưu tập đồ gia dụng tiện ích cho ngôi nhà của bạn
-          </p>
-        </div>
+          </Typography.Text>
+        </Card>
 
         {/* Product Grid */}
         <ProductGrid
@@ -101,15 +103,16 @@ export default function Home() {
 
         {/* Empty State */}
         {products.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg mb-4">Chưa có sản phẩm nào</p>
-            <button
-              onClick={fetchProducts}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+          <Card style={{ marginTop: 16 }}>
+            <Empty
+              description="Chưa có sản phẩm nào"
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
-              Tải lại
-            </button>
-          </div>
+              <Button type="primary" onClick={fetchProducts}>
+                Tải lại
+              </Button>
+            </Empty>
+          </Card>
         )}
       </main>
 
