@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 interface DashboardStats {
   totalRevenue: number;
@@ -9,8 +12,34 @@ interface DashboardStats {
   previousMonthRevenue: number;
 }
 
+function createAdminDashboardClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return supabase;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 export async function GET() {
   try {
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sb = createAdminDashboardClient();
     const now = new Date();
     const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const firstDayLastMonth = new Date(
@@ -22,7 +51,7 @@ export async function GET() {
     const firstDayLastMonthISO = firstDayLastMonth.toISOString();
 
     // 1. Tổng doanh thu từ đơn hàng "delivered"
-    const { data: revenueData, error: revenueError } = await supabase
+    const { data: revenueData, error: revenueError } = await sb
       .from("orders")
       .select("total_amount")
       .eq("status", "delivered");
@@ -36,7 +65,7 @@ export async function GET() {
       ) || 0;
 
     // 2. Tổng lợi nhuận: SUM((unit_price - cost_price) * quantity)
-    const { data: profitData, error: profitError } = await supabase.from(
+    const { data: profitData, error: profitError } = await sb.from(
       "order_items",
     ).select(`
         quantity,
@@ -60,7 +89,7 @@ export async function GET() {
         }, 0) || 0;
 
     // 3. Doanh thu tháng này
-    const { data: thisMonthData, error: thisMonthError } = await supabase
+    const { data: thisMonthData, error: thisMonthError } = await sb
       .from("orders")
       .select("total_amount")
       .eq("status", "delivered")
@@ -75,7 +104,7 @@ export async function GET() {
       ) || 0;
 
     // 4. Doanh thu tháng trước
-    const { data: lastMonthData, error: lastMonthError } = await supabase
+    const { data: lastMonthData, error: lastMonthError } = await sb
       .from("orders")
       .select("total_amount")
       .eq("status", "delivered")

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 interface ChartData {
   date: string;
@@ -7,8 +10,34 @@ interface ChartData {
   orders: number;
 }
 
+function createAdminDashboardClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return supabase;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 export async function GET() {
   try {
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sb = createAdminDashboardClient();
     // Lấy dữ liệu 7 ngày gần nhất
     const today = new Date();
     const sevenDaysAgo = new Date(today);
@@ -16,7 +45,7 @@ export async function GET() {
 
     const startDate = sevenDaysAgo.toISOString().split("T")[0];
 
-    const { data: ordersData, error } = await supabase
+    const { data: ordersData, error } = await sb
       .from("orders")
       .select("created_at, total_amount, status")
       .eq("status", "delivered")

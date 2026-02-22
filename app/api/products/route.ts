@@ -328,6 +328,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (normalizedStockQuantity !== null && normalizedStockQuantity !== 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Sản phẩm mới mặc định tồn kho bằng 0. Vui lòng dùng chức năng Nhập kho để thêm hàng.",
+        },
+        { status: 400 },
+      );
+    }
+
     const { data, error } = await supabase
       .from("products")
       .insert({
@@ -337,7 +347,7 @@ export async function POST(request: NextRequest) {
         discount_percent:
           normalizedDiscountPercent !== null ? normalizedDiscountPercent : 0,
         cost_price: normalizedCostPrice,
-        stock_quantity: normalizedStockQuantity ?? 0,
+        stock_quantity: 0,
         category: normalizedCategoryNames[0],
         image_url: null,
         is_active: is_active !== undefined ? is_active : true,

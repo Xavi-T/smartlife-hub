@@ -1,11 +1,40 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+
+function createAdminDashboardClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return supabase;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 export async function GET() {
   try {
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sb = createAdminDashboardClient();
     // Query order_items joined with products and orders
     // Only count delivered orders for actual sales
-    const { data: topProducts, error } = await supabase
+    const { data: topProducts, error } = await sb
       .from("order_items")
       .select(
         `

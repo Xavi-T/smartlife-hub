@@ -3,15 +3,29 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search,
-  Filter,
-  RefreshCw,
-  Package,
-  AlertTriangle,
-} from "lucide-react";
+  Alert,
+  Button,
+  Card,
+  Col,
+  Input,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Statistic,
+  Typography,
+} from "antd";
+import {
+  AlertOutlined,
+  AppstoreAddOutlined,
+  DatabaseOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 import { InventoryTable } from "@/components/admin/InventoryTable";
-import { RestockModal } from "@/components/admin/RestockModal";
 import { StockInboundModal } from "@/components/admin/StockInboundModal";
+import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 export default function InventoryPage() {
@@ -22,7 +36,6 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
   const [isInboundModalOpen, setIsInboundModalOpen] = useState(false);
 
   // Fetch products
@@ -83,11 +96,7 @@ export default function InventoryPage() {
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
-    setIsInboundModalOpen(true); // Đổi sang modal nhập hàng mới
-  };
-
-  const handleRestockSuccess = () => {
-    fetchProducts();
+    setIsInboundModalOpen(true);
   };
 
   const handleInboundSuccess = () => {
@@ -96,198 +105,131 @@ export default function InventoryPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Đang tải dữ liệu...</p>
-        </div>
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <Space orientation="vertical" align="center">
+          <Spin size="large" />
+          <Typography.Text type="secondary">
+            Đang tải dữ liệu...
+          </Typography.Text>
+        </Space>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Quản lý Kho hàng
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Theo dõi tồn kho và nhập hàng nhanh chóng
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
+    <div style={{ minHeight: "100vh", background: "#f5f5f5" }}>
+      <Space
+        orientation="vertical"
+        size={16}
+        style={{ width: "100%", padding: 24 }}
+      >
+        <Card>
+          <Space
+            style={{ width: "100%", justifyContent: "space-between" }}
+            align="start"
+            wrap
+          >
+            <Space>
+              <Button
+                icon={<PlusOutlined />}
                 onClick={() => router.push("/admin/products")}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
               >
-                <Package className="w-4 h-4" />
                 Thêm sản phẩm
-              </button>
-              <button
+              </Button>
+              <Button
+                type="primary"
+                icon={<ReloadOutlined spin={isRefreshing} />}
                 onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                loading={isRefreshing}
               >
-                <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-                />
                 Làm mới
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+              </Button>
+            </Space>
+          </Space>
+        </Card>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Tổng sản phẩm</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {products.length}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Tổng số lượng</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {stats.totalItems.toLocaleString("vi-VN")}
-                </p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Package className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Cần nhập hàng</p>
-                <p className="text-3xl font-bold text-red-600">
-                  {stats.lowStockCount}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Tồn kho {"<"} 10</p>
-              </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm sản phẩm theo tên..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={8}>
+            <Card>
+              <Statistic
+                title="Tổng sản phẩm"
+                value={products.length}
+                prefix={<AppstoreAddOutlined />}
               />
-            </div>
+            </Card>
+          </Col>
+          <Col xs={24} md={8}>
+            <Card>
+              <Statistic
+                title="Tổng số lượng tồn"
+                value={stats.totalItems}
+                formatter={(value) =>
+                  Number(value || 0).toLocaleString("vi-VN")
+                }
+                prefix={<DatabaseOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} md={8}>
+            <Card>
+              <Statistic
+                title="Giá trị tồn kho"
+                value={stats.totalValue}
+                formatter={(value) => formatCurrency(Number(value || 0))}
+                style={{ color: "#1677ff" }}
+              />
+            </Card>
+          </Col>
+        </Row>
 
-            {/* Category Filter */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <select
+        <Card>
+          <Space
+            wrap
+            style={{ width: "100%", justifyContent: "space-between" }}
+          >
+            <Space wrap>
+              <Input
+                allowClear
+                placeholder="Tìm kiếm sản phẩm theo tên..."
+                prefix={<SearchOutlined />}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                style={{ minWidth: 280 }}
+              />
+              <Select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-              >
-                <option value="all">Tất cả danh mục</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+                onChange={setSelectedCategory}
+                style={{ minWidth: 220 }}
+                options={[
+                  { value: "all", label: "Tất cả danh mục" },
+                  ...categories.map((category) => ({
+                    value: category,
+                    label: category,
+                  })),
+                ]}
+              />
+            </Space>
+            <Typography.Text type="secondary">
+              {filteredProducts.length} sản phẩm
+            </Typography.Text>
+          </Space>
+        </Card>
 
-          {/* Active Filters */}
-          {(searchQuery || selectedCategory !== "all") && (
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-600">Lọc:</span>
-              {searchQuery && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                  Tìm: &quot;{searchQuery}&quot;
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="hover:bg-blue-200 rounded-full p-0.5"
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              {selectedCategory !== "all" && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full">
-                  {selectedCategory}
-                  <button
-                    onClick={() => setSelectedCategory("all")}
-                    className="hover:bg-purple-200 rounded-full p-0.5"
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-              <span className="text-sm text-gray-500">
-                ({filteredProducts.length} sản phẩm)
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Low Stock Alert */}
         {stats.lowStockCount > 0 && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-semibold text-red-900">
-                  Cảnh báo tồn kho thấp
-                </h3>
-                <p className="text-sm text-red-700 mt-1">
-                  Có {stats.lowStockCount} sản phẩm có tồn kho dưới 10. Click
-                  vào sản phẩm để nhập hàng nhanh.
-                </p>
-              </div>
-            </div>
-          </div>
+          <Alert
+            showIcon
+            type="warning"
+            icon={<AlertOutlined />}
+            title="Cảnh báo tồn kho thấp"
+            description={`Có ${stats.lowStockCount} sản phẩm có tồn kho dưới 10. Click vào sản phẩm để nhập hàng nhanh.`}
+          />
         )}
 
-        {/* Inventory Table */}
         <InventoryTable
           products={filteredProducts}
           onProductClick={handleProductClick}
         />
-      </div>
-
-      {/* Restock Modal */}
-      <RestockModal
-        isOpen={isRestockModalOpen}
-        onClose={() => setIsRestockModalOpen(false)}
-        product={selectedProduct}
-        onSuccess={handleRestockSuccess}
-      />
+      </Space>
 
       {/* Stock Inbound Modal */}
       <StockInboundModal

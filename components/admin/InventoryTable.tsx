@@ -1,6 +1,17 @@
 "use client";
 
-import { AlertTriangle, Package } from "lucide-react";
+import {
+  Button,
+  Card,
+  Empty,
+  Image,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { AlertOutlined, InboxOutlined } from "@ant-design/icons";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
@@ -13,149 +24,148 @@ export function InventoryTable({
   products,
   onProductClick,
 }: InventoryTableProps) {
+  const columns: ColumnsType<Product> = [
+    {
+      title: "Sản phẩm",
+      key: "product",
+      render: (_: unknown, product) => (
+        <Space>
+          {product.image_url ? (
+            <Image
+              src={product.image_url}
+              alt={product.name}
+              width={48}
+              height={48}
+              preview={false}
+              style={{ objectFit: "cover", borderRadius: 8 }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 8,
+                background: "#f5f5f5",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              📦
+            </div>
+          )}
+          <div>
+            <Typography.Text strong>{product.name}</Typography.Text>
+          </div>
+        </Space>
+      ),
+    },
+    {
+      title: "Danh mục",
+      dataIndex: "category",
+      key: "category",
+      width: 160,
+      render: (category: string) => <Tag color="blue">{category}</Tag>,
+    },
+    {
+      title: "Giá vốn",
+      dataIndex: "cost_price",
+      key: "cost_price",
+      align: "right",
+      width: 140,
+      render: (value: number) => formatCurrency(value),
+    },
+    {
+      title: "Giá bán",
+      key: "price",
+      align: "right",
+      width: 180,
+      render: (_: unknown, product) => {
+        const profit = product.price - product.cost_price;
+        const profitMargin =
+          product.price > 0 ? (profit / product.price) * 100 : 0;
+
+        return (
+          <div>
+            <Typography.Text strong style={{ color: "#1677ff" }}>
+              {formatCurrency(product.price)}
+            </Typography.Text>
+            <br />
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Lãi: {profitMargin.toFixed(1)}%
+            </Typography.Text>
+          </div>
+        );
+      },
+    },
+    {
+      title: "Tồn kho",
+      key: "stock",
+      align: "center",
+      width: 150,
+      render: (_: unknown, product) => {
+        const isLowStock = product.stock_quantity < 10;
+
+        return (
+          <Space orientation="vertical" size={2} align="center">
+            <Typography.Text
+              strong
+              style={{ color: isLowStock ? "#ff4d4f" : undefined }}
+            >
+              {product.stock_quantity}
+            </Typography.Text>
+            {isLowStock && (
+              <Tag color="error" icon={<AlertOutlined />}>
+                Cần nhập
+              </Tag>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      title: "Hành động",
+      key: "action",
+      width: 140,
+      align: "center",
+      render: (_: unknown, product) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<InboxOutlined />}
+          onClick={(event) => {
+            event.stopPropagation();
+            onProductClick(product);
+          }}
+        >
+          Nhập hàng
+        </Button>
+      ),
+    },
+  ];
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Danh sách sản phẩm ({products.length})
-        </h2>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Sản phẩm
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Danh mục
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Giá vốn
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Giá bán
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Tồn kho
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Hành động
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {products.map((product) => {
-              const isLowStock = product.stock_quantity < 10;
-              const profit = product.price - product.cost_price;
-              const profitMargin = ((profit / product.price) * 100).toFixed(1);
-
-              return (
-                <tr
-                  key={product.id}
-                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                    isLowStock ? "bg-red-50" : ""
-                  }`}
-                  onClick={() => onProductClick(product)}
-                >
-                  {/* Product */}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="h-12 w-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                          <span className="text-gray-400 text-xs">N/A</span>
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {product.name}
-                        </div>
-                        {product.description && (
-                          <div className="text-sm text-gray-500 line-clamp-1 max-w-xs">
-                            {product.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Category */}
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {product.category}
-                    </span>
-                  </td>
-
-                  {/* Cost Price */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(product.cost_price)}
-                    </div>
-                  </td>
-
-                  {/* Selling Price */}
-                  <td className="px-6 py-4 text-right">
-                    <div className="text-sm font-bold text-blue-600">
-                      {formatCurrency(product.price)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Lãi: {profitMargin}%
-                    </div>
-                  </td>
-
-                  {/* Stock */}
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col items-center gap-1">
-                      <span
-                        className={`text-lg font-bold ${
-                          isLowStock ? "text-red-600" : "text-gray-900"
-                        }`}
-                      >
-                        {product.stock_quantity}
-                      </span>
-                      {isLowStock && (
-                        <div className="flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-red-500" />
-                          <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                            Cần nhập hàng
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Action */}
-                  <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onProductClick(product);
-                      }}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
-                      <Package className="w-4 h-4" />
-                      Nhập hàng
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {products.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          Không tìm thấy sản phẩm nào
-        </div>
-      )}
-    </div>
+    <Card
+      title={`Danh sách sản phẩm (${products.length})`}
+      styles={{ body: { padding: 0 } }}
+    >
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={products}
+        scroll={{ x: 980 }}
+        pagination={{
+          pageSize: 20,
+          showSizeChanger: true,
+          pageSizeOptions: ["10", "20", "50", "100"],
+          showTotal: (total) => `Tổng ${total} sản phẩm`,
+        }}
+        onRow={(record) => ({
+          onClick: () => onProductClick(record),
+        })}
+        locale={{
+          emptyText: <Empty description="Không tìm thấy sản phẩm nào" />,
+        }}
+      />
+    </Card>
   );
 }

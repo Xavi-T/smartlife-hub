@@ -29,7 +29,6 @@ interface ProductFormValues {
   price: number;
   discount_percent?: number;
   cost_price: number;
-  stock_quantity?: number;
   categories: string[];
   is_active?: boolean;
 }
@@ -63,7 +62,6 @@ export function ProductFormModal({
         price: product.price,
         discount_percent: product.discount_percent || 0,
         cost_price: product.cost_price,
-        stock_quantity: product.stock_quantity,
         categories:
           product.categories && product.categories.length > 0
             ? product.categories.map((item) => item.name)
@@ -74,7 +72,6 @@ export function ProductFormModal({
       form.resetFields();
       form.setFieldsValue({
         is_active: true,
-        stock_quantity: 0,
         discount_percent: 0,
         categories: [],
       });
@@ -319,44 +316,29 @@ export function ProductFormModal({
             </Form.Item>
           </div>
 
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+          <Form.Item
+            label="Danh mục"
+            name="categories"
+            rules={[
+              { required: true, message: "Vui lòng chọn ít nhất 1 danh mục" },
+            ]}
+            tooltip="Có thể chọn nhiều danh mục hoặc gõ để tạo mới"
           >
-            <Form.Item
-              label="Tồn kho ban đầu"
-              name="stock_quantity"
-              rules={[
-                {
-                  type: "number",
-                  min: 0,
-                  message: "Tồn kho phải lớn hơn hoặc bằng 0",
-                },
-              ]}
-              tooltip="Để cập nhật tồn kho sau này, dùng chức năng Nhập hàng"
-            >
-              <InputNumber
-                style={{ width: "100%" }}
-                placeholder="0"
-                disabled={isEditMode}
-              />
-            </Form.Item>
+            <Select
+              placeholder="Chọn hoặc nhập danh mục"
+              showSearch
+              mode="tags"
+              options={categoryOptions}
+            />
+          </Form.Item>
 
-            <Form.Item
-              label="Danh mục"
-              name="categories"
-              rules={[
-                { required: true, message: "Vui lòng chọn ít nhất 1 danh mục" },
-              ]}
-              tooltip="Có thể chọn nhiều danh mục hoặc gõ để tạo mới"
-            >
-              <Select
-                placeholder="Chọn hoặc nhập danh mục"
-                showSearch
-                mode="tags"
-                options={categoryOptions}
-              />
-            </Form.Item>
-          </div>
+          <Typography.Text
+            type="secondary"
+            style={{ display: "block", marginBottom: 16 }}
+          >
+            Tồn kho ban đầu mặc định bằng 0. Sau khi tạo sản phẩm, dùng chức
+            năng Nhập kho để thêm hàng vào kho.
+          </Typography.Text>
 
           <Typography.Text
             type="secondary"
