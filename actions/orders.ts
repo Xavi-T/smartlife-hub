@@ -2,11 +2,229 @@
 
 import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
+import { createClient } from "@supabase/supabase-js";
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
   CartItem,
+  CheckoutMethod,
+  PaymentMethod,
 } from "@/types/order";
+
+interface ProductForOrder {
+  id: string;
+  name: string;
+  price: number;
+  discount_percent: number | null;
+  stock_quantity: number;
+  is_active: boolean;
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+function createOrderWriteClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }) as any;
+}
+
+function calculateEffectivePrice(
+  price: number,
+  discountPercent: number | null,
+): number {
+  const discount = Math.min(Math.max(discountPercent || 0, 0), 100);
+  return Math.round(price * (1 - discount / 100));
+}
+
+function isMissingCreateOrderRpc(
+  error: { code?: string; message?: string } | null,
+): boolean {
+  if (!error) return false;
+  return (
+    error.code === "PGRST202" ||
+    error.message?.includes("create_order_transaction") === true
+  );
+}
+
+async function createOrderDirectly(params: {
+  db: any;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  notes: string;
+  checkoutMethod: CheckoutMethod;
+  paymentMethod: PaymentMethod;
+  items: CartItem[];
+}): Promise<CreateOrderResponse> {
+  const {
+    db,
+    customerName,
+    customerPhone,
+    customerAddress,
+    notes,
+    checkoutMethod,
+    paymentMethod,
+    items,
+  } = params;
+
+  if (!db) {
+    return {
+      success: false,
+      message:
+        "Thiếu SUPABASE_SERVICE_ROLE_KEY. Không thể tạo đơn hàng khi RLS đang bật.",
+    };
+  }
+
+  const productIds = items.map((item) => item.product_id);
+  const { data: productsData, error: productsError } = await db
+    .from("products")
+    .select("id, name, price, discount_percent, stock_quantity, is_active")
+    .in("id", productIds);
+
+  if (productsError) {
+    return {
+      success: false,
+      message: "Không thể tải thông tin sản phẩm",
+    };
+  }
+
+  const productRows = (productsData || []) as ProductForOrder[];
+  const productMap = new Map(
+    productRows.map((product: ProductForOrder) => [product.id, product]),
+  );
+
+  for (const item of items) {
+    const product = productMap.get(item.product_id);
+    if (!product) {
+      return { success: false, message: "Sản phẩm không tồn tại" };
+    }
+    if (!product.is_active) {
+      return {
+        success: false,
+        message: `Sản phẩm \"${product.name}\" đã ngừng bán`,
+      };
+    }
+    if (product.stock_quantity < item.quantity) {
+      return {
+        success: false,
+        message: `Sản phẩm \"${product.name}\" chỉ còn ${product.stock_quantity} sản phẩm`,
+      };
+    }
+  }
+
+  const baseOrderInsert = {
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    customer_address: customerAddress,
+    total_amount: 0,
+    status: "pending",
+    notes,
+  };
+
+  const orderInsertWithPayment = {
+    ...baseOrderInsert,
+    checkout_method: checkoutMethod,
+    payment_method: paymentMethod,
+    payment_confirmed: paymentMethod === "cod",
+    payment_confirmed_at:
+      paymentMethod === "cod" ? new Date().toISOString() : null,
+    payment_confirmed_by: paymentMethod === "cod" ? "system" : null,
+  };
+
+  let orderId: string | null = null;
+  let orderInsertError: { code?: string; message?: string } | null = null;
+
+  const { data: createdWithPayment, error: createWithPaymentError } = await db
+    .from("orders")
+    .insert(orderInsertWithPayment)
+    .select("id")
+    .single();
+
+  if (!createWithPaymentError && createdWithPayment?.id) {
+    orderId = createdWithPayment.id;
+  } else {
+    orderInsertError = createWithPaymentError as {
+      code?: string;
+      message?: string;
+    };
+
+    const { data: createdBase, error: createBaseError } = await db
+      .from("orders")
+      .insert(baseOrderInsert)
+      .select("id")
+      .single();
+
+    if (createBaseError || !createdBase?.id) {
+      return {
+        success: false,
+        message:
+          "Không thể tạo đơn hàng" +
+          (orderInsertError?.message ? `: ${orderInsertError.message}` : ""),
+      };
+    }
+
+    orderId = createdBase.id;
+  }
+
+  const orderItemsPayload = items.map((item) => {
+    const product = productMap.get(item.product_id)!;
+    const unitPrice = calculateEffectivePrice(
+      product.price,
+      product.discount_percent,
+    );
+    return {
+      order_id: orderId,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: unitPrice,
+      subtotal: unitPrice * item.quantity,
+    };
+  });
+
+  const { error: orderItemsError } = await db
+    .from("order_items")
+    .insert(orderItemsPayload);
+
+  if (orderItemsError) {
+    await db.from("orders").delete().eq("id", orderId);
+    return {
+      success: false,
+      message: `Không thể tạo chi tiết đơn hàng: ${orderItemsError.message}`,
+    };
+  }
+
+  const { data: finalOrder, error: finalOrderError } = await db
+    .from("orders")
+    .select("id, total_amount")
+    .eq("id", orderId)
+    .single();
+
+  if (finalOrderError || !finalOrder) {
+    return {
+      success: false,
+      message: "Không thể lấy thông tin đơn hàng sau khi tạo",
+    };
+  }
+
+  return {
+    success: true,
+    orderId: finalOrder.id,
+    totalAmount: Number(finalOrder.total_amount || 0),
+    message: "Tạo đơn hàng thành công",
+  };
+}
 
 /**
  * Server Action: Tạo đơn hàng mới
@@ -25,6 +243,20 @@ export async function createOrder(
   request: CreateOrderRequest,
 ): Promise<CreateOrderResponse> {
   try {
+    const orderWriteClient = createOrderWriteClient() as any;
+    if (!orderWriteClient) {
+      return {
+        success: false,
+        message:
+          "Thiếu cấu hình máy chủ để tạo đơn hàng. Vui lòng liên hệ quản trị viên.",
+      };
+    }
+
+    const checkoutMethod: CheckoutMethod = request.checkoutMethod || "cod";
+    const paymentMethod: PaymentMethod =
+      request.paymentMethod ||
+      (checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod");
+
     // Validate input
     if (!request.customer.name?.trim()) {
       return {
@@ -40,14 +272,18 @@ export async function createOrder(
       };
     }
 
-    if (request.customer.phone.length < 10) {
+    const normalizedPhone = normalizePhone(request.customer.phone);
+    if (normalizedPhone.length < 10) {
       return {
         success: false,
         message: "Số điện thoại không hợp lệ",
       };
     }
 
-    if (!request.customer.address?.trim()) {
+    if (
+      checkoutMethod === "bank_transfer" &&
+      !request.customer.address?.trim()
+    ) {
       return {
         success: false,
         message: "Vui lòng nhập địa chỉ giao hàng",
@@ -78,21 +314,71 @@ export async function createOrder(
       }
     }
 
-    // Gọi PostgreSQL function để xử lý transaction
-    const { data, error } = await supabase.rpc("create_order_transaction", {
-      p_customer_name: request.customer.name.trim(),
-      p_customer_phone: request.customer.phone.trim(),
-      p_customer_address: request.customer.address.trim(),
-      p_notes: request.customer.notes?.trim() || null,
-      p_items: JSON.stringify(request.items),
-    });
+    const resolvedAddress = request.customer.address?.trim()
+      ? request.customer.address.trim()
+      : "Sẽ trao đổi khi tư vấn qua điện thoại";
+
+    const extraNotes = [
+      `Hình thức đặt hàng: ${
+        checkoutMethod === "bank_transfer" ? "Chuyển khoản" : "Ship COD"
+      }`,
+      `Thanh toán: ${
+        paymentMethod === "bank_transfer"
+          ? "Chuyển khoản"
+          : "Thanh toán khi nhận hàng (COD)"
+      }`,
+    ];
+
+    if (request.customer.notes?.trim()) {
+      extraNotes.unshift(request.customer.notes.trim());
+    }
+
+    const finalNotes = extraNotes.join("\n");
+
+    // Ưu tiên RPC transaction nếu có trong DB
+    const { data, error } = await orderWriteClient.rpc(
+      "create_order_transaction",
+      {
+        p_customer_name: request.customer.name.trim(),
+        p_customer_phone: normalizedPhone,
+        p_customer_address: resolvedAddress,
+        p_notes: finalNotes,
+        p_items: JSON.stringify(request.items),
+      },
+    );
 
     if (error) {
-      console.error("Database error:", error);
-      return {
-        success: false,
-        message: "Lỗi khi tạo đơn hàng: " + error.message,
-      };
+      if (!isMissingCreateOrderRpc(error)) {
+        console.error("Database error:", error);
+        return {
+          success: false,
+          message: "Lỗi khi tạo đơn hàng: " + error.message,
+        };
+      }
+
+      const fallbackResult = await createOrderDirectly({
+        db: orderWriteClient,
+        customerName: request.customer.name.trim(),
+        customerPhone: normalizedPhone,
+        customerAddress: resolvedAddress,
+        notes: finalNotes,
+        checkoutMethod,
+        paymentMethod,
+        items: request.items,
+      });
+
+      if (!fallbackResult.success || !fallbackResult.orderId) {
+        return fallbackResult;
+      }
+
+      await AuditLogger.orderCreated(
+        fallbackResult.orderId,
+        request.customer.name,
+        fallbackResult.totalAmount || 0,
+        request.items.length,
+      );
+
+      return fallbackResult;
     }
 
     // Parse response từ function
@@ -138,10 +424,17 @@ export async function checkStockAvailability(
   try {
     const productIds = items.map((item) => item.product_id);
 
-    const { data: products, error } = await supabase
+    const { data: productsData, error } = await supabase
       .from("products")
       .select("id, name, stock_quantity, is_active")
       .in("id", productIds);
+
+    const products = (productsData || []) as Array<{
+      id: string;
+      name: string;
+      stock_quantity: number;
+      is_active: boolean;
+    }>;
 
     if (error) {
       return {
@@ -191,7 +484,8 @@ export async function checkStockAvailability(
  */
 export async function getOrderDetails(orderId: string) {
   try {
-    const { data: order, error: orderError } = await supabase
+    const orderReadClient = createOrderWriteClient() || supabase;
+    const { data: order, error: orderError } = await orderReadClient
       .from("orders")
       .select(
         `
@@ -221,6 +515,63 @@ export async function getOrderDetails(orderId: string) {
     return {
       success: false,
       message: "Không thể lấy thông tin đơn hàng",
+    };
+  }
+}
+
+export async function getOrdersByPhone(phone: string) {
+  try {
+    const normalizedPhone = normalizePhone(phone);
+
+    if (normalizedPhone.length < 10) {
+      return {
+        success: false,
+        message: "Số điện thoại không hợp lệ",
+      };
+    }
+
+    const orderReadClient = createOrderWriteClient() || supabase;
+    const { data: orders, error } = await orderReadClient
+      .from("orders")
+      .select(
+        `
+        id,
+        customer_name,
+        customer_phone,
+        customer_address,
+        total_amount,
+        status,
+        notes,
+        created_at,
+        order_items (
+          id,
+          quantity,
+          unit_price,
+          subtotal,
+          products (
+            name,
+            image_url
+          )
+        )
+      `,
+      )
+      .or(
+        `customer_phone.eq.${normalizedPhone},customer_phone.eq.${phone.trim()}`,
+      )
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: orders || [],
+    };
+  } catch (error) {
+    console.error("Error getting orders by phone:", error);
+    return {
+      success: false,
+      message: "Không thể tra cứu đơn hàng",
     };
   }
 }

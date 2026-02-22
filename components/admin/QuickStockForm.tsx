@@ -90,7 +90,7 @@ export function QuickStockForm({
         }
       >
         <Alert
-          message="Nhập hàng đầy đủ"
+          title="Nhập hàng đầy đủ"
           description="Để nhập hàng với đầy đủ thông tin (nhà cung cấp, ghi chú), vui lòng vào trang Quản lý Kho."
           type="info"
           showIcon

@@ -46,6 +46,10 @@ interface Order {
   customer_address: string;
   total_amount: number;
   status: "pending" | "processing" | "delivered" | "cancelled";
+  checkout_method?: "cod" | "bank_transfer";
+  payment_method?: "cod" | "bank_transfer";
+  payment_confirmed?: boolean;
+  payment_confirmed_at?: string | null;
   notes: string | null;
   created_at: string;
   order_items: OrderItem[];
@@ -85,6 +89,25 @@ export default function OrdersPage() {
   const handleOrderClick = (order: Order) => {
     setSelectedOrder(order);
     setIsDetailModalOpen(true);
+  };
+
+  const handleConfirmPayment = async (orderId: string, confirmed: boolean) => {
+    try {
+      const response = await fetch("/api/admin/orders/confirm-payment", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, paymentConfirmed: confirmed }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Không thể cập nhật thanh toán");
+      }
+
+      await fetchOrders();
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+    }
   };
 
   // Stats
@@ -202,6 +225,48 @@ export default function OrdersPage() {
       ],
       onFilter: (value, record) => record.status === value,
       render: (status: Order["status"]) => getStatusTag(status),
+    },
+    {
+      title: "Thanh toán",
+      key: "payment",
+      width: 220,
+      render: (_: unknown, record: Order) => {
+        const isBankTransfer = record.payment_method === "bank_transfer";
+
+        if (!isBankTransfer) {
+          return <Tag color="default">COD</Tag>;
+        }
+
+        if (record.payment_confirmed) {
+          return (
+            <Space orientation="vertical" size={4}>
+              <Tag color="green">Đã xác nhận</Tag>
+              <Button
+                size="small"
+                type="link"
+                danger
+                onClick={() => handleConfirmPayment(record.id, false)}
+                style={{ padding: 0 }}
+              >
+                Bỏ xác nhận
+              </Button>
+            </Space>
+          );
+        }
+
+        return (
+          <Space orientation="vertical" size={4}>
+            <Tag color="orange">Chờ xác nhận CK</Tag>
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => handleConfirmPayment(record.id, true)}
+            >
+              Xác nhận đã thanh toán
+            </Button>
+          </Space>
+        );
+      },
     },
     {
       title: "Tổng tiền",

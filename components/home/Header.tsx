@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 
 interface HeaderProps {
@@ -26,18 +27,26 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             </div>
           </div>
 
-          <button
-            onClick={onCartClick}
-            className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Giỏ hàng"
-          >
-            <ShoppingCart className="w-6 h-6 text-gray-700" />
-            {cartItemsCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {cartItemsCount > 9 ? "9+" : cartItemsCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/orders/track"
+              className="text-sm font-medium text-gray-600 hover:text-blue-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Tra cứu đơn
+            </Link>
+            <button
+              onClick={onCartClick}
+              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Giỏ hàng"
+            >
+              <ShoppingCart className="w-6 h-6 text-gray-700" />
+              {cartItemsCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {cartItemsCount > 9 ? "9+" : cartItemsCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </header>

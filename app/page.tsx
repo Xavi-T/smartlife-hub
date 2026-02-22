@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Header } from "@/components/home/Header";
 import { ProductGrid } from "@/components/home/ProductGrid";
 import { CartModal } from "@/components/home/CartModal";
-import { CheckoutModal } from "@/components/home/CheckoutModal";
 import { useCart } from "@/hooks/useCart";
 import type { Product } from "@/types/database";
 import { message } from "antd";
@@ -16,14 +15,12 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const {
     cart,
     addToCart,
     updateQuantity,
     removeFromCart,
-    clearCart,
     getTotalItems,
     getTotalPrice,
     isLoaded,
@@ -55,16 +52,11 @@ export default function Home() {
 
   const handleCheckout = () => {
     setIsCartOpen(false);
-    setIsCheckoutOpen(true);
+    router.push("/checkout");
   };
 
   const handleViewDetail = (product: Product) => {
     router.push(`/products/${product.id}`);
-  };
-
-  const handleOrderSuccess = () => {
-    clearCart();
-    fetchProducts(); // Refresh products to update stock
   };
 
   if (isLoading || !isLoaded) {
@@ -130,15 +122,6 @@ export default function Home() {
         onRemoveItem={removeFromCart}
         onCheckout={handleCheckout}
         totalPrice={getTotalPrice()}
-      />
-
-      {/* Checkout Modal */}
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        cart={cart}
-        totalPrice={getTotalPrice()}
-        onSuccess={handleOrderSuccess}
       />
     </div>
   );

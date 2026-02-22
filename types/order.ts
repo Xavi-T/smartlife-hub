@@ -6,13 +6,19 @@ export interface CartItem {
 export interface CustomerInfo {
   name: string;
   phone: string;
-  address: string;
+  address?: string;
   notes?: string;
 }
+
+export type CheckoutMethod = "cod" | "bank_transfer";
+
+export type PaymentMethod = "cod" | "bank_transfer";
 
 export interface CreateOrderRequest {
   customer: CustomerInfo;
   items: CartItem[];
+  checkoutMethod?: CheckoutMethod;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface CreateOrderResponse {

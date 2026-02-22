@@ -14,7 +14,6 @@ import {
 import { ArrowLeftOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
-import { CheckoutModal } from "@/components/home/CheckoutModal";
 import { useCart } from "@/hooks/useCart";
 import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
@@ -42,14 +41,12 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const {
     cart,
     addToCart,
     updateQuantity,
     removeFromCart,
-    clearCart,
     getTotalItems,
     getTotalPrice,
     isLoaded,
@@ -129,12 +126,7 @@ export default function ProductDetailPage() {
 
   const handleCheckout = () => {
     setIsCartOpen(false);
-    setIsCheckoutOpen(true);
-  };
-
-  const handleOrderSuccess = () => {
-    clearCart();
-    router.refresh();
+    router.push("/checkout");
   };
 
   if (isLoading || !isLoaded) {
@@ -390,14 +382,6 @@ export default function ProductDetailPage() {
         onRemoveItem={removeFromCart}
         onCheckout={handleCheckout}
         totalPrice={getTotalPrice()}
-      />
-
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        cart={cart}
-        totalPrice={getTotalPrice()}
-        onSuccess={handleOrderSuccess}
       />
     </div>
   );

@@ -42,6 +42,11 @@ export interface Order {
   customer_address: string;
   total_amount: number;
   status: OrderStatus;
+  checkout_method?: "cod" | "bank_transfer";
+  payment_method?: "cod" | "bank_transfer";
+  payment_confirmed?: boolean;
+  payment_confirmed_at?: string | null;
+  payment_confirmed_by?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
