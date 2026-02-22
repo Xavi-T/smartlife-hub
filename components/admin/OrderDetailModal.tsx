@@ -1,14 +1,19 @@
 "use client";
 
 import {
-  X,
-  Package,
-  User,
-  Phone,
-  MapPin,
-  Calendar,
-  DollarSign,
-} from "lucide-react";
+  Alert,
+  Card,
+  Col,
+  Descriptions,
+  Image,
+  Modal,
+  Row,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
 import { formatCurrency } from "@/lib/utils";
 
 interface OrderItem {
@@ -47,221 +52,185 @@ export function OrderDetailModal({
   onClose,
   order,
 }: OrderDetailModalProps) {
-  if (!isOpen || !order) return null;
-
   const statusColors = {
-    pending: "bg-yellow-100 text-yellow-800",
-    processing: "bg-blue-100 text-blue-800",
-    delivered: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
+    pending: "gold",
+    processing: "processing",
+    delivered: "success",
+    cancelled: "error",
+  } as const;
 
   const statusLabels = {
     pending: "Chờ xác nhận",
     processing: "Đang giao",
     delivered: "Đã giao",
     cancelled: "Đã hủy",
-  };
+  } as const;
+
+  const columns: ColumnsType<OrderItem> = [
+    {
+      title: "Sản phẩm",
+      dataIndex: "products",
+      key: "products",
+      render: (product: OrderItem["products"]) => (
+        <Space>
+          {product.image_url ? (
+            <Image
+              src={product.image_url}
+              alt={product.name}
+              width={48}
+              height={48}
+              style={{ objectFit: "cover", borderRadius: 8 }}
+              preview={false}
+            />
+          ) : (
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 8,
+                background: "#f5f5f5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              📦
+            </div>
+          )}
+          <div>
+            <Typography.Text strong>{product.name}</Typography.Text>
+            <br />
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {product.category}
+            </Typography.Text>
+          </div>
+        </Space>
+      ),
+    },
+    {
+      title: "Số lượng",
+      dataIndex: "quantity",
+      key: "quantity",
+      width: 100,
+      align: "center",
+    },
+    {
+      title: "Đơn giá",
+      dataIndex: "unit_price",
+      key: "unit_price",
+      width: 160,
+      align: "right",
+      render: (value: number) => formatCurrency(value),
+    },
+    {
+      title: "Thành tiền",
+      dataIndex: "subtotal",
+      key: "subtotal",
+      width: 160,
+      align: "right",
+      render: (value: number) => (
+        <Typography.Text strong style={{ color: "#1677ff" }}>
+          {formatCurrency(value)}
+        </Typography.Text>
+      ),
+    },
+  ];
+
+  if (!order) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="relative min-h-screen flex items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Chi tiết đơn hàng
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                #{order.id.slice(0, 8).toUpperCase()}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="p-6 space-y-6">
-            {/* Order Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer Info */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <User className="w-5 h-5 text-blue-600" />
-                  Thông tin khách hàng
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <User className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-gray-600">Tên khách hàng</p>
-                      <p className="font-medium text-gray-900">
-                        {order.customer_name}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Phone className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-gray-600">Số điện thoại</p>
-                      <p className="font-medium text-gray-900">
-                        {order.customer_phone}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-gray-600">Địa chỉ giao hàng</p>
-                      <p className="font-medium text-gray-900">
-                        {order.customer_address}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Info */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Package className="w-5 h-5 text-blue-600" />
-                  Thông tin đơn hàng
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-gray-600">Ngày đặt hàng</p>
-                      <p className="font-medium text-gray-900">
-                        {new Date(order.created_at).toLocaleString("vi-VN")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Package className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-gray-600">Trạng thái</p>
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColors[order.status as keyof typeof statusColors]}`}
-                      >
-                        {
-                          statusLabels[
-                            order.status as keyof typeof statusLabels
-                          ]
-                        }
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <DollarSign className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-gray-600">Tổng tiền</p>
-                      <p className="font-bold text-blue-600 text-lg">
-                        {formatCurrency(order.total_amount)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Notes */}
-            {order.notes && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Ghi chú</h3>
-                <p className="text-sm text-gray-700">{order.notes}</p>
-              </div>
-            )}
-
-            {/* Order Items */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">
-                Danh sách sản phẩm ({order.order_items.length})
-              </h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Sản phẩm
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                        Số lượng
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Đơn giá
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Thành tiền
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {order.order_items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            {item.products.image_url ? (
-                              <img
-                                src={item.products.image_url}
-                                alt={item.products.name}
-                                className="w-12 h-12 object-cover rounded-lg"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
-                                📦
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {item.products.name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {item.products.category}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center font-semibold text-gray-900">
-                          {item.quantity}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-900">
-                          {formatCurrency(item.unit_price)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-blue-600">
-                          {formatCurrency(item.subtotal)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td
-                        colSpan={3}
-                        className="px-4 py-3 text-right font-bold text-gray-900"
-                      >
-                        Tổng cộng:
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-blue-600 text-lg">
-                        {formatCurrency(order.total_amount)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          </div>
+    <Modal
+      title={
+        <div>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            Chi tiết đơn hàng
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            #{order.id.slice(0, 8).toUpperCase()}
+          </Typography.Text>
         </div>
-      </div>
-    </div>
+      }
+      open={isOpen}
+      onCancel={onClose}
+      footer={null}
+      width={960}
+      destroyOnHidden
+    >
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Card title="Thông tin khách hàng" size="small">
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="Tên khách hàng">
+                  {order.customer_name}
+                </Descriptions.Item>
+                <Descriptions.Item label="Số điện thoại">
+                  {order.customer_phone}
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ giao hàng">
+                  {order.customer_address}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card title="Thông tin đơn hàng" size="small">
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="Ngày đặt hàng">
+                  {new Date(order.created_at).toLocaleString("vi-VN")}
+                </Descriptions.Item>
+                <Descriptions.Item label="Trạng thái">
+                  <Tag
+                    color={
+                      statusColors[order.status as keyof typeof statusColors]
+                    }
+                  >
+                    {statusLabels[order.status as keyof typeof statusLabels]}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tổng tiền">
+                  <Typography.Text strong style={{ color: "#1677ff" }}>
+                    {formatCurrency(order.total_amount)}
+                  </Typography.Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
+        </Row>
+
+        {order.notes && (
+          <Alert
+            type="warning"
+            showIcon
+            title="Ghi chú"
+            description={order.notes}
+          />
+        )}
+
+        <Card
+          title={`Danh sách sản phẩm (${order.order_items.length})`}
+          size="small"
+        >
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={order.order_items}
+            pagination={false}
+            summary={() => (
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0} colSpan={3}>
+                  <Typography.Text strong>Tổng cộng</Typography.Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={1} align="right">
+                  <Typography.Text strong style={{ color: "#1677ff" }}>
+                    {formatCurrency(order.total_amount)}
+                  </Typography.Text>
+                </Table.Summary.Cell>
+              </Table.Summary.Row>
+            )}
+          />
+        </Card>
+      </Space>
+    </Modal>
   );
 }

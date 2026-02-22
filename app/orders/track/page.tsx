@@ -39,6 +39,10 @@ interface OrderView {
   customer_address: string;
   total_amount: number;
   status: OrderStatus;
+  checkout_method?: "cod" | "bank_transfer";
+  payment_method?: "cod" | "bank_transfer";
+  payment_confirmed?: boolean;
+  payment_confirmed_at?: string | null;
   notes: string | null;
   created_at: string;
   order_items: OrderItemView[];
@@ -53,8 +57,54 @@ function getStatusMeta(status: OrderStatus) {
 
 function getTimelineCurrent(status: OrderStatus): number {
   if (status === "pending") return 0;
-  if (status === "processing") return 1;
-  return 2;
+  if (status === "processing") return 2;
+  if (status === "delivered") return 3;
+  return 1;
+}
+
+function getDeliveryStepItems(status: OrderStatus) {
+  const baseItems = [
+    { title: "Chờ xác nhận", content: "Đơn hàng đã được tiếp nhận" },
+    { title: "Đã xác nhận", content: "Cửa hàng xác nhận và chuẩn bị" },
+    { title: "Đang giao", content: "Đơn vị vận chuyển đang giao" },
+    { title: "Đã giao", content: "Khách đã nhận hàng" },
+  ];
+
+  if (status !== "cancelled") return baseItems;
+
+  return [
+    { title: "Chờ xác nhận", content: "Đơn hàng đã được tiếp nhận" },
+    { title: "Đã hủy", content: "Đơn hàng đã bị hủy" },
+  ];
+}
+
+function getPaymentMeta(order: OrderView): {
+  label: string;
+  color: "default" | "processing" | "success" | "warning";
+  detail?: string;
+} {
+  if (order.payment_method === "bank_transfer") {
+    if (order.payment_confirmed) {
+      return {
+        label: "Đã xác nhận thanh toán chuyển khoản",
+        color: "success",
+        detail: order.payment_confirmed_at
+          ? `Xác nhận lúc ${new Date(order.payment_confirmed_at).toLocaleString("vi-VN")}`
+          : undefined,
+      };
+    }
+
+    return {
+      label: "Đang chờ xác nhận thanh toán chuyển khoản",
+      color: "processing",
+      detail: "Hệ thống sẽ xác nhận sau khi cửa hàng kiểm tra giao dịch.",
+    };
+  }
+
+  return {
+    label: "Thanh toán khi nhận hàng (COD)",
+    color: "default",
+  };
 }
 
 export default function OrderTrackingPage() {
@@ -169,6 +219,7 @@ export default function OrderTrackingPage() {
           <Space orientation="vertical" size={16} style={{ width: "100%" }}>
             {orders.map((order) => {
               const statusMeta = getStatusMeta(order.status);
+              const paymentMeta = getPaymentMeta(order);
               return (
                 <Card key={order.id}>
                   <div
@@ -203,6 +254,23 @@ export default function OrderTrackingPage() {
                     Địa chỉ: {order.customer_address}
                   </Typography.Text>
 
+                  <div style={{ marginBottom: 12 }}>
+                    <Typography.Text type="secondary">
+                      Thanh toán:
+                    </Typography.Text>
+                    <div style={{ marginTop: 4 }}>
+                      <Tag color={paymentMeta.color}>{paymentMeta.label}</Tag>
+                    </div>
+                    {paymentMeta.detail && (
+                      <Typography.Text
+                        type="secondary"
+                        style={{ display: "block", marginTop: 4 }}
+                      >
+                        {paymentMeta.detail}
+                      </Typography.Text>
+                    )}
+                  </div>
+
                   <div style={{ marginBottom: 14 }}>
                     <Steps
                       size="small"
@@ -210,11 +278,7 @@ export default function OrderTrackingPage() {
                       status={
                         order.status === "cancelled" ? "error" : "process"
                       }
-                      items={[
-                        { title: "Đã tiếp nhận" },
-                        { title: "Đang xử lý" },
-                        { title: "Hoàn tất" },
-                      ]}
+                      items={getDeliveryStepItems(order.status)}
                     />
                   </div>
 

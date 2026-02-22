@@ -1,15 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+
+function createAdminCustomersClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return supabase;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { phone: string } },
+  { params }: { params: Promise<{ phone: string }> },
 ) {
   try {
-    const phone = decodeURIComponent(params.phone);
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { phone: rawPhone } = await params;
+    const phone = decodeURIComponent(rawPhone);
+    const normalizedPhone = phone.replace(/\D/g, "");
+    const adminCustomersClient = createAdminCustomersClient();
 
     // Lấy tất cả đơn hàng của khách hàng này
-    const { data: orders, error } = await supabase
+    const { data: orders, error } = await adminCustomersClient
       .from("orders")
       .select(
         `
@@ -28,27 +59,28 @@ export async function GET(
         )
       `,
       )
-      .eq("customer_phone", phone)
+      .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.${phone}`)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
+    const deliveredOrders = orders.filter((o) => o.status === "delivered");
+    const deliveredRevenue = deliveredOrders.reduce(
+      (sum, o) => sum + o.total_amount,
+      0,
+    );
+
     // Tính thống kê
     const stats = {
       totalOrders: orders.length,
-      totalSpent: orders
-        .filter((o) => o.status === "delivered")
-        .reduce((sum, o) => sum + o.total_amount, 0),
+      totalSpent: deliveredRevenue,
       pendingOrders: orders.filter((o) => o.status === "pending").length,
       processingOrders: orders.filter((o) => o.status === "processing").length,
-      deliveredOrders: orders.filter((o) => o.status === "delivered").length,
+      deliveredOrders: deliveredOrders.length,
       cancelledOrders: orders.filter((o) => o.status === "cancelled").length,
       averageOrderValue:
-        orders.length > 0
-          ? orders
-              .filter((o) => o.status === "delivered")
-              .reduce((sum, o) => sum + o.total_amount, 0) /
-            orders.filter((o) => o.status === "delivered").length
+        deliveredOrders.length > 0
+          ? deliveredRevenue / deliveredOrders.length
           : 0,
       firstOrderDate:
         orders.length > 0 ? orders[orders.length - 1].created_at : null,

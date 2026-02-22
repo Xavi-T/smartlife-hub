@@ -1,10 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+
+function createAdminOrdersClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return supabase as any;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }) as any;
+}
 
 export async function PATCH(request: NextRequest) {
   try {
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { orderId, newStatus, currentStatus } = await request.json();
+    const sb = createAdminOrdersClient();
 
     if (!orderId || !newStatus) {
       return NextResponse.json(
@@ -25,7 +54,7 @@ export async function PATCH(request: NextRequest) {
     // Logic hoàn trả kho khi HỦY đơn
     if (newStatus === "cancelled" && currentStatus !== "cancelled") {
       // Lấy danh sách order_items
-      const { data: orderItems, error: itemsError } = await supabase
+      const { data: orderItems, error: itemsError } = await sb
         .from("order_items")
         .select("product_id, quantity")
         .eq("order_id", orderId);
@@ -35,7 +64,7 @@ export async function PATCH(request: NextRequest) {
       // Hoàn trả stock cho từng sản phẩm
       if (orderItems && orderItems.length > 0) {
         for (const item of orderItems) {
-          const { error: updateError } = await supabase.rpc(
+          const { error: updateError } = await sb.rpc(
             "increment_product_stock",
             {
               product_uuid: item.product_id,
@@ -54,7 +83,7 @@ export async function PATCH(request: NextRequest) {
     // Logic trừ kho khi chuyển từ PENDING sang PROCESSING (Đã xác nhận)
     if (newStatus === "processing" && currentStatus === "pending") {
       // Lấy danh sách order_items
-      const { data: orderItems, error: itemsError } = await supabase
+      const { data: orderItems, error: itemsError } = await sb
         .from("order_items")
         .select("product_id, quantity")
         .eq("order_id", orderId);
@@ -65,7 +94,7 @@ export async function PATCH(request: NextRequest) {
       if (orderItems && orderItems.length > 0) {
         for (const item of orderItems) {
           // Kiểm tra tồn kho trước
-          const { data: product, error: productError } = await supabase
+          const { data: product, error: productError } = await sb
             .from("products")
             .select("stock_quantity, name")
             .eq("id", item.product_id)
@@ -83,7 +112,7 @@ export async function PATCH(request: NextRequest) {
           }
 
           // Trừ stock
-          const { error: updateError } = await supabase.rpc(
+          const { error: updateError } = await sb.rpc(
             "decrement_product_stock",
             {
               product_uuid: item.product_id,
@@ -103,7 +132,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update order status
-    const { data: updatedOrder, error: updateError } = await supabase
+    const { data: updatedOrder, error: updateError } = await sb
       .from("orders")
       .update({
         status: newStatus,

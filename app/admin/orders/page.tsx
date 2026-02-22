@@ -11,8 +11,12 @@ import {
   Statistic,
   Row,
   Col,
+  Dropdown,
+  Modal,
+  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import type { MenuProps } from "antd";
 import {
   ShoppingOutlined,
   DollarOutlined,
@@ -62,6 +66,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -107,6 +112,67 @@ export default function OrdersPage() {
       await fetchOrders();
     } catch (error) {
       console.error("Error confirming payment:", error);
+    }
+  };
+
+  const handleStatusChange = async (
+    order: Order,
+    newStatus: Order["status"],
+  ) => {
+    if (newStatus === order.status) return;
+
+    const confirmMessages: Partial<Record<Order["status"], string>> = {
+      processing: "Xác nhận đơn hàng này? Hàng sẽ được trừ khỏi kho.",
+      delivered: "Đánh dấu đơn hàng này đã giao?",
+      cancelled: "Hủy đơn hàng này? Hàng sẽ được hoàn về kho.",
+    };
+
+    const confirmMessage = confirmMessages[newStatus];
+    if (confirmMessage) {
+      const shouldContinue = await new Promise<boolean>((resolve) => {
+        Modal.confirm({
+          title: "Xác nhận cập nhật trạng thái",
+          content: confirmMessage,
+          okText: "Xác nhận",
+          cancelText: "Hủy",
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+        });
+      });
+
+      if (!shouldContinue) return;
+    }
+
+    setUpdatingOrderId(order.id);
+
+    try {
+      const response = await fetch("/api/admin/orders/update-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          newStatus,
+          currentStatus: order.status,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Không thể cập nhật trạng thái");
+      }
+
+      message.success(result.message || "Đã cập nhật trạng thái đơn hàng");
+      await fetchOrders();
+    } catch (error) {
+      console.error("Error updating status:", error);
+      message.error(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi cập nhật trạng thái",
+      );
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -172,7 +238,7 @@ export default function OrdersPage() {
         <div style={{ padding: 8 }}>
           <Input
             placeholder="Tìm tên khách hàng"
-            value={selectedKeys[0]}
+            value={(selectedKeys[0] as string) ?? ""}
             onChange={(e) =>
               setSelectedKeys(e.target.value ? [e.target.value] : [])
             }
@@ -301,7 +367,7 @@ export default function OrdersPage() {
       title: "Thao tác",
       key: "actions",
       fixed: "right",
-      width: 150,
+      width: 220,
       render: (_, record) => (
         <Space>
           <Button
@@ -312,17 +378,48 @@ export default function OrdersPage() {
           >
             Chi tiết
           </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => {
-              // TODO: Quick edit functionality
-              console.log("Edit order:", record.id);
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "pending",
+                  label: "Chờ xác nhận",
+                  disabled: record.status === "pending",
+                },
+                {
+                  key: "processing",
+                  label: "Đang giao",
+                  disabled: record.status === "processing",
+                },
+                {
+                  key: "delivered",
+                  label: "Đã giao",
+                  disabled: record.status === "delivered",
+                },
+                {
+                  key: "cancelled",
+                  label: "Đã hủy",
+                  disabled: record.status === "cancelled",
+                },
+              ] as MenuProps["items"],
+              onClick: ({ key }) =>
+                handleStatusChange(record, key as Order["status"]),
             }}
+            trigger={["click"]}
           >
-            Sửa
-          </Button>
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              loading={updatingOrderId === record.id}
+              disabled={
+                updatingOrderId === record.id ||
+                record.status === "delivered" ||
+                record.status === "cancelled"
+              }
+            >
+              Sửa
+            </Button>
+          </Dropdown>
         </Space>
       ),
     },

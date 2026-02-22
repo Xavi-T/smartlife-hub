@@ -541,6 +541,10 @@ export async function getOrdersByPhone(phone: string) {
         customer_address,
         total_amount,
         status,
+        checkout_method,
+        payment_method,
+        payment_confirmed,
+        payment_confirmed_at,
         notes,
         created_at,
         order_items (

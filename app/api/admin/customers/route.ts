@@ -1,14 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+
+function createAdminCustomersClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!serviceRoleKey || !supabaseUrl) {
+    return supabase;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const searchQuery = searchParams.get("search") || "";
     const customerType = searchParams.get("type") || "all";
 
     // Lấy tất cả đơn hàng
-    const { data: orders, error } = await supabase
+    const adminCustomersClient = createAdminCustomersClient();
+    const { data: orders, error } = await adminCustomersClient
       .from("orders")
       .select("*")
       .order("created_at", { ascending: false });
@@ -127,9 +156,9 @@ export async function GET(request: NextRequest) {
       loyalCustomers: customers.filter((c) => c.totalOrders >= 3).length,
       totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
       averageLTV:
-        customers.length > 0
+        customerMap.size > 0
           ? customers.reduce((sum, c) => sum + c.totalSpent, 0) /
-            customers.length
+            customerMap.size
           : 0,
     };
 
