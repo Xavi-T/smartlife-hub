@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import type { Product } from "@/types/database";
-import { calculateDiscountedPrice } from "@/lib/utils";
+import {
+  calculateDiscountedPrice,
+  getEffectiveDiscountPercent,
+} from "@/lib/utils";
 
 export interface CartItem {
   product: Product;
@@ -39,9 +42,14 @@ export function useCart() {
 
   const addToCart = (product: Product, quantity: number = 1) => {
     const safeQuantity = Math.max(1, Math.floor(quantity));
+    const effectiveDiscountPercent = getEffectiveDiscountPercent({
+      discountPercent: product.discount_percent,
+      discountStartAt: product.discount_start_at,
+      discountEndAt: product.discount_end_at,
+    });
     const normalizedProduct: Product = {
       ...product,
-      price: calculateDiscountedPrice(product.price, product.discount_percent),
+      price: calculateDiscountedPrice(product.price, effectiveDiscountPercent),
     };
 
     setCart((prev) => {

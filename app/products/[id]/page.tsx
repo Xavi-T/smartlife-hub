@@ -15,7 +15,12 @@ import { ArrowLeftOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
 import { useCart } from "@/hooks/useCart";
-import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
+import {
+  calculateDiscountedPrice,
+  formatCurrency,
+  formatRemainingTime,
+  getEffectiveDiscountPercent,
+} from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 interface ProductMedia {
@@ -41,6 +46,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const {
     cart,
@@ -108,6 +114,24 @@ export default function ProductDetailPage() {
     }
   }, [productId, messageApi]);
 
+  useEffect(() => {
+    if (
+      !product ||
+      Number(product.discount_percent || 0) <= 0 ||
+      (!product.discount_start_at && !product.discount_end_at)
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [product]);
+
   const categoryNames = useMemo(() => {
     if (!product) return [];
     if (product.categories && product.categories.length > 0) {
@@ -167,10 +191,22 @@ export default function ProductDetailPage() {
   const isOutOfStock = product.stock_quantity <= 0;
   const activeMedia = mediaItems[activeMediaIndex];
   const fallbackMediaUrl = product.image_url || null;
-  const discountPercent = product.discount_percent || 0;
+  const discountPercent = getEffectiveDiscountPercent({
+    discountPercent: product.discount_percent,
+    discountStartAt: product.discount_start_at,
+    discountEndAt: product.discount_end_at,
+    nowMs,
+  });
   const hasDiscount = discountPercent > 0;
   const finalPrice = calculateDiscountedPrice(product.price, discountPercent);
   const savingAmount = product.price - finalPrice;
+  const discountEndMs = product.discount_end_at
+    ? Date.parse(product.discount_end_at)
+    : NaN;
+  const hasValidDiscountEnd = Number.isFinite(discountEndMs);
+  const remainingDiscountMs = hasValidDiscountEnd
+    ? Math.max(0, discountEndMs - nowMs)
+    : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -279,6 +315,15 @@ export default function ProductDetailPage() {
                       </span>
                     </div>
                   )}
+
+                  {hasDiscount &&
+                    hasValidDiscountEnd &&
+                    remainingDiscountMs > 0 && (
+                      <div className="text-sm font-medium text-orange-600">
+                        Kết thúc giảm giá sau:{" "}
+                        {formatRemainingTime(remainingDiscountMs)}
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -362,7 +407,11 @@ export default function ProductDetailPage() {
                       {formatCurrency(
                         calculateDiscountedPrice(
                           item.price,
-                          item.discount_percent,
+                          getEffectiveDiscountPercent({
+                            discountPercent: item.discount_percent,
+                            discountStartAt: item.discount_start_at,
+                            discountEndAt: item.discount_end_at,
+                          }),
                         ),
                       )}
                     </div>

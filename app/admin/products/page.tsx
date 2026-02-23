@@ -29,7 +29,6 @@ import {
   DollarOutlined,
   AppstoreOutlined,
 } from "@ant-design/icons";
-import { ProductFormModal } from "@/components/admin/ProductFormModal";
 import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
@@ -49,10 +48,6 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  // Modal states
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
@@ -124,13 +119,11 @@ export default function ProductsPage() {
   };
 
   const handleAdd = () => {
-    setSelectedProduct(null);
-    setIsFormModalOpen(true);
+    router.push("/admin/products/new");
   };
 
   const handleEdit = (product: Product) => {
-    setSelectedProduct(product);
-    setIsFormModalOpen(true);
+    router.push(`/admin/products/${product.id}/edit`);
   };
 
   const handleDelete = async (product: Product) => {
@@ -488,14 +481,6 @@ export default function ProductsPage() {
           scroll={{ x: 1200 }}
         />
       </Card>
-
-      {/* Form Modal */}
-      <ProductFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        product={selectedProduct}
-        onSuccess={fetchProducts}
-      />
     </div>
   );
 }

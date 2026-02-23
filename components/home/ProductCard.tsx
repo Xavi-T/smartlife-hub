@@ -2,7 +2,11 @@
 
 import { Button, Card, Image, Space, Tag, Typography } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
-import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
+import {
+  calculateDiscountedPrice,
+  formatCurrency,
+  getEffectiveDiscountPercent,
+} from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 interface ProductCardProps {
@@ -17,7 +21,11 @@ export function ProductCard({
   onViewDetail,
 }: ProductCardProps) {
   const isOutOfStock = product.stock_quantity === 0;
-  const discountPercent = product.discount_percent || 0;
+  const discountPercent = getEffectiveDiscountPercent({
+    discountPercent: product.discount_percent,
+    discountStartAt: product.discount_start_at,
+    discountEndAt: product.discount_end_at,
+  });
   const hasDiscount = discountPercent > 0;
   const finalPrice = calculateDiscountedPrice(product.price, discountPercent);
   const savingAmount = product.price - finalPrice;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { AuditLogger } from "@/lib/auditLogger";
 import type { Database } from "@/types/database";
@@ -78,6 +79,22 @@ function toOptionalNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseOptionalTimestamp(value: unknown): {
+  value: string | null;
+  invalid: boolean;
+} {
+  if (value === undefined || value === null || value === "") {
+    return { value: null, invalid: false };
+  }
+
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return { value: null, invalid: true };
+  }
+
+  return { value: parsed.toISOString(), invalid: false };
+}
+
 async function createApiSupabaseClient() {
   const cookieStore = await cookies();
 
@@ -97,6 +114,44 @@ async function createApiSupabaseClient() {
       },
     },
   );
+}
+
+function createServiceRoleSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+async function clearExpiredProductDiscounts() {
+  const serviceRoleClient = createServiceRoleSupabaseClient();
+  if (!serviceRoleClient) return;
+
+  const nowIso = new Date().toISOString();
+
+  const { error } = await serviceRoleClient
+    .from("products")
+    .update({
+      discount_percent: 0,
+      discount_start_at: null,
+      discount_end_at: null,
+    })
+    .gt("discount_percent", 0)
+    .not("discount_end_at", "is", null)
+    .lte("discount_end_at", nowIso);
+
+  if (error) {
+    console.error("Error clearing expired product discounts:", error);
+  }
 }
 
 function slugify(value: string): string {
@@ -193,6 +248,7 @@ async function syncProductCategoriesByName(
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createApiSupabaseClient();
+    await clearExpiredProductDiscounts();
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("activeOnly") === "true";
 
@@ -271,6 +327,8 @@ export async function POST(request: NextRequest) {
       description,
       price,
       discount_percent,
+      discount_start_at,
+      discount_end_at,
       cost_price,
       stock_quantity,
       category,
@@ -286,6 +344,12 @@ export async function POST(request: NextRequest) {
     const normalizedCostPrice = toOptionalNumber(cost_price);
     const normalizedStockQuantity = toOptionalNumber(stock_quantity);
     const normalizedDiscountPercent = toOptionalNumber(discount_percent);
+    const {
+      value: normalizedDiscountStartAt,
+      invalid: invalidDiscountStartAt,
+    } = parseOptionalTimestamp(discount_start_at);
+    const { value: normalizedDiscountEndAt, invalid: invalidDiscountEndAt } =
+      parseOptionalTimestamp(discount_end_at);
 
     // Validation
     if (
@@ -312,6 +376,38 @@ export async function POST(request: NextRequest) {
         { error: "Giảm giá phải nằm trong khoảng 0-100%" },
         { status: 400 },
       );
+    }
+
+    if (invalidDiscountStartAt || invalidDiscountEndAt) {
+      return NextResponse.json(
+        { error: "Thời gian hiệu lực giảm giá không hợp lệ" },
+        { status: 400 },
+      );
+    }
+
+    const finalDiscountPercent =
+      normalizedDiscountPercent !== null ? normalizedDiscountPercent : 0;
+
+    if (finalDiscountPercent > 0) {
+      if (!normalizedDiscountStartAt || !normalizedDiscountEndAt) {
+        return NextResponse.json(
+          {
+            error:
+              "Vui lòng chọn đầy đủ thời gian bắt đầu và kết thúc khi thiết lập giảm giá",
+          },
+          { status: 400 },
+        );
+      }
+
+      if (
+        new Date(normalizedDiscountEndAt).getTime() <=
+        new Date(normalizedDiscountStartAt).getTime()
+      ) {
+        return NextResponse.json(
+          { error: "Thời gian kết thúc giảm giá phải sau thời gian bắt đầu" },
+          { status: 400 },
+        );
+      }
     }
 
     if (normalizedPrice < normalizedCostPrice) {
@@ -344,8 +440,11 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         description: description?.trim() || null,
         price: normalizedPrice,
-        discount_percent:
-          normalizedDiscountPercent !== null ? normalizedDiscountPercent : 0,
+        discount_percent: finalDiscountPercent,
+        discount_start_at:
+          finalDiscountPercent > 0 ? normalizedDiscountStartAt : null,
+        discount_end_at:
+          finalDiscountPercent > 0 ? normalizedDiscountEndAt : null,
         cost_price: normalizedCostPrice,
         stock_quantity: 0,
         category: normalizedCategoryNames[0],
@@ -410,6 +509,8 @@ export async function PATCH(request: NextRequest) {
       description,
       price,
       discount_percent,
+      discount_start_at,
+      discount_end_at,
       cost_price,
       stock_quantity,
       category,
@@ -425,6 +526,20 @@ export async function PATCH(request: NextRequest) {
     const normalizedCostPrice = toOptionalNumber(cost_price);
     const normalizedStockQuantity = toOptionalNumber(stock_quantity);
     const normalizedDiscountPercent = toOptionalNumber(discount_percent);
+    const {
+      value: normalizedDiscountStartAt,
+      invalid: invalidDiscountStartAt,
+    } = parseOptionalTimestamp(discount_start_at);
+    const { value: normalizedDiscountEndAt, invalid: invalidDiscountEndAt } =
+      parseOptionalTimestamp(discount_end_at);
+    const hasDiscountStartAt = Object.prototype.hasOwnProperty.call(
+      body,
+      "discount_start_at",
+    );
+    const hasDiscountEndAt = Object.prototype.hasOwnProperty.call(
+      body,
+      "discount_end_at",
+    );
 
     if (!id) {
       return NextResponse.json(
@@ -474,6 +589,21 @@ export async function PATCH(request: NextRequest) {
       updates.discount_percent = normalizedDiscountPercent;
     }
 
+    if (invalidDiscountStartAt || invalidDiscountEndAt) {
+      return NextResponse.json(
+        { error: "Thời gian hiệu lực giảm giá không hợp lệ" },
+        { status: 400 },
+      );
+    }
+
+    if (hasDiscountStartAt) {
+      updates.discount_start_at = normalizedDiscountStartAt;
+    }
+
+    if (hasDiscountEndAt) {
+      updates.discount_end_at = normalizedDiscountEndAt;
+    }
+
     if (cost_price !== undefined) {
       if (normalizedCostPrice === null || normalizedCostPrice < 0) {
         return NextResponse.json(
@@ -486,12 +616,20 @@ export async function PATCH(request: NextRequest) {
 
     let currentPrice: number | null = null;
     let currentCostPrice: number | null = null;
+    let currentDiscountPercent: number | null = null;
+    let currentDiscountStartAt: string | null = null;
+    let currentDiscountEndAt: string | null = null;
 
-    if (price !== undefined || cost_price !== undefined) {
+    const hasDiscountChanges =
+      discount_percent !== undefined || hasDiscountStartAt || hasDiscountEndAt;
+
+    if (price !== undefined || cost_price !== undefined || hasDiscountChanges) {
       const { data: currentProduct, error: currentProductError } =
         await supabase
           .from("products")
-          .select("price, cost_price")
+          .select(
+            "price, cost_price, discount_percent, discount_start_at, discount_end_at",
+          )
           .eq("id", id)
           .single();
 
@@ -504,6 +642,9 @@ export async function PATCH(request: NextRequest) {
 
       currentPrice = currentProduct.price;
       currentCostPrice = currentProduct.cost_price;
+      currentDiscountPercent = Number(currentProduct.discount_percent || 0);
+      currentDiscountStartAt = currentProduct.discount_start_at || null;
+      currentDiscountEndAt = currentProduct.discount_end_at || null;
     }
 
     const finalPrice = price !== undefined ? normalizedPrice : currentPrice;
@@ -521,6 +662,51 @@ export async function PATCH(request: NextRequest) {
         { error: "Giá bán phải lớn hơn hoặc bằng giá vốn" },
         { status: 400 },
       );
+    }
+
+    const finalDiscountPercent =
+      discount_percent !== undefined
+        ? normalizedDiscountPercent
+        : currentDiscountPercent;
+    const finalDiscountStartAt = hasDiscountStartAt
+      ? normalizedDiscountStartAt
+      : currentDiscountStartAt;
+    const finalDiscountEndAt = hasDiscountEndAt
+      ? normalizedDiscountEndAt
+      : currentDiscountEndAt;
+
+    if (
+      finalDiscountPercent !== null &&
+      finalDiscountPercent !== undefined &&
+      finalDiscountPercent > 0
+    ) {
+      if (!finalDiscountStartAt || !finalDiscountEndAt) {
+        return NextResponse.json(
+          {
+            error:
+              "Vui lòng chọn đầy đủ thời gian bắt đầu và kết thúc khi thiết lập giảm giá",
+          },
+          { status: 400 },
+        );
+      }
+
+      if (
+        new Date(finalDiscountEndAt).getTime() <=
+        new Date(finalDiscountStartAt).getTime()
+      ) {
+        return NextResponse.json(
+          { error: "Thời gian kết thúc giảm giá phải sau thời gian bắt đầu" },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (
+      discount_percent !== undefined &&
+      Number(normalizedDiscountPercent || 0) <= 0
+    ) {
+      updates.discount_start_at = null;
+      updates.discount_end_at = null;
     }
 
     if (stock_quantity !== undefined) {

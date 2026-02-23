@@ -15,6 +15,8 @@ CREATE TABLE products (
   description TEXT,
   price DECIMAL(12, 2) NOT NULL CHECK (price >= 0),
   discount_percent DECIMAL(5, 2) NOT NULL DEFAULT 0 CHECK (discount_percent >= 0 AND discount_percent <= 100),
+  discount_start_at TIMESTAMP WITH TIME ZONE,
+  discount_end_at TIMESTAMP WITH TIME ZONE,
   cost_price DECIMAL(12, 2) NOT NULL CHECK (cost_price >= 0),
   stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
   image_url VARCHAR(500),

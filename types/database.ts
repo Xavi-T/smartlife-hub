@@ -6,6 +6,8 @@ export interface ProductRow {
   description: string | null;
   price: number;
   discount_percent: number | null;
+  discount_start_at: string | null;
+  discount_end_at: string | null;
   cost_price: number;
   stock_quantity: number;
   image_url: string | null;
