@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Layout,
@@ -11,12 +11,15 @@ import {
   Grid,
   Badge,
   Space,
+  Select,
+  Typography,
 } from "antd";
 import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
   ShoppingCartOutlined,
   UserOutlined,
+  CrownOutlined,
   InboxOutlined,
   AppstoreOutlined,
   TagsOutlined,
@@ -35,6 +38,14 @@ const { useBreakpoint } = Grid;
 
 interface AdminLayoutProps {
   children: React.ReactNode;
+}
+
+interface HeaderPriorityCustomer {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_segment: string;
+  discount_percent: number;
 }
 
 // Menu items với icon và label
@@ -61,6 +72,11 @@ const menuItems: MenuProps["items"] = [
     key: "/admin/customers",
     icon: <UserOutlined />,
     label: "Khách hàng",
+  },
+  {
+    key: "/admin/priority-customers",
+    icon: <CrownOutlined />,
+    label: "Khách hàng ưu tiên",
   },
   {
     type: "divider",
@@ -115,8 +131,46 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const screens = useBreakpoint();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [prioritySearch, setPrioritySearch] = useState("");
+  const [priorityCustomers, setPriorityCustomers] = useState<
+    HeaderPriorityCustomer[]
+  >([]);
+  const [isPrioritySearching, setIsPrioritySearching] = useState(false);
 
   const isMobile = screens.xs || screens.sm;
+
+  useEffect(() => {
+    const timeoutId = setTimeout(async () => {
+      try {
+        setIsPrioritySearching(true);
+        const params = new URLSearchParams();
+        params.set("active", "active");
+        if (prioritySearch.trim()) {
+          params.set("search", prioritySearch.trim());
+        }
+
+        const response = await fetch(
+          `/api/admin/priority-customers?${params.toString()}`,
+        );
+
+        if (!response.ok) {
+          setPriorityCustomers([]);
+          return;
+        }
+
+        const result = await response.json();
+        const rows = Array.isArray(result.customers) ? result.customers : [];
+        setPriorityCustomers(rows.slice(0, 8));
+      } catch (error) {
+        console.error("Error searching priority customers:", error);
+        setPriorityCustomers([]);
+      } finally {
+        setIsPrioritySearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [prioritySearch]);
 
   // Handle menu click
   const handleMenuClick: MenuProps["onClick"] = (e) => {
@@ -165,6 +219,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       categories: "Danh mục",
       orders: "Đơn hàng",
       customers: "Khách hàng",
+      "priority-customers": "Khách hàng ưu tiên",
       inventory: "Kho hàng",
       "stock-inbound": "Nhập kho",
       "stock-history": "Lịch sử kho",
@@ -315,6 +370,39 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             )}
 
             <Breadcrumb items={getBreadcrumbItems()} />
+
+            {!isMobile && (
+              <Space size={8}>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  Danh sách KH ưu tiên
+                </Typography.Text>
+                <Select
+                  showSearch
+                  allowClear
+                  value={undefined}
+                  placeholder="Tìm khách hàng ưu tiên..."
+                  style={{ width: 320 }}
+                  filterOption={false}
+                  onSearch={setPrioritySearch}
+                  notFoundContent={
+                    isPrioritySearching ? "Đang tìm..." : "Không có kết quả"
+                  }
+                  options={priorityCustomers.map((customer) => ({
+                    value: customer.id,
+                    label: `${customer.customer_name} • ${customer.customer_phone}`,
+                  }))}
+                  onSelect={(value) => {
+                    const selected = priorityCustomers.find(
+                      (item) => item.id === value,
+                    );
+                    if (!selected) return;
+                    router.push(
+                      `/admin/priority-customers?search=${encodeURIComponent(selected.customer_phone)}`,
+                    );
+                  }}
+                />
+              </Space>
+            )}
           </div>
 
           {/* Right: Admin Info */}

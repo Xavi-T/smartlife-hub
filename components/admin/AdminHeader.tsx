@@ -19,7 +19,7 @@ interface AdminHeaderProps {
 }
 
 interface SearchResult {
-  type: "product" | "customer";
+  type: "product" | "customer" | "priority_customer";
   id: string;
   title: string;
   subtitle: string;
@@ -84,6 +84,24 @@ export function AdminHeader({
             href: `/admin/customers?search=${c.phone}`,
           }));
           results.push(...matchedCustomers);
+        }
+
+        // Search priority customers
+        const priorityCustomersRes = await fetch(
+          `/api/admin/priority-customers?search=${searchQuery}&active=active`,
+        );
+        if (priorityCustomersRes.ok) {
+          const { customers } = await priorityCustomersRes.json();
+          const matchedPriorityCustomers = (customers || [])
+            .slice(0, 3)
+            .map((c: any) => ({
+              type: "priority_customer" as const,
+              id: c.id,
+              title: c.customer_name,
+              subtitle: `${c.customer_phone} - ${c.customer_segment} - ${Number(c.discount_percent || 0)}%`,
+              href: `/admin/priority-customers?search=${c.customer_phone}`,
+            }));
+          results.push(...matchedPriorityCustomers);
         }
 
         setSearchResults(results);
@@ -167,13 +185,19 @@ export function AdminHeader({
                 >
                   <div
                     className={`p-2 rounded-lg ${
-                      result.type === "product" ? "bg-blue-50" : "bg-green-50"
+                      result.type === "product"
+                        ? "bg-blue-50"
+                        : result.type === "customer"
+                          ? "bg-green-50"
+                          : "bg-amber-50"
                     }`}
                   >
                     {result.type === "product" ? (
                       <Package className="w-5 h-5 text-blue-600" />
-                    ) : (
+                    ) : result.type === "customer" ? (
                       <User className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <User className="w-5 h-5 text-amber-600" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -188,10 +212,16 @@ export function AdminHeader({
                     className={`text-xs font-medium px-2 py-1 rounded ${
                       result.type === "product"
                         ? "bg-blue-50 text-blue-700"
-                        : "bg-green-50 text-green-700"
+                        : result.type === "customer"
+                          ? "bg-green-50 text-green-700"
+                          : "bg-amber-50 text-amber-700"
                     }`}
                   >
-                    {result.type === "product" ? "Sản phẩm" : "Khách hàng"}
+                    {result.type === "product"
+                      ? "Sản phẩm"
+                      : result.type === "customer"
+                        ? "Khách hàng"
+                        : "KH ưu tiên"}
                   </span>
                 </button>
               ))}
@@ -213,7 +243,7 @@ export function AdminHeader({
       <div className="flex items-center gap-2">
         <button
           onClick={onQuickOrder}
-          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
+          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
         >
           <ShoppingCart className="w-4 h-4" />
           <span className="text-sm font-medium">Tạo đơn</span>

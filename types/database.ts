@@ -75,6 +75,36 @@ export interface ProductSalesSummary {
   total_profit: number;
 }
 
+export interface CustomerSegmentSetting {
+  id: string;
+  segment_key: string;
+  segment_label: string;
+  min_delivered_orders: number;
+  min_total_spent: number;
+  discount_percent: number;
+  is_priority: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PriorityCustomer {
+  id: string;
+  customer_phone: string;
+  customer_name: string;
+  customer_segment: string;
+  discount_percent: number;
+  total_orders_snapshot: number;
+  delivered_orders_snapshot: number;
+  total_spent_snapshot: number;
+  source: string;
+  notes: string | null;
+  is_active: boolean;
+  last_order_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardStats {
   totalRevenue: number;
   totalProfit: number;
@@ -109,6 +139,23 @@ export interface Database {
         Row: ProductCategory;
         Insert: Omit<ProductCategory, "id" | "created_at">;
         Update: Partial<Omit<ProductCategory, "id" | "created_at">>;
+      };
+      customer_segment_settings: {
+        Row: CustomerSegmentSetting;
+        Insert: Omit<
+          CustomerSegmentSetting,
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<
+          Omit<CustomerSegmentSetting, "id" | "created_at" | "updated_at">
+        >;
+      };
+      priority_customers: {
+        Row: PriorityCustomer;
+        Insert: Omit<PriorityCustomer, "id" | "created_at" | "updated_at">;
+        Update: Partial<
+          Omit<PriorityCustomer, "id" | "created_at" | "updated_at">
+        >;
       };
     };
     Views: {

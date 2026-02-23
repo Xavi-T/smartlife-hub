@@ -65,6 +65,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           </Link>
 
           <Space size="small">
+            <Link href="/priority-customers">
+              <Button type="text">Danh sách KH ưu tiên</Button>
+            </Link>
             <Link href="/orders/track">
               <Button type="text">Tra cứu đơn</Button>
             </Link>

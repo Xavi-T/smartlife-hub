@@ -48,14 +48,36 @@ function calculateEffectivePrice(
   return Math.round(price * (1 - discount / 100));
 }
 
-function isMissingCreateOrderRpc(
-  error: { code?: string; message?: string } | null,
-): boolean {
-  if (!error) return false;
-  return (
-    error.code === "PGRST202" ||
-    error.message?.includes("create_order_transaction") === true
+async function getCustomerSegmentDiscountPercent(
+  db: any,
+  customerPhone: string,
+): Promise<{ segmentLabel: string | null; discountPercent: number }> {
+  const { data: priorityCustomer } = await db
+    .from("priority_customers")
+    .select("customer_segment")
+    .eq("customer_phone", customerPhone)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!priorityCustomer?.customer_segment) {
+    return { segmentLabel: null, discountPercent: 0 };
+  }
+
+  const { data: segment } = await db
+    .from("customer_segment_settings")
+    .select("segment_label, discount_percent")
+    .eq("segment_key", priorityCustomer.customer_segment)
+    .maybeSingle();
+
+  const discountPercent = Math.min(
+    100,
+    Math.max(0, Number(segment?.discount_percent || 0)),
   );
+
+  return {
+    segmentLabel: segment?.segment_label || priorityCustomer.customer_segment,
+    discountPercent,
+  };
 }
 
 async function createOrderDirectly(params: {
@@ -67,6 +89,7 @@ async function createOrderDirectly(params: {
   checkoutMethod: CheckoutMethod;
   paymentMethod: PaymentMethod;
   items: CartItem[];
+  customerDiscountPercent?: number;
 }): Promise<CreateOrderResponse> {
   const {
     db,
@@ -77,6 +100,7 @@ async function createOrderDirectly(params: {
     checkoutMethod,
     paymentMethod,
     items,
+    customerDiscountPercent = 0,
   } = params;
 
   if (!db) {
@@ -180,9 +204,16 @@ async function createOrderDirectly(params: {
 
   const orderItemsPayload = items.map((item) => {
     const product = productMap.get(item.product_id)!;
-    const unitPrice = calculateEffectivePrice(
+    const baseUnitPrice = calculateEffectivePrice(
       product.price,
       product.discount_percent,
+    );
+    const safeCustomerDiscount = Math.min(
+      100,
+      Math.max(0, Number(customerDiscountPercent || 0)),
+    );
+    const unitPrice = Math.round(
+      baseUnitPrice * (1 - safeCustomerDiscount / 100),
     );
     return {
       order_id: orderId,
@@ -231,13 +262,11 @@ async function createOrderDirectly(params: {
  *
  * Logic:
  * 1. Validate input
- * 2. Gọi PostgreSQL function để xử lý transaction
- * 3. Function sẽ:
+ * 2. Xác định % giảm theo phân loại khách hàng ưu tiên (qua SĐT)
+ * 3. Tạo đơn hàng trực tiếp trong DB:
  *    - Kiểm tra tồn kho từng sản phẩm
- *    - Tạo order
- *    - Tạo order_items
- *    - Cập nhật (trừ) tồn kho
- * 4. Tất cả trong một transaction - rollback nếu có lỗi
+ *    - Tạo order + order_items (đã áp giảm giá)
+ *    - Trigger DB tự cập nhật (trừ) tồn kho
  */
 export async function createOrder(
   request: CreateOrderRequest,
@@ -335,76 +364,40 @@ export async function createOrder(
 
     const finalNotes = extraNotes.join("\n");
 
-    // Ưu tiên RPC transaction nếu có trong DB
-    const { data, error } = await orderWriteClient.rpc(
-      "create_order_transaction",
-      {
-        p_customer_name: request.customer.name.trim(),
-        p_customer_phone: normalizedPhone,
-        p_customer_address: resolvedAddress,
-        p_notes: finalNotes,
-        p_items: JSON.stringify(request.items),
-      },
+    const customerDiscountInfo = await getCustomerSegmentDiscountPercent(
+      orderWriteClient,
+      normalizedPhone,
     );
 
-    if (error) {
-      if (!isMissingCreateOrderRpc(error)) {
-        console.error("Database error:", error);
-        return {
-          success: false,
-          message: "Lỗi khi tạo đơn hàng: " + error.message,
-        };
-      }
+    const notesWithPriorityDiscount =
+      customerDiscountInfo.discountPercent > 0
+        ? `${finalNotes}\nGiảm theo phân loại khách hàng ưu tiên (${customerDiscountInfo.segmentLabel}): ${customerDiscountInfo.discountPercent}%`
+        : finalNotes;
 
-      const fallbackResult = await createOrderDirectly({
-        db: orderWriteClient,
-        customerName: request.customer.name.trim(),
-        customerPhone: normalizedPhone,
-        customerAddress: resolvedAddress,
-        notes: finalNotes,
-        checkoutMethod,
-        paymentMethod,
-        items: request.items,
-      });
+    const createResult = await createOrderDirectly({
+      db: orderWriteClient,
+      customerName: request.customer.name.trim(),
+      customerPhone: normalizedPhone,
+      customerAddress: resolvedAddress,
+      notes: notesWithPriorityDiscount,
+      checkoutMethod,
+      paymentMethod,
+      items: request.items,
+      customerDiscountPercent: customerDiscountInfo.discountPercent,
+    });
 
-      if (!fallbackResult.success || !fallbackResult.orderId) {
-        return fallbackResult;
-      }
-
-      await AuditLogger.orderCreated(
-        fallbackResult.orderId,
-        request.customer.name,
-        fallbackResult.totalAmount || 0,
-        request.items.length,
-      );
-
-      return fallbackResult;
+    if (!createResult.success || !createResult.orderId) {
+      return createResult;
     }
 
-    // Parse response từ function
-    const result = data?.[0];
-
-    if (!result || !result.success) {
-      return {
-        success: false,
-        message: result?.message || "Không thể tạo đơn hàng",
-      };
-    }
-
-    // Log audit event
     await AuditLogger.orderCreated(
-      result.order_id,
+      createResult.orderId,
       request.customer.name,
-      parseFloat(result.total_amount),
+      createResult.totalAmount || 0,
       request.items.length,
     );
 
-    return {
-      success: true,
-      orderId: result.order_id,
-      totalAmount: parseFloat(result.total_amount),
-      message: result.message,
-    };
+    return createResult;
   } catch (error) {
     console.error("Error in createOrder:", error);
     return {

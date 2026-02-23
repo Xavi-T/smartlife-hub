@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Users,
+  Crown,
   TrendingUp,
   History,
   FileText,
@@ -80,6 +81,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           label: "Khách hàng",
           href: "/admin/customers",
           icon: Users,
+        },
+        {
+          label: "Khách hàng ưu tiên",
+          href: "/admin/priority-customers",
+          icon: Crown,
         },
       ],
     },
@@ -161,7 +167,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -264,7 +270,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           </button>
 
           {/* Version Info */}
-          <div className="px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+          <div className="px-3 py-2 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg">
             <p className="text-xs font-medium text-gray-700 mb-1">
               Phiên bản 1.0
             </p>
