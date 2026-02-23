@@ -14,6 +14,7 @@ import {
   LogOut,
   Box,
   Warehouse,
+  ScanLine,
 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
@@ -72,6 +73,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     {
       title: "Bán hàng",
       items: [
+        {
+          label: "Bán hàng nhanh",
+          href: "/admin/quick-sales",
+          icon: ScanLine,
+        },
         {
           label: "Đơn hàng",
           href: "/admin/orders",

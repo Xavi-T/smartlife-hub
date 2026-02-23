@@ -156,7 +156,7 @@ export function OrderDetailModal({
       width={960}
       destroyOnHidden
     >
-      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Card title="Thông tin khách hàng" size="small">
@@ -202,7 +202,7 @@ export function OrderDetailModal({
           <Alert
             type="warning"
             showIcon
-            title="Ghi chú"
+            message="Ghi chú"
             description={order.notes}
           />
         )}

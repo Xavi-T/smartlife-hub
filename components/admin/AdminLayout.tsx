@@ -18,6 +18,7 @@ import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
   ShoppingCartOutlined,
+  ThunderboltOutlined,
   UserOutlined,
   CrownOutlined,
   InboxOutlined,
@@ -62,6 +63,11 @@ const menuItems: MenuProps["items"] = [
     key: "sales",
     label: "Bán hàng",
     type: "group",
+  },
+  {
+    key: "/admin/quick-sales",
+    icon: <ThunderboltOutlined />,
+    label: "Bán hàng nhanh",
   },
   {
     key: "/admin/orders",
@@ -220,6 +226,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       orders: "Đơn hàng",
       customers: "Khách hàng",
       "priority-customers": "Khách hàng ưu tiên",
+      "quick-sales": "Bán hàng nhanh",
       inventory: "Kho hàng",
       "stock-inbound": "Nhập kho",
       "stock-history": "Lịch sử kho",

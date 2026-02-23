@@ -14,11 +14,20 @@ export type CheckoutMethod = "cod" | "bank_transfer";
 
 export type PaymentMethod = "cod" | "bank_transfer";
 
+export interface ManualProductDiscount {
+  productId: string;
+  percent: number;
+}
+
 export interface CreateOrderRequest {
   customer: CustomerInfo;
   items: CartItem[];
   checkoutMethod?: CheckoutMethod;
   paymentMethod?: PaymentMethod;
+  isCounterSale?: boolean;
+  manualDiscountPercent?: number;
+  manualDiscountMode?: "order_total" | "product_items";
+  manualProductDiscounts?: ManualProductDiscount[];
 }
 
 export interface CreateOrderResponse {

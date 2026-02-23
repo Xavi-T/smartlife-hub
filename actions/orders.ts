@@ -8,6 +8,7 @@ import type {
   CreateOrderResponse,
   CartItem,
   CheckoutMethod,
+  ManualProductDiscount,
   PaymentMethod,
 } from "@/types/order";
 
@@ -16,6 +17,7 @@ interface ProductForOrder {
   name: string;
   price: number;
   discount_percent: number | null;
+  category: string;
   stock_quantity: number;
   is_active: boolean;
 }
@@ -88,8 +90,12 @@ async function createOrderDirectly(params: {
   notes: string;
   checkoutMethod: CheckoutMethod;
   paymentMethod: PaymentMethod;
+  isCounterSale?: boolean;
   items: CartItem[];
   customerDiscountPercent?: number;
+  manualDiscountPercent?: number;
+  manualDiscountMode?: "order_total" | "product_items";
+  manualProductDiscounts?: ManualProductDiscount[];
 }): Promise<CreateOrderResponse> {
   const {
     db,
@@ -99,8 +105,12 @@ async function createOrderDirectly(params: {
     notes,
     checkoutMethod,
     paymentMethod,
+    isCounterSale = false,
     items,
     customerDiscountPercent = 0,
+    manualDiscountPercent = 0,
+    manualDiscountMode = "order_total",
+    manualProductDiscounts = [],
   } = params;
 
   if (!db) {
@@ -114,7 +124,9 @@ async function createOrderDirectly(params: {
   const productIds = items.map((item) => item.product_id);
   const { data: productsData, error: productsError } = await db
     .from("products")
-    .select("id, name, price, discount_percent, stock_quantity, is_active")
+    .select(
+      "id, name, price, discount_percent, category, stock_quantity, is_active",
+    )
     .in("id", productIds);
 
   if (productsError) {
@@ -153,7 +165,7 @@ async function createOrderDirectly(params: {
     customer_phone: customerPhone,
     customer_address: customerAddress,
     total_amount: 0,
-    status: "pending",
+    status: isCounterSale ? "delivered" : "pending",
     notes,
   };
 
@@ -161,10 +173,13 @@ async function createOrderDirectly(params: {
     ...baseOrderInsert,
     checkout_method: checkoutMethod,
     payment_method: paymentMethod,
-    payment_confirmed: paymentMethod === "cod",
+    payment_confirmed: isCounterSale || paymentMethod === "cod",
     payment_confirmed_at:
-      paymentMethod === "cod" ? new Date().toISOString() : null,
-    payment_confirmed_by: paymentMethod === "cod" ? "system" : null,
+      isCounterSale || paymentMethod === "cod"
+        ? new Date().toISOString()
+        : null,
+    payment_confirmed_by:
+      isCounterSale || paymentMethod === "cod" ? "system" : null,
   };
 
   let orderId: string | null = null;
@@ -202,6 +217,13 @@ async function createOrderDirectly(params: {
     orderId = createdBase.id;
   }
 
+  const manualProductDiscountMap = new Map<string, number>(
+    (manualProductDiscounts || []).map((item) => [
+      item.productId,
+      Math.min(100, Math.max(0, Number(item.percent || 0))),
+    ]),
+  );
+
   const orderItemsPayload = items.map((item) => {
     const product = productMap.get(item.product_id)!;
     const baseUnitPrice = calculateEffectivePrice(
@@ -212,8 +234,21 @@ async function createOrderDirectly(params: {
       100,
       Math.max(0, Number(customerDiscountPercent || 0)),
     );
+    const safeManualDiscount = Math.min(
+      100,
+      Math.max(0, Number(manualDiscountPercent || 0)),
+    );
+    const manualDiscountForItem =
+      manualDiscountMode === "order_total"
+        ? safeManualDiscount
+        : Math.min(
+            100,
+            Math.max(0, manualProductDiscountMap.get(product.id) || 0),
+          );
     const unitPrice = Math.round(
-      baseUnitPrice * (1 - safeCustomerDiscount / 100),
+      baseUnitPrice *
+        (1 - safeCustomerDiscount / 100) *
+        (1 - manualDiscountForItem / 100),
     );
     return {
       order_id: orderId,
@@ -285,6 +320,37 @@ export async function createOrder(
     const paymentMethod: PaymentMethod =
       request.paymentMethod ||
       (checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod");
+    const isCounterSale = Boolean(request.isCounterSale);
+    const manualDiscountPercent = Math.min(
+      100,
+      Math.max(0, Number(request.manualDiscountPercent || 0)),
+    );
+    const manualDiscountMode = request.manualDiscountMode || "order_total";
+    const manualProductDiscounts = Array.from(
+      new Map(
+        (request.manualProductDiscounts || [])
+          .filter((item) => item.productId)
+          .map((item) => [
+            item.productId,
+            Math.min(100, Math.max(0, Number(item.percent || 0))),
+          ]),
+      ),
+    ).map(([productId, percent]) => ({ productId, percent }));
+    if (manualDiscountMode === "product_items") {
+      const orderItemIds = new Set(
+        request.items.map((item) => item.product_id),
+      );
+      const hasInvalidProduct = manualProductDiscounts.some(
+        (item) => !orderItemIds.has(item.productId),
+      );
+      if (hasInvalidProduct) {
+        return {
+          success: false,
+          message:
+            "Sản phẩm giảm giá không hợp lệ. Vui lòng chọn sản phẩm có trong giỏ hàng.",
+        };
+      }
+    }
 
     // Validate input
     if (!request.customer.name?.trim()) {
@@ -310,6 +376,7 @@ export async function createOrder(
     }
 
     if (
+      !isCounterSale &&
       checkoutMethod === "bank_transfer" &&
       !request.customer.address?.trim()
     ) {
@@ -343,23 +410,47 @@ export async function createOrder(
       }
     }
 
-    const resolvedAddress = request.customer.address?.trim()
-      ? request.customer.address.trim()
-      : "Sẽ trao đổi khi tư vấn qua điện thoại";
+    const resolvedAddress = isCounterSale
+      ? "Mua tại quầy"
+      : request.customer.address?.trim()
+        ? request.customer.address.trim()
+        : "Sẽ trao đổi khi tư vấn qua điện thoại";
 
-    const extraNotes = [
-      `Hình thức đặt hàng: ${
-        checkoutMethod === "bank_transfer" ? "Chuyển khoản" : "Ship COD"
-      }`,
-      `Thanh toán: ${
-        paymentMethod === "bank_transfer"
-          ? "Chuyển khoản"
-          : "Thanh toán khi nhận hàng (COD)"
-      }`,
-    ];
+    const extraNotes = isCounterSale
+      ? [
+          "Hình thức đặt hàng: Bán tại quầy",
+          "Thanh toán: Đã thanh toán tại quầy",
+        ]
+      : [
+          `Hình thức đặt hàng: ${
+            checkoutMethod === "bank_transfer" ? "Chuyển khoản" : "Ship COD"
+          }`,
+          `Thanh toán: ${
+            paymentMethod === "bank_transfer"
+              ? "Chuyển khoản"
+              : "Thanh toán khi nhận hàng (COD)"
+          }`,
+        ];
 
     if (request.customer.notes?.trim()) {
       extraNotes.unshift(request.customer.notes.trim());
+    }
+
+    const positiveProductDiscountCount = manualProductDiscounts.filter(
+      (item) => item.percent > 0,
+    ).length;
+    if (
+      (manualDiscountMode === "order_total" && manualDiscountPercent > 0) ||
+      (manualDiscountMode === "product_items" &&
+        positiveProductDiscountCount > 0)
+    ) {
+      if (manualDiscountMode === "product_items") {
+        extraNotes.unshift(
+          `Giảm giá theo từng sản phẩm (${positiveProductDiscountCount} sản phẩm)`,
+        );
+      } else {
+        extraNotes.unshift(`Giảm giá theo tổng đơn: ${manualDiscountPercent}%`);
+      }
     }
 
     const finalNotes = extraNotes.join("\n");
@@ -382,8 +473,12 @@ export async function createOrder(
       notes: notesWithPriorityDiscount,
       checkoutMethod,
       paymentMethod,
+      isCounterSale,
       items: request.items,
       customerDiscountPercent: customerDiscountInfo.discountPercent,
+      manualDiscountPercent,
+      manualDiscountMode,
+      manualProductDiscounts,
     });
 
     if (!createResult.success || !createResult.orderId) {
