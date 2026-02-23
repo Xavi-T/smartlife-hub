@@ -39,6 +39,13 @@ function getProductCategoryNames(product: Product): string[] {
   return product.category ? [product.category] : [];
 }
 
+function stripHtmlTags(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function ProductsPage() {
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
@@ -193,7 +200,7 @@ export default function ProductsPage() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {record.description}
+                {stripHtmlTags(record.description)}
               </div>
             )}
           </div>

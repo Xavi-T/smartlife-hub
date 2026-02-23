@@ -2,15 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Button,
-  Card,
-  InputNumber,
-  Space,
-  Tag,
-  Typography,
-  message,
-} from "antd";
+import DOMPurify from "dompurify";
+import { Button, Card, InputNumber, Space, Tag, message } from "antd";
 import { ArrowLeftOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
@@ -32,8 +25,6 @@ interface ProductMedia {
   height: number | null;
   media_type: "image" | "video";
 }
-
-const { Paragraph } = Typography;
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -207,6 +198,9 @@ export default function ProductDetailPage() {
   const remainingDiscountMs = hasValidDiscountEnd
     ? Math.max(0, discountEndMs - nowMs)
     : 0;
+  const sanitizedDescription = DOMPurify.sanitize(product.description || "", {
+    USE_PROFILES: { html: true },
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -359,16 +353,12 @@ export default function ProductDetailPage() {
         </Card>
 
         <Card title="Mô tả sản phẩm">
-          {product.description ? (
-            <Paragraph
-              style={{
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.8,
-                marginBottom: 0,
-              }}
-            >
-              {product.description}
-            </Paragraph>
+          {sanitizedDescription ? (
+            <div
+              style={{ lineHeight: 1.8, marginBottom: 0 }}
+              className="[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_a]:text-blue-600 [&_a]:underline [&_.sl-rte-image-wrapper]:max-w-full"
+              dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+            />
           ) : (
             <div className="text-gray-500">
               Sản phẩm chưa có mô tả chi tiết.

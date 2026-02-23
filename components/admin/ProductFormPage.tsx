@@ -20,8 +20,8 @@ import {
 import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import type { Product } from "@/types/database";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 
-const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
 interface ProductFormValues {
@@ -40,6 +40,19 @@ interface CategoryOption {
   value: string;
 }
 
+interface ProductMediaItem {
+  id: string;
+  image_url: string;
+  is_cover: boolean;
+  media_type: "image" | "video";
+}
+
+interface EditorMediaImage {
+  id: string;
+  url: string;
+  isCover?: boolean;
+}
+
 interface ProductFormPageProps {
   mode: "create" | "edit";
   productId?: string;
@@ -52,6 +65,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingProduct, setIsLoadingProduct] = useState(mode === "edit");
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [editorMediaImages, setEditorMediaImages] = useState<
+    EditorMediaImage[]
+  >([]);
   const discountPercent = Number(Form.useWatch("discount_percent", form) || 0);
   const hasDiscount = discountPercent > 0;
 
@@ -86,6 +102,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
   useEffect(() => {
     if (!isEditMode || !productId) {
       form.resetFields();
+      setEditorMediaImages([]);
       form.setFieldsValue({
         is_active: true,
         discount_percent: 0,
@@ -130,6 +147,22 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
               : [product.category],
           is_active: product.is_active,
         });
+
+        const mediaRes = await fetch(`/api/products/${productId}/media`);
+        if (mediaRes.ok) {
+          const mediaList = (await mediaRes.json()) as ProductMediaItem[];
+          setEditorMediaImages(
+            mediaList
+              .filter((item) => item.media_type === "image" && item.image_url)
+              .map((item) => ({
+                id: item.id,
+                url: item.image_url,
+                isCover: item.is_cover,
+              })),
+          );
+        } else {
+          setEditorMediaImages([]);
+        }
       } catch (error) {
         console.error("Error fetching product:", error);
         messageApi.error("Không thể tải thông tin sản phẩm");
@@ -281,11 +314,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   name="description"
                   tooltip="Dùng như editor để viết thông tin nổi bật, thông số, hướng dẫn sử dụng..."
                 >
-                  <TextArea
-                    rows={8}
-                    placeholder="Ví dụ:\n- Công suất: 2000W\n- Chất liệu: Inox 304\n- Bảo hành: 12 tháng\n\nHướng dẫn sử dụng:\n..."
-                    maxLength={3000}
-                    showCount
+                  <RichTextEditor
+                    placeholder="Ví dụ: tiêu đề, thông số, hướng dẫn sử dụng, hình ảnh minh họa..."
+                    productMediaImages={editorMediaImages}
                   />
                 </Form.Item>
 
