@@ -249,9 +249,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
       {contextHolder}
 
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        <Space direction="orientation" size={16} style={{ width: "100%" }}>
           <Space style={{ justifyContent: "space-between", width: "100%" }}>
-            <Space direction="vertical" size={0}>
+            <Space direction="orientation" size={0}>
               <Typography.Title level={2} style={{ margin: 0 }}>
                 {pageTitle}
               </Typography.Title>

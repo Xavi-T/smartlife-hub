@@ -123,7 +123,7 @@ export default function Home() {
   if (isLoading || !isLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 grid place-items-center">
-        <Space direction="vertical" align="center" size="middle">
+        <Space direction="orientation" align="center" size="middle">
           <Spin size="large" />
           <Typography.Text type="secondary">
             Đang tải sản phẩm...
