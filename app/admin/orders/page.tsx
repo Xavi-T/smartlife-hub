@@ -356,6 +356,22 @@ export default function OrdersPage() {
     };
   }, [orders]);
 
+  const filteredOrders = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (!keyword) return orders;
+
+    return orders.filter((order) => {
+      const orderCode = order.id.slice(0, 8).toLowerCase();
+      return (
+        order.id.toLowerCase().includes(keyword) ||
+        orderCode.includes(keyword) ||
+        order.customer_name.toLowerCase().includes(keyword) ||
+        order.customer_phone.toLowerCase().includes(keyword) ||
+        order.customer_address.toLowerCase().includes(keyword)
+      );
+    });
+  }, [orders, searchQuery]);
+
   // Status tag config
   const getStatusTag = (status: Order["status"]) => {
     const statusConfig = {
@@ -640,25 +656,38 @@ export default function OrdersPage() {
           </Space>
         }
         extra={
-          <Button
-            icon={<ReloadOutlined spin={isRefreshing} />}
-            onClick={handleRefresh}
-            loading={isRefreshing}
-          >
-            Làm mới
-          </Button>
+          <Space>
+            <Input
+              allowClear
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Tìm mã đơn, tên khách, SĐT, địa chỉ"
+              prefix={<SearchOutlined />}
+              style={{ width: 320 }}
+            />
+            <Button
+              icon={<ReloadOutlined spin={isRefreshing} />}
+              onClick={handleRefresh}
+              loading={isRefreshing}
+            >
+              Làm mới
+            </Button>
+          </Space>
         }
       >
         <Table
           columns={columns}
-          dataSource={orders}
+          dataSource={filteredOrders}
           rowKey="id"
           loading={isLoading}
           scroll={{ x: 1200 }}
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
-            showTotal: (total) => `Tổng ${total} đơn hàng`,
+            showTotal: (total) =>
+              searchQuery.trim()
+                ? `Hiển thị ${total} / ${orders.length} đơn hàng`
+                : `Tổng ${total} đơn hàng`,
             pageSizeOptions: ["10", "20", "50", "100"],
           }}
         />
