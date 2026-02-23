@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
+type OrderStatus = "pending" | "processing" | "delivered" | "cancelled";
+
 function createAdminOrdersClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -43,45 +45,59 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Validate status
-    const validStatuses = ["pending", "processing", "delivered", "cancelled"];
-    if (!validStatuses.includes(newStatus)) {
+    const validStatuses: OrderStatus[] = [
+      "pending",
+      "processing",
+      "delivered",
+      "cancelled",
+    ];
+    const normalizedNewStatus = newStatus as OrderStatus;
+    const normalizedCurrentStatus = currentStatus as OrderStatus;
+
+    if (!validStatuses.includes(normalizedNewStatus)) {
       return NextResponse.json(
         { error: "Trạng thái không hợp lệ" },
         { status: 400 },
       );
     }
 
-    // Logic hoàn trả kho khi HỦY đơn
-    if (newStatus === "cancelled" && currentStatus !== "cancelled") {
-      // Lấy danh sách order_items
-      const { data: orderItems, error: itemsError } = await sb
-        .from("order_items")
-        .select("product_id, quantity")
-        .eq("order_id", orderId);
-
-      if (itemsError) throw itemsError;
-
-      // Hoàn trả stock cho từng sản phẩm
-      if (orderItems && orderItems.length > 0) {
-        for (const item of orderItems) {
-          const { error: updateError } = await sb.rpc(
-            "increment_product_stock",
-            {
-              product_uuid: item.product_id,
-              quantity_to_add: item.quantity,
-            },
-          );
-
-          if (updateError) {
-            console.error("Error restoring stock:", updateError);
-            // Continue với các items khác
-          }
-        }
-      }
+    if (!validStatuses.includes(normalizedCurrentStatus)) {
+      return NextResponse.json(
+        { error: "Trạng thái hiện tại không hợp lệ" },
+        { status: 400 },
+      );
     }
 
-    // Logic trừ kho khi chuyển từ PENDING sang PROCESSING (Đã xác nhận)
-    if (newStatus === "processing" && currentStatus === "pending") {
+    const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
+      pending: ["processing", "cancelled"],
+      processing: ["pending", "delivered", "cancelled"],
+      delivered: ["cancelled"],
+      cancelled: [],
+    };
+
+    if (
+      !allowedTransitions[normalizedCurrentStatus].includes(normalizedNewStatus)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Không thể chuyển từ ${normalizedCurrentStatus} sang ${normalizedNewStatus}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const isStockDeductedStatus = (status: OrderStatus) =>
+      status === "processing" || status === "delivered";
+
+    const shouldDeductStock =
+      !isStockDeductedStatus(normalizedCurrentStatus) &&
+      isStockDeductedStatus(normalizedNewStatus);
+
+    const shouldRestoreStock =
+      isStockDeductedStatus(normalizedCurrentStatus) &&
+      !isStockDeductedStatus(normalizedNewStatus);
+
+    if (shouldDeductStock || shouldRestoreStock) {
       // Lấy danh sách order_items
       const { data: orderItems, error: itemsError } = await sb
         .from("order_items")
@@ -90,42 +106,60 @@ export async function PATCH(request: NextRequest) {
 
       if (itemsError) throw itemsError;
 
-      // Trừ stock cho từng sản phẩm
       if (orderItems && orderItems.length > 0) {
         for (const item of orderItems) {
-          // Kiểm tra tồn kho trước
-          const { data: product, error: productError } = await sb
-            .from("products")
-            .select("stock_quantity, name")
-            .eq("id", item.product_id)
-            .single();
+          if (shouldDeductStock) {
+            // Kiểm tra tồn kho trước
+            const { data: product, error: productError } = await sb
+              .from("products")
+              .select("stock_quantity, name")
+              .eq("id", item.product_id)
+              .single();
 
-          if (productError) throw productError;
+            if (productError) throw productError;
 
-          if (product.stock_quantity < item.quantity) {
-            return NextResponse.json(
+            if (product.stock_quantity < item.quantity) {
+              return NextResponse.json(
+                {
+                  error: `Không đủ hàng trong kho cho sản phẩm: ${product.name}`,
+                },
+                { status: 400 },
+              );
+            }
+
+            const { error: updateError } = await sb.rpc(
+              "decrement_product_stock",
               {
-                error: `Không đủ hàng trong kho cho sản phẩm: ${product.name}`,
+                product_uuid: item.product_id,
+                quantity_to_subtract: item.quantity,
               },
-              { status: 400 },
             );
+
+            if (updateError) {
+              console.error("Error deducting stock:", updateError);
+              return NextResponse.json(
+                { error: "Không thể trừ kho" },
+                { status: 500 },
+              );
+            }
           }
 
-          // Trừ stock
-          const { error: updateError } = await sb.rpc(
-            "decrement_product_stock",
-            {
-              product_uuid: item.product_id,
-              quantity_to_subtract: item.quantity,
-            },
-          );
-
-          if (updateError) {
-            console.error("Error deducting stock:", updateError);
-            return NextResponse.json(
-              { error: "Không thể trừ kho" },
-              { status: 500 },
+          if (shouldRestoreStock) {
+            const { error: updateError } = await sb.rpc(
+              "increment_product_stock",
+              {
+                product_uuid: item.product_id,
+                quantity_to_add: item.quantity,
+              },
             );
+
+            if (updateError) {
+              console.error("Error restoring stock:", updateError);
+              return NextResponse.json(
+                { error: "Không thể hoàn kho" },
+                { status: 500 },
+              );
+            }
           }
         }
       }
@@ -135,7 +169,7 @@ export async function PATCH(request: NextRequest) {
     const { data: updatedOrder, error: updateError } = await sb
       .from("orders")
       .update({
-        status: newStatus,
+        status: normalizedNewStatus,
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderId)
@@ -148,28 +182,41 @@ export async function PATCH(request: NextRequest) {
     await AuditLogger.orderStatusChanged(
       orderId,
       orderId.slice(0, 8).toUpperCase(),
-      currentStatus,
-      newStatus,
+      normalizedCurrentStatus,
+      normalizedNewStatus,
       updatedOrder.customer_name,
     );
 
     // Log stock changes if applicable
-    if (newStatus === "cancelled" && currentStatus !== "cancelled") {
+    if (shouldRestoreStock) {
       await AuditLogger.systemEvent(
-        `Đã hoàn trả hàng về kho do hủy đơn #${orderId.slice(0, 8).toUpperCase()}`,
+        `Đã hoàn trả hàng về kho do cập nhật trạng thái đơn #${orderId.slice(0, 8).toUpperCase()}`,
         { order_id: orderId },
       );
-    } else if (newStatus === "processing" && currentStatus === "pending") {
+    } else if (shouldDeductStock) {
       await AuditLogger.systemEvent(
         `Đã trừ hàng khỏi kho do xác nhận đơn #${orderId.slice(0, 8).toUpperCase()}`,
         { order_id: orderId },
       );
     }
 
+    let messageText = "Đã cập nhật trạng thái đơn hàng thành công";
+    if (
+      normalizedCurrentStatus === "delivered" &&
+      normalizedNewStatus === "cancelled"
+    ) {
+      messageText = "Đã ghi nhận hoàn trả sau giao và hoàn hàng về kho";
+    } else if (
+      normalizedCurrentStatus === "pending" &&
+      normalizedNewStatus === "cancelled"
+    ) {
+      messageText = "Đã hủy đơn chờ xác nhận";
+    }
+
     return NextResponse.json({
       success: true,
       order: updatedOrder,
-      message: `Đã cập nhật trạng thái đơn hàng thành công`,
+      message: messageText,
     });
   } catch (error: any) {
     console.error("Error updating order status:", error);

@@ -121,13 +121,38 @@ export default function OrdersPage() {
   ) => {
     if (newStatus === order.status) return;
 
-    const confirmMessages: Partial<Record<Order["status"], string>> = {
-      processing: "Xác nhận đơn hàng này? Hàng sẽ được trừ khỏi kho.",
-      delivered: "Đánh dấu đơn hàng này đã giao?",
-      cancelled: "Hủy đơn hàng này? Hàng sẽ được hoàn về kho.",
+    const getConfirmMessage = (
+      currentStatus: Order["status"],
+      nextStatus: Order["status"],
+    ): string | undefined => {
+      if (currentStatus === "pending" && nextStatus === "processing") {
+        return "Xác nhận đơn hàng này? Hàng sẽ được trừ khỏi kho.";
+      }
+
+      if (currentStatus === "processing" && nextStatus === "delivered") {
+        return "Đánh dấu đơn hàng này đã giao?";
+      }
+
+      if (nextStatus === "cancelled" && currentStatus === "delivered") {
+        return "Khách đã hoàn trả sau giao. Xác nhận hủy đơn và hoàn hàng về kho?";
+      }
+
+      if (nextStatus === "cancelled" && currentStatus === "processing") {
+        return "Hủy đơn đang giao? Hàng sẽ được hoàn về kho.";
+      }
+
+      if (nextStatus === "cancelled" && currentStatus === "pending") {
+        return "Hủy đơn chờ xác nhận?";
+      }
+
+      if (currentStatus === "processing" && nextStatus === "pending") {
+        return "Chuyển lại về chờ xác nhận? Hàng sẽ được hoàn về kho.";
+      }
+
+      return undefined;
     };
 
-    const confirmMessage = confirmMessages[newStatus];
+    const confirmMessage = getConfirmMessage(order.status, newStatus);
     if (confirmMessage) {
       const shouldContinue = await new Promise<boolean>((resolve) => {
         Modal.confirm({
@@ -384,17 +409,25 @@ export default function OrdersPage() {
                 {
                   key: "pending",
                   label: "Chờ xác nhận",
-                  disabled: record.status === "pending",
+                  disabled:
+                    record.status === "pending" ||
+                    record.status === "delivered" ||
+                    record.status === "cancelled",
                 },
                 {
                   key: "processing",
                   label: "Đang giao",
-                  disabled: record.status === "processing",
+                  disabled:
+                    record.status === "processing" ||
+                    record.status === "delivered" ||
+                    record.status === "cancelled",
                 },
                 {
                   key: "delivered",
                   label: "Đã giao",
-                  disabled: record.status === "delivered",
+                  disabled:
+                    record.status !== "processing" ||
+                    record.status === "delivered",
                 },
                 {
                   key: "cancelled",
@@ -412,9 +445,7 @@ export default function OrdersPage() {
               icon={<EditOutlined />}
               loading={updatingOrderId === record.id}
               disabled={
-                updatingOrderId === record.id ||
-                record.status === "delivered" ||
-                record.status === "cancelled"
+                updatingOrderId === record.id || record.status === "cancelled"
               }
             >
               Sửa
