@@ -55,7 +55,7 @@ export default function PriorityCustomersPublicPage() {
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Space direction="orientation" size={16} style={{ width: "100%" }}>
+        <Space orientation="vertical" size={16} style={{ width: "100%" }}>
           <div>
             <Typography.Title level={2} style={{ marginBottom: 4 }}>
               Danh sách khách hàng ưu tiên
@@ -83,7 +83,7 @@ export default function PriorityCustomersPublicPage() {
               renderItem={(customer) => (
                 <List.Item>
                   <Space
-                    direction="orientation"
+                    orientation="vertical"
                     size={2}
                     style={{ width: "100%" }}
                   >

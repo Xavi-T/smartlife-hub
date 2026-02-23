@@ -571,7 +571,7 @@ export default function PriorityCustomersPage() {
   return (
     <div>
       {contextHolder}
-      <Space direction="orientation" size={16} style={{ width: "100%" }}>
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <div>
           <Typography.Title level={2} style={{ marginBottom: 4 }}>
             Khách hàng ưu tiên

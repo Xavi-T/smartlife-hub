@@ -156,7 +156,7 @@ export function OrderDetailModal({
       width={960}
       destroyOnHidden
     >
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Card title="Thông tin khách hàng" size="small">

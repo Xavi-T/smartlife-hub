@@ -14,7 +14,6 @@ import {
 } from "@ant-design/icons";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { ProductTable } from "@/components/admin/ProductTable";
-import { QuickStockForm } from "@/components/admin/QuickStockForm";
 import { TopSellingProducts } from "@/components/admin/TopSellingProducts";
 import type { Product } from "@/types/database";
 
@@ -210,18 +209,9 @@ export default function AdminDashboard() {
         <TopSellingProducts />
       </div>
 
-      {/* Two Column Layout */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {/* Product Table - 2 columns on large screens */}
-        <Col xs={24} lg={16}>
-          <ProductTable products={products} />
-        </Col>
-
-        {/* Quick Stock Form - 1 column on large screens */}
-        <Col xs={24} lg={8}>
-          <QuickStockForm products={products} onStockUpdated={handleRefresh} />
-        </Col>
-      </Row>
+      <div style={{ marginBottom: 24 }}>
+        <ProductTable products={products} />
+      </div>
 
       {/* Low Stock Alert */}
       {lowStockProducts.length > 0 && (

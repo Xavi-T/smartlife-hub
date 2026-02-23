@@ -123,7 +123,7 @@ export default function Home() {
   if (isLoading || !isLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 grid place-items-center">
-        <Space direction="orientation" align="center" size="middle">
+        <Space orientation="vertical" align="center" size="middle">
           <Spin size="large" />
           <Typography.Text type="secondary">
             Đang tải sản phẩm...
@@ -147,7 +147,7 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Card
           style={{ marginBottom: 24, padding: 0 }}
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
         >
           <Carousel autoplay dots>
             {carouselItems.map((item) => (

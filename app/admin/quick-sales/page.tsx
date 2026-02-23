@@ -483,9 +483,9 @@ export default function QuickSalesPage() {
     <div style={{ background: "#f5f5f5", minHeight: "100vh", padding: 16 }}>
       {contextHolder}
 
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <Card>
-          <Space direction="vertical" size={4}>
+          <Space orientation="vertical" size={4}>
             <Title level={3} style={{ margin: 0 }}>
               Bán hàng nhanh tại quầy
             </Title>
@@ -929,7 +929,7 @@ export default function QuickSalesPage() {
                     </Space>
                   }
                   description={
-                    <Space direction="vertical" size={0}>
+                    <Space orientation="vertical" size={0}>
                       <Text type="secondary">
                         {order.customer_name} • {order.customer_phone}
                       </Text>
