@@ -16,10 +16,12 @@ import {
   Warehouse,
   ScanLine,
 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
 import { toast } from "sonner";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { canAccessAdminPath, getRoleFromUser, type AppRole } from "@/lib/rbac";
 
 interface NavItem {
   label: string;
@@ -42,6 +44,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<AppRole>("admin");
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     "Tổng quan",
     "Sản phẩm",
@@ -122,6 +125,22 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     },
   ];
 
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserRole(getRoleFromUser(data.user));
+    });
+  }, []);
+
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canAccessAdminPath(currentUserRole, item.href),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+
   const toggleGroup = (title: string) => {
     setExpandedGroups((prev) =>
       prev.includes(title) ? prev.filter((g) => g !== title) : [...prev, title],
@@ -191,7 +210,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-6 px-3">
-          {navGroups.map((group) => {
+          {visibleNavGroups.map((group) => {
             const isExpanded = expandedGroups.includes(group.title);
             return (
               <div key={group.title} className="mb-6">

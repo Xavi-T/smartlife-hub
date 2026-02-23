@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Layout,
@@ -20,6 +20,7 @@ import {
   ShoppingCartOutlined,
   ThunderboltOutlined,
   UserOutlined,
+  TeamOutlined,
   CrownOutlined,
   InboxOutlined,
   AppstoreOutlined,
@@ -33,6 +34,8 @@ import {
 import { Toaster } from "sonner";
 import { toast } from "sonner";
 import { logout } from "@/actions/auth";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { canAccessAdminPath, getRoleFromUser, type AppRole } from "@/lib/rbac";
 
 const { Header, Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -130,6 +133,11 @@ const menuItems: MenuProps["items"] = [
     icon: <AuditOutlined />,
     label: "Nhật ký hoạt động",
   },
+  {
+    key: "/admin/users",
+    icon: <TeamOutlined />,
+    label: "Quản lý users",
+  },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
@@ -142,8 +150,33 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     HeaderPriorityCustomer[]
   >([]);
   const [isPrioritySearching, setIsPrioritySearching] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<AppRole>("admin");
+  const [currentUserEmail, setCurrentUserEmail] = useState(
+    "admin@smartlife.com",
+  );
+  const [currentUserName, setCurrentUserName] = useState("Administrator");
 
   const isMobile = screens.xs || screens.sm;
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    const loadCurrentUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const role = getRoleFromUser(user);
+      setCurrentUserRole(role);
+      setCurrentUserEmail(user.email || "");
+      setCurrentUserName(
+        String(user.user_metadata?.fullName || "Administrator"),
+      );
+    };
+
+    loadCurrentUser();
+  }, []);
 
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
@@ -177,6 +210,30 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
     return () => clearTimeout(timeoutId);
   }, [prioritySearch]);
+
+  const filteredMenuItems = useMemo(() => {
+    if (currentUserRole !== "employee") {
+      return menuItems;
+    }
+
+    return [
+      {
+        key: "sales",
+        label: "Bán hàng",
+        type: "group",
+      },
+      {
+        key: "/admin/quick-sales",
+        icon: <ThunderboltOutlined />,
+        label: "Bán hàng nhanh",
+      },
+      {
+        key: "/admin/orders",
+        icon: <ShoppingCartOutlined />,
+        label: "Đơn hàng",
+      },
+    ] as MenuProps["items"];
+  }, [currentUserRole]);
 
   // Handle menu click
   const handleMenuClick: MenuProps["onClick"] = (e) => {
@@ -231,6 +288,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       "stock-inbound": "Nhập kho",
       "stock-history": "Lịch sử kho",
       "audit-logs": "Nhật ký hoạt động",
+      users: "Quản lý users",
     };
 
     return pathSegments.map((segment, index) => {
@@ -283,7 +341,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         theme="dark"
         mode="inline"
         selectedKeys={[pathname]}
-        items={menuItems}
+        items={filteredMenuItems}
         onClick={handleMenuClick}
         style={{ borderRight: 0 }}
       />
@@ -378,7 +436,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
             <Breadcrumb items={getBreadcrumbItems()} />
 
-            {!isMobile && (
+            {!isMobile && currentUserRole !== "employee" && (
               <Space size={8}>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   Danh sách KH ưu tiên
@@ -458,7 +516,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       lineHeight: "20px",
                     }}
                   >
-                    Administrator
+                    {currentUserName}
                   </div>
                   <div
                     style={{
@@ -467,7 +525,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       lineHeight: "18px",
                     }}
                   >
-                    admin@smartlife.com
+                    {currentUserEmail}
                   </div>
                 </Space>
               )}

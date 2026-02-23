@@ -608,20 +608,7 @@ export default function OrdersPage() {
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="Doanh thu"
-              value={stats.totalRevenue}
-              prefix={<DollarOutlined />}
-              styles={{ content: { color: "#52c41a" } }}
-              formatter={(value) => formatCurrency(value as number)}
-            />
-            <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
-              Đơn đã giao
-            </div>
-          </Card>
-        </Col>
+
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic

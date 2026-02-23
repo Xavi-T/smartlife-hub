@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  canAccessAdminPath,
+  getAdminHomePath,
+  getRoleFromUser,
+} from "@/lib/rbac";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -7,6 +12,9 @@ export async function middleware(request: NextRequest) {
       headers: request.headers,
     },
   });
+
+  const isServerActionRequest =
+    request.method === "POST" && request.headers.has("next-action");
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,6 +44,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Server Action requests expect a specific RSC response format.
+  // Redirecting them in middleware can cause client-side
+  // "An unexpected response was received from the server" errors.
+  if (isServerActionRequest) {
+    return response;
+  }
+
   // Check if accessing admin routes
   if (request.nextUrl.pathname.startsWith("/admin")) {
     // If not authenticated, redirect to login
@@ -44,11 +59,21 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("redirect", request.nextUrl.pathname);
       return NextResponse.redirect(loginUrl);
     }
+
+    const role = getRoleFromUser(user);
+    const pathname = request.nextUrl.pathname;
+
+    if (!canAccessAdminPath(role, pathname)) {
+      return NextResponse.redirect(
+        new URL(getAdminHomePath(role), request.url),
+      );
+    }
   }
 
   // If accessing login page while authenticated, redirect to admin
   if (request.nextUrl.pathname === "/login" && user) {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    const role = getRoleFromUser(user);
+    return NextResponse.redirect(new URL(getAdminHomePath(role), request.url));
   }
 
   return response;
