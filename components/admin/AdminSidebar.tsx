@@ -310,7 +310,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         onClose={() => setShowLogoutDialog(false)}
         onConfirm={confirmLogout}
         title="Xác nhận đăng xuất"
-        message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?"
+        tittle="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?"
         confirmText="Đăng xuất"
         cancelText="Hủy"
         isDangerous={true}

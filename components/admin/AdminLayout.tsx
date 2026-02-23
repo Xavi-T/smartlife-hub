@@ -40,6 +40,12 @@ import { canAccessAdminPath, getRoleFromUser, type AppRole } from "@/lib/rbac";
 const { Header, Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
 
+const roleLabelMap: Record<AppRole, string> = {
+  admin: "Admin",
+  manager: "Manager",
+  employee: "Employee",
+};
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
@@ -255,10 +261,21 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   // Dropdown menu for user avatar
   const userMenuItems: MenuProps["items"] = [
     {
-      key: "profile",
-      icon: <UserOutlined />,
-      label: "Thông tin cá nhân",
+      key: "user-info",
       disabled: true,
+      label: (
+        <div style={{ minWidth: 220, lineHeight: 1.5 }}>
+          <div style={{ fontWeight: 600, color: "#262626" }}>
+            {currentUserName}
+          </div>
+          <div style={{ fontSize: 12, color: "#8c8c8c" }}>
+            {currentUserEmail}
+          </div>
+          <div style={{ fontSize: 12, color: "#595959" }}>
+            Vai trò: {roleLabelMap[currentUserRole]}
+          </div>
+        </div>
+      ),
     },
     {
       type: "divider",
@@ -497,14 +514,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               }}
             >
               <Badge dot status="success" offset={[-4, 36]}>
-                <Avatar
-                  icon={<UserOutlined />}
-                  size={40}
-                  style={{
-                    backgroundColor: "#1890ff",
-                    border: "2px solid #e6f7ff",
-                  }}
-                />
+                <div
+                  title={`${currentUserName} (${roleLabelMap[currentUserRole]})`}
+                >
+                  <Avatar
+                    icon={<UserOutlined />}
+                    size={40}
+                    style={{
+                      backgroundColor: "#1890ff",
+                      border: "2px solid #e6f7ff",
+                    }}
+                  />
+                </div>
               </Badge>
               {!isMobile && (
                 <Space orientation="vertical" size={0}>
@@ -526,6 +547,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     }}
                   >
                     {currentUserEmail}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#8c8c8c",
+                      lineHeight: "18px",
+                    }}
+                  >
+                    {roleLabelMap[currentUserRole]}
                   </div>
                 </Space>
               )}

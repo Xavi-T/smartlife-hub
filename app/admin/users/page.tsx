@@ -162,7 +162,7 @@ export default function AdminUsersPage() {
       Modal.info({
         title: "Mật khẩu tạm thời",
         content: (
-          <Space direction="vertical" size={8}>
+          <Space orientation="vertical" size={8}>
             <Typography.Text>
               Tài khoản: <Typography.Text strong>{user.email}</Typography.Text>
             </Typography.Text>
@@ -377,7 +377,7 @@ export default function AdminUsersPage() {
             type="error"
             showIcon
             style={{ marginBottom: 16 }}
-            message={fetchError}
+            tittle={fetchError}
           />
         )}
 
@@ -394,6 +394,7 @@ export default function AdminUsersPage() {
       <Modal
         title="Tạo tài khoản mới"
         open={isCreateModalOpen}
+        forceRender
         onCancel={() => setIsCreateModalOpen(false)}
         okText="Tạo tài khoản"
         cancelText="Hủy"
@@ -458,6 +459,7 @@ export default function AdminUsersPage() {
       <Modal
         title="Cập nhật tài khoản"
         open={isEditModalOpen}
+        forceRender
         onCancel={() => {
           setIsEditModalOpen(false);
           setEditingUser(null);

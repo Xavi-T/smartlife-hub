@@ -202,7 +202,7 @@ export function OrderDetailModal({
           <Alert
             type="warning"
             showIcon
-            message="Ghi chú"
+            tittle="Ghi chú"
             description={order.notes}
           />
         )}

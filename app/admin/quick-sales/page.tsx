@@ -9,7 +9,6 @@ import {
   Form,
   Input,
   InputNumber,
-  List,
   Select,
   Space,
   Switch,
@@ -521,10 +520,12 @@ export default function QuickSalesPage() {
                 borderRadius: 8,
               }}
             >
-              <List
-                dataSource={filteredProducts}
-                locale={{ emptyText: "Không tìm thấy sản phẩm khả dụng" }}
-                renderItem={(product) => {
+              {filteredProducts.length === 0 ? (
+                <div style={{ padding: 16 }}>
+                  <Text type="secondary">Không tìm thấy sản phẩm khả dụng</Text>
+                </div>
+              ) : (
+                filteredProducts.map((product) => {
                   const effectiveDiscountPercent = getEffectiveDiscountPercent({
                     discountPercent: product.discount_percent,
                     discountStartAt: product.discount_start_at,
@@ -536,31 +537,33 @@ export default function QuickSalesPage() {
                   );
 
                   return (
-                    <List.Item
+                    <div
                       key={product.id}
-                      style={{ padding: "10px 12px", cursor: "pointer" }}
+                      style={{
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid #f0f0f0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
                       onClick={() => addToCart(product)}
                     >
-                      <List.Item.Meta
-                        title={
-                          <Space size={8} wrap>
-                            <Text strong>{product.name}</Text>
-                            {effectiveDiscountPercent > 0 && (
-                              <Tag color="red">
-                                -{effectiveDiscountPercent}%
-                              </Tag>
-                            )}
-                          </Space>
-                        }
-                        description={
-                          <Space size={8} wrap>
-                            <Text type="secondary">{product.category}</Text>
-                            <Text type="secondary">
-                              Còn {product.stock_quantity}
-                            </Text>
-                          </Space>
-                        }
-                      />
+                      <div>
+                        <Space size={8} wrap>
+                          <Text strong>{product.name}</Text>
+                          {effectiveDiscountPercent > 0 && (
+                            <Tag color="red">-{effectiveDiscountPercent}%</Tag>
+                          )}
+                        </Space>
+                        <Space size={8} wrap>
+                          <Text type="secondary">{product.category}</Text>
+                          <Text type="secondary">
+                            Còn {product.stock_quantity}
+                          </Text>
+                        </Space>
+                      </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ color: "#cf1322", fontWeight: 600 }}>
                           {formatCurrency(salePrice)}
@@ -575,10 +578,10 @@ export default function QuickSalesPage() {
                           </Text>
                         )}
                       </div>
-                    </List.Item>
+                    </div>
                   );
-                }}
-              />
+                })
+              )}
             </div>
           </Card>
 
@@ -901,35 +904,37 @@ export default function QuickSalesPage() {
             </Button>
           }
         >
-          <List
-            loading={isLoadingRecentOrders}
-            dataSource={recentOrders}
-            locale={{ emptyText: "Chưa có đơn hàng gần đây" }}
-            renderItem={(order) => (
-              <List.Item
-                key={order.id}
-                actions={[
-                  <Button
-                    key="print"
-                    type="link"
-                    icon={<PrinterOutlined />}
-                    onClick={() => printInvoice(order, messageApi)}
+          {isLoadingRecentOrders ? (
+            <div style={{ padding: 12 }}>
+              <Text type="secondary">Đang tải đơn hàng gần đây...</Text>
+            </div>
+          ) : recentOrders.length === 0 ? (
+            <div style={{ padding: 12 }}>
+              <Text type="secondary">Chưa có đơn hàng gần đây</Text>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {recentOrders.map((order) => (
+                <Card key={order.id} size="small">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 12,
+                    }}
                   >
-                    Xuất hoá đơn
-                  </Button>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <Space size={8}>
-                      <Text strong>#{order.id.slice(0, 8).toUpperCase()}</Text>
-                      <Tag color="blue">
-                        {new Date(order.created_at).toLocaleTimeString("vi-VN")}
-                      </Tag>
-                    </Space>
-                  }
-                  description={
                     <Space orientation="vertical" size={0}>
+                      <Space size={8}>
+                        <Text strong>
+                          #{order.id.slice(0, 8).toUpperCase()}
+                        </Text>
+                        <Tag color="blue">
+                          {new Date(order.created_at).toLocaleTimeString(
+                            "vi-VN",
+                          )}
+                        </Tag>
+                      </Space>
                       <Text type="secondary">
                         {order.customer_name} • {order.customer_phone}
                       </Text>
@@ -937,11 +942,19 @@ export default function QuickSalesPage() {
                         {formatCurrency(order.total_amount)}
                       </Text>
                     </Space>
-                  }
-                />
-              </List.Item>
-            )}
-          />
+
+                    <Button
+                      type="link"
+                      icon={<PrinterOutlined />}
+                      onClick={() => printInvoice(order, messageApi)}
+                    >
+                      Xuất hoá đơn
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </Card>
       </Space>
     </div>
