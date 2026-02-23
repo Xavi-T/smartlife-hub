@@ -26,6 +26,25 @@ function getErrorMessage(error: unknown): string {
   return "Đã xảy ra lỗi";
 }
 
+type CostingMethod = "weighted_average" | "latest_cost";
+
+type StockInboundHistoryItem = {
+  id: string;
+  product_id: string;
+  quantity_added: number;
+  cost_price_at_time: number;
+  supplier: string | null;
+  notes: string | null;
+  created_at: string;
+  products?: {
+    id: string;
+    name: string;
+    image_url: string | null;
+    category: string;
+    cost_price?: number;
+  } | null;
+};
+
 // POST: Ghi nhận nhập hàng
 export async function POST(request: NextRequest) {
   try {
@@ -40,9 +59,18 @@ export async function POST(request: NextRequest) {
 
     const sb = createAdminInventoryClient();
     const body = await request.json();
-    const { productId, quantityAdded, costPriceAtTime, supplier, notes } = body;
+    const {
+      productId,
+      quantityAdded,
+      costPriceAtTime,
+      supplier,
+      notes,
+      costingMethod,
+    } = body;
     const normalizedQuantity = Number(quantityAdded);
     const normalizedCostPrice = Number(costPriceAtTime);
+    const normalizedCostingMethod: CostingMethod =
+      costingMethod === "latest_cost" ? "latest_cost" : "weighted_average";
 
     // Validation
     if (
@@ -81,6 +109,15 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    if (normalizedCostingMethod === "latest_cost") {
+      const { error: updateCostError } = await sb
+        .from("products")
+        .update({ cost_price: normalizedCostPrice })
+        .eq("id", productId);
+
+      if (updateCostError) throw updateCostError;
+    }
+
     // Get product info for logging + stock verification
     const { data: product, error: productError } = await sb
       .from("products")
@@ -92,10 +129,15 @@ export async function POST(request: NextRequest) {
 
     const rpcResult = (data || {}) as {
       new_stock_quantity?: number | null;
+      new_weighted_avg_cost?: number | null;
       [key: string]: unknown;
     };
     const resolvedNewStockQuantity =
       rpcResult.new_stock_quantity ?? product?.stock_quantity ?? null;
+    const resolvedNewCostPrice =
+      normalizedCostingMethod === "latest_cost"
+        ? normalizedCostPrice
+        : (rpcResult.new_weighted_avg_cost ?? null);
 
     if (resolvedNewStockQuantity === null) {
       return NextResponse.json(
@@ -123,6 +165,8 @@ export async function POST(request: NextRequest) {
       message: "Nhập hàng thành công",
       data: {
         ...rpcResult,
+        costing_method: normalizedCostingMethod,
+        new_cost_price: resolvedNewCostPrice,
         new_stock_quantity: resolvedNewStockQuantity,
       },
     });
@@ -138,11 +182,21 @@ export async function POST(request: NextRequest) {
 // GET: Lấy lịch sử nhập hàng
 export async function GET(request: NextRequest) {
   try {
+    const authClient = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
     const limit = parseInt(searchParams.get("limit") || "50");
+    const sb = createAdminInventoryClient();
 
-    let query = supabase
+    let query = sb
       .from("stock_inbound")
       .select(
         `
@@ -151,7 +205,8 @@ export async function GET(request: NextRequest) {
           id,
           name,
           image_url,
-          category
+          category,
+          cost_price
         )
       `,
       )
@@ -167,22 +222,34 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const inbounds: StockInboundHistoryItem[] = (
+      Array.isArray(data) ? data : []
+    ) as StockInboundHistoryItem[];
+
     // Tính tổng thống kê
-    const totalQuantity = data.reduce(
-      (sum, item) => sum + item.quantity_added,
+    const totalQuantity = inbounds.reduce(
+      (sum: number, item: StockInboundHistoryItem) => sum + item.quantity_added,
       0,
     );
-    const totalValue = data.reduce(
-      (sum, item) => sum + item.quantity_added * item.cost_price_at_time,
+    const totalValue = inbounds.reduce(
+      (sum: number, item: StockInboundHistoryItem) =>
+        sum + item.quantity_added * item.cost_price_at_time,
       0,
     );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayRecords = inbounds.filter((item: StockInboundHistoryItem) => {
+      const createdAt = new Date(item.created_at);
+      return createdAt >= today;
+    }).length;
 
     return NextResponse.json({
-      inbounds: data,
+      inbounds,
       stats: {
-        totalRecords: data.length,
+        totalRecords: inbounds.length,
         totalQuantity,
         totalValue,
+        todayRecords,
       },
     });
   } catch (error: unknown) {

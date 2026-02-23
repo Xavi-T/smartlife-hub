@@ -36,10 +36,15 @@ interface StockInboundRecord {
   supplier: string | null;
   notes: string | null;
   created_at: string;
-  old_stock_quantity: number;
-  new_stock_quantity: number;
-  old_weighted_avg_cost: number;
-  new_weighted_avg_cost: number;
+  old_stock_quantity?: number | null;
+  new_stock_quantity?: number | null;
+  old_weighted_avg_cost?: number | null;
+  new_weighted_avg_cost?: number | null;
+  new_cost_price?: number | null;
+  products?: {
+    name?: string;
+    cost_price?: number;
+  } | null;
 }
 
 interface StockInboundStats {
@@ -56,28 +61,54 @@ export default function StockInboundPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
 
+  const normalizeNumber = (value: unknown): number | null => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [recordsRes, statsRes] = await Promise.all([
-        fetch("/api/admin/stock-inbound"),
-        fetch("/api/admin/stock-inbound/stats"),
-      ]);
+      const recordsRes = await fetch("/api/admin/stock-inbound");
 
-      if (recordsRes.ok) {
-        const data = await recordsRes.json();
-        setRecords(Array.isArray(data) ? data : []);
-      } else {
+      if (!recordsRes.ok) {
         setRecords([]);
+        setStats(null);
+        return;
       }
 
-      if (statsRes.ok) {
-        const data = await statsRes.json();
-        setStats(data);
-      }
+      const payload = await recordsRes.json();
+      const inbounds = Array.isArray(payload?.inbounds) ? payload.inbounds : [];
+
+      const normalizedRecords: StockInboundRecord[] = inbounds.map(
+        (item: any) => ({
+          ...item,
+          quantity_added: Number(item.quantity_added) || 0,
+          cost_price_at_time: Number(item.cost_price_at_time) || 0,
+          old_stock_quantity: normalizeNumber(item.old_stock_quantity),
+          new_stock_quantity: normalizeNumber(item.new_stock_quantity),
+          old_weighted_avg_cost: normalizeNumber(item.old_weighted_avg_cost),
+          new_weighted_avg_cost: normalizeNumber(item.new_weighted_avg_cost),
+          new_cost_price: normalizeNumber(item.new_cost_price),
+          product_name: item.product_name || item.products?.name || "N/A",
+        }),
+      );
+
+      setRecords(normalizedRecords);
+      setStats(
+        payload?.stats
+          ? {
+              totalRecords: payload.stats.totalRecords || 0,
+              totalQuantity: payload.stats.totalQuantity || 0,
+              totalValue: payload.stats.totalValue || 0,
+              todayRecords: payload.stats.todayRecords || 0,
+            }
+          : null,
+      );
     } catch (error) {
       console.error("Error fetching data:", error);
       setRecords([]);
+      setStats(null);
     } finally {
       setIsLoading(false);
     }
@@ -125,9 +156,12 @@ export default function StockInboundPage() {
               +{record.quantity_added}
             </Tag>
           </div>
-          <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
-            {record.old_stock_quantity} → {record.new_stock_quantity}
-          </div>
+          {record.old_stock_quantity != null &&
+            record.new_stock_quantity != null && (
+              <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
+                {record.old_stock_quantity} → {record.new_stock_quantity}
+              </div>
+            )}
         </div>
       ),
     },
@@ -148,21 +182,36 @@ export default function StockInboundPage() {
       ),
     },
     {
-      title: "Giá vốn BQ mới",
+      title: "Giá vốn sau nhập",
       dataIndex: "new_weighted_avg_cost",
       key: "new_weighted_avg_cost",
       width: 140,
-      render: (cost: number, record: StockInboundRecord) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{formatCurrency(cost)}</div>
-          {record.old_weighted_avg_cost !== cost && (
-            <div style={{ fontSize: 11, color: "#52c41a" }}>
-              {record.old_weighted_avg_cost > cost ? "↓" : "↑"}{" "}
-              {formatCurrency(Math.abs(cost - record.old_weighted_avg_cost))}
+      render: (cost: number, record: StockInboundRecord) =>
+        (() => {
+          const resolvedCost =
+            normalizeNumber(cost) ??
+            normalizeNumber(record.new_cost_price) ??
+            normalizeNumber(record.products?.cost_price) ??
+            normalizeNumber(record.cost_price_at_time);
+          const oldCost = normalizeNumber(record.old_weighted_avg_cost);
+          const hasValidCost = resolvedCost !== null;
+          const hasChange =
+            hasValidCost && oldCost !== null && oldCost !== resolvedCost;
+
+          return (
+            <div>
+              <div style={{ fontWeight: 500 }}>
+                {hasValidCost ? formatCurrency(resolvedCost) : "Chưa có"}
+              </div>
+              {hasChange && (
+                <div style={{ fontSize: 11, color: "#52c41a" }}>
+                  {oldCost! > resolvedCost! ? "↓" : "↑"}{" "}
+                  {formatCurrency(Math.abs(resolvedCost! - oldCost!))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      ),
+          );
+        })(),
     },
     {
       title: "Nhà cung cấp",

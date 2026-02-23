@@ -5,6 +5,7 @@ import {
   Modal,
   Form,
   Select,
+  Radio,
   InputNumber,
   Input,
   Card,
@@ -33,6 +34,8 @@ interface StockInboundModalProps {
   onSuccess?: () => void;
 }
 
+type CostingMethod = "weighted_average" | "latest_cost";
+
 export function StockInboundModal({
   isOpen,
   onClose,
@@ -50,6 +53,9 @@ export function StockInboundModal({
   // Watch form values for preview calculation
   const quantityAdded = Form.useWatch("quantityAdded", form);
   const costPriceAtTime = Form.useWatch("costPriceAtTime", form);
+  const costingMethod =
+    (Form.useWatch("costingMethod", form) as CostingMethod | undefined) ||
+    "weighted_average";
 
   useEffect(() => {
     if (isOpen && !initialProduct) {
@@ -60,7 +66,10 @@ export function StockInboundModal({
   useEffect(() => {
     if (initialProduct) {
       setSelectedProduct(initialProduct);
-      form.setFieldValue("costPriceAtTime", initialProduct.cost_price);
+      form.setFieldsValue({
+        costPriceAtTime: initialProduct.cost_price,
+        costingMethod: "weighted_average",
+      });
     }
   }, [initialProduct, form]);
 
@@ -81,6 +90,7 @@ export function StockInboundModal({
     setSelectedProduct(product || null);
     if (product) {
       form.setFieldValue("costPriceAtTime", product.cost_price);
+      form.setFieldValue("costingMethod", "weighted_average");
     }
   };
 
@@ -100,6 +110,7 @@ export function StockInboundModal({
           productId: selectedProduct.id,
           quantityAdded: values.quantityAdded,
           costPriceAtTime: values.costPriceAtTime,
+          costingMethod: values.costingMethod || "weighted_average",
           supplier: values.supplier?.trim() || null,
           notes: values.notes?.trim() || null,
         }),
@@ -112,7 +123,7 @@ export function StockInboundModal({
       }
 
       messageApi.success(
-        `Đã nhập ${values.quantityAdded} ${selectedProduct.name}. Tồn kho mới: ${result.data.new_stock_quantity}`,
+        `Đã nhập ${values.quantityAdded} ${selectedProduct.name}. Tồn kho mới: ${result.data.new_stock_quantity}. Giá vốn mới: ${formatCurrency(result.data.new_cost_price ?? result.data.new_weighted_avg_cost ?? values.costPriceAtTime)}`,
       );
 
       // Reset form
@@ -148,7 +159,7 @@ export function StockInboundModal({
     const currentQty = selectedProduct.stock_quantity || 0;
     const currentCost = selectedProduct.cost_price || 0;
 
-    if (currentQty === 0) return cost;
+    if (currentQty === 0 || costingMethod === "latest_cost") return cost;
 
     const newAvgCost =
       (currentQty * currentCost + qty * cost) / (currentQty + qty);
@@ -300,11 +311,23 @@ export function StockInboundModal({
                   formatter={(value) =>
                     `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                   }
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
                 />
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            name="costingMethod"
+            label="Phương pháp tính giá vốn sau nhập"
+            initialValue="weighted_average"
+          >
+            <Radio.Group>
+              <Radio value="weighted_average">Bình quân gia quyền</Radio>
+              <Radio value="latest_cost" style={{ marginLeft: 16 }}>
+                Lấy giá nhập mới nhất
+              </Radio>
+            </Radio.Group>
+          </Form.Item>
 
           <Form.Item
             name="supplier"
@@ -359,7 +382,11 @@ export function StockInboundModal({
                 </Col>
                 <Col span={8}>
                   <Statistic
-                    title="Giá vốn BQ mới"
+                    title={
+                      costingMethod === "latest_cost"
+                        ? "Giá vốn mới"
+                        : "Giá vốn BQ mới"
+                    }
                     value={formatCurrency(previewAvgCost)}
                     style={{ fontSize: 20, color: "#1890ff" }}
                   />
