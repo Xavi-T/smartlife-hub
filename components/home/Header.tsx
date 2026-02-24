@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Space, Typography } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
@@ -10,6 +11,37 @@ interface HeaderProps {
 }
 
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
+  const [logoSrc, setLogoSrc] = useState("/logo.png");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSiteLogo = async () => {
+      try {
+        const response = await fetch("/api/media?purpose=site_logo", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) return;
+
+        const result = await response.json();
+        const firstLogo = Array.isArray(result.media) ? result.media[0] : null;
+
+        if (active && firstLogo?.image_url) {
+          setLogoSrc(firstLogo.image_url);
+        }
+      } catch {
+        // Keep default logo fallback
+      }
+    };
+
+    loadSiteLogo();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <header
       style={{
@@ -48,11 +80,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 placeItems: "center",
               }}
             >
-              <img
-                src="/logo.png"
-                alt="SmartLife Hub Logo"
-                className="w-6 h-6"
-              />
+              <img src={logoSrc} alt="SmartLife Hub Logo" className="w-6 h-6" />
             </div>
             <div>
               <Typography.Title level={4} style={{ margin: 0 }}>

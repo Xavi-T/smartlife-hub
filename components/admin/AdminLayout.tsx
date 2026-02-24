@@ -24,6 +24,7 @@ import {
   CrownOutlined,
   InboxOutlined,
   AppstoreOutlined,
+  PictureOutlined,
   TagsOutlined,
   LogoutOutlined,
   MenuUnfoldOutlined,
@@ -105,6 +106,11 @@ const menuItems: MenuProps["items"] = [
     key: "/admin/products",
     icon: <AppstoreOutlined />,
     label: "Sản phẩm",
+  },
+  {
+    key: "/admin/media",
+    icon: <PictureOutlined />,
+    label: "Quản lý media",
   },
   {
     key: "/admin/categories",

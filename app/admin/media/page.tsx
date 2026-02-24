@@ -1,0 +1,526 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Card,
+  Col,
+  Form,
+  Image as AntImage,
+  Input,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  Upload,
+  message,
+} from "antd";
+import type { UploadFile } from "antd/es/upload/interface";
+import {
+  CopyOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  InboxOutlined,
+  ReloadOutlined,
+  SaveOutlined,
+} from "@ant-design/icons";
+import { formatFileSize, getImageDimensions } from "@/lib/imageUtils";
+
+const HOMEPAGE_BANNER_MIN_RATIO = 2.2;
+const HOMEPAGE_BANNER_MAX_RATIO = 4.2;
+
+type MediaItem = {
+  id: string;
+  media_key: string | null;
+  purpose: string;
+  alt_text: string | null;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  image_url: string;
+  storage_path: string;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+};
+
+type UploadFormValues = {
+  purpose: string;
+  mediaKey?: string;
+  altText?: string;
+};
+
+type EditFormValues = {
+  purpose: string;
+  mediaKey?: string;
+  altText?: string;
+};
+
+const PURPOSE_OPTIONS = [
+  { value: "site_logo", label: "Logo website" },
+  { value: "site_favicon", label: "Favicon" },
+  { value: "homepage_banner", label: "Banner trang chủ" },
+];
+
+const PURPOSE_LABEL_MAP = new Map(
+  PURPOSE_OPTIONS.map((item) => [item.value, item.label]),
+);
+
+export default function MediaManagerPage() {
+  const [messageApi, contextHolder] = message.useMessage();
+  const [uploadForm] = Form.useForm<UploadFormValues>();
+  const [editForm] = Form.useForm<EditFormValues>();
+
+  const [items, setItems] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [purposeFilter, setPurposeFilter] = useState<string>("all");
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+
+  const fetchMedia = async (params?: { q?: string; purpose?: string }) => {
+    const q = params?.q ?? search;
+    const purpose = params?.purpose ?? purposeFilter;
+
+    setLoading(true);
+    try {
+      const query = new URLSearchParams();
+      if (q.trim()) query.set("q", q.trim());
+      if (purpose !== "all") query.set("purpose", purpose);
+
+      const response = await fetch(`/api/admin/media?${query.toString()}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Không thể tải danh sách media");
+      }
+
+      setItems(Array.isArray(result.media) ? result.media : []);
+    } catch (error: unknown) {
+      messageApi.error(
+        error instanceof Error
+          ? error.message
+          : "Không thể tải danh sách media",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    uploadForm.setFieldsValue({ purpose: "site_logo" });
+    fetchMedia({ q: "", purpose: "all" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleUpload = async (values: UploadFormValues) => {
+    const rawFile = fileList[0]?.originFileObj;
+    if (!rawFile) {
+      messageApi.error("Vui lòng chọn file trước khi upload");
+      return;
+    }
+
+    const isVideoFile = rawFile.type.startsWith("video/");
+
+    if (isVideoFile && values.purpose !== "homepage_banner") {
+      messageApi.error("Video chỉ được phép upload cho Banner trang chủ");
+      return;
+    }
+
+    if (!isVideoFile && !rawFile.type.startsWith("image/")) {
+      messageApi.error("Chỉ hỗ trợ file ảnh hoặc video");
+      return;
+    }
+
+    let imageWidth: number | null = null;
+    let imageHeight: number | null = null;
+
+    if (!isVideoFile) {
+      try {
+        const dimensions = await getImageDimensions(rawFile);
+        imageWidth = dimensions.width;
+        imageHeight = dimensions.height;
+
+        if (values.purpose === "homepage_banner") {
+          const ratio = dimensions.width / dimensions.height;
+          if (
+            ratio < HOMEPAGE_BANNER_MIN_RATIO ||
+            ratio > HOMEPAGE_BANNER_MAX_RATIO
+          ) {
+            messageApi.error(
+              "Banner trang chủ cần ảnh ngang (khuyến nghị tỉ lệ khoảng 16:5). Vui lòng chọn ảnh khác để tránh vỡ layout.",
+            );
+            return;
+          }
+        }
+      } catch {
+        messageApi.error(
+          "Không thể đọc kích thước ảnh. Vui lòng thử lại file khác.",
+        );
+        return;
+      }
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", rawFile);
+      formData.append("purpose", values.purpose || "site_logo");
+      if (values.mediaKey?.trim())
+        formData.append("mediaKey", values.mediaKey.trim());
+      if (values.altText?.trim())
+        formData.append("altText", values.altText.trim());
+      if (imageWidth && imageHeight) {
+        formData.append("width", String(imageWidth));
+        formData.append("height", String(imageHeight));
+      }
+
+      const response = await fetch("/api/admin/media", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Upload thất bại");
+      }
+
+      messageApi.success("Upload media thành công");
+      setFileList([]);
+      uploadForm.resetFields();
+      uploadForm.setFieldsValue({ purpose: "site_logo" });
+      fetchMedia();
+    } catch (error: unknown) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Upload thất bại",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/admin/media/${id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Không thể xóa media");
+      }
+
+      messageApi.success("Đã xóa media");
+      fetchMedia();
+    } catch (error: unknown) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Không thể xóa media",
+      );
+    }
+  };
+
+  const openEditModal = (item: MediaItem) => {
+    setEditingItem(item);
+    editForm.setFieldsValue({
+      purpose: item.purpose,
+      mediaKey: item.media_key || undefined,
+      altText: item.alt_text || undefined,
+    });
+  };
+
+  const handleSaveMetadata = async (values: EditFormValues) => {
+    if (!editingItem) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/admin/media/${editingItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Không thể cập nhật media");
+      }
+
+      messageApi.success("Đã cập nhật metadata");
+      setEditingItem(null);
+      fetchMedia();
+    } catch (error: unknown) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Không thể cập nhật media",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyText = async (value: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      messageApi.success(successMessage);
+    } catch {
+      messageApi.error("Không thể copy vào clipboard");
+    }
+  };
+
+  const columns = useMemo(
+    () => [
+      {
+        title: "Preview",
+        dataIndex: "image_url",
+        key: "preview",
+        width: 130,
+        render: (url: string, record: MediaItem) =>
+          record.mime_type.startsWith("video/") ? (
+            <video
+              src={url}
+              width={88}
+              height={56}
+              style={{ objectFit: "cover", borderRadius: 8 }}
+              muted
+              playsInline
+              controls
+            />
+          ) : (
+            <AntImage
+              src={url}
+              alt={record.alt_text || record.file_name}
+              width={88}
+              height={56}
+              style={{ objectFit: "cover", borderRadius: 8 }}
+            />
+          ),
+      },
+      {
+        title: "Thông tin",
+        key: "info",
+        render: (_: unknown, record: MediaItem) => (
+          <Space orientation="vertical" size={2}>
+            <Typography.Text strong>{record.file_name}</Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {formatFileSize(record.file_size)}
+              {record.width && record.height
+                ? ` • ${record.width}x${record.height}`
+                : ""}
+            </Typography.Text>
+            <Typography.Text code>
+              {record.media_key || "(chưa có key)"}
+            </Typography.Text>
+          </Space>
+        ),
+      },
+      {
+        title: "Mục đích",
+        dataIndex: "purpose",
+        key: "purpose",
+        width: 180,
+        render: (value: string) => (
+          <Tag color="blue">{PURPOSE_LABEL_MAP.get(value) || value}</Tag>
+        ),
+      },
+      {
+        title: "Ngày tạo",
+        dataIndex: "created_at",
+        key: "created_at",
+        width: 190,
+        render: (value: string) => new Date(value).toLocaleString("vi-VN"),
+      },
+      {
+        title: "Thao tác",
+        key: "actions",
+        width: 260,
+        render: (_: unknown, record: MediaItem) => (
+          <Space wrap>
+            <Button
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => copyText(record.image_url, "Đã copy URL media")}
+            >
+              Copy URL
+            </Button>
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEditModal(record)}
+            >
+              Sửa
+            </Button>
+            <Popconfirm
+              title="Xóa media này?"
+              description="Thao tác này không thể hoàn tác"
+              okText="Xóa"
+              cancelText="Hủy"
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                Xóa
+              </Button>
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ],
+    [messageApi],
+  );
+
+  return (
+    <div style={{ padding: 24 }}>
+      {contextHolder}
+
+      <Typography.Title level={3} style={{ marginTop: 0, marginBottom: 4 }}>
+        Quản lý Media
+      </Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+        Upload và quản lý ảnh dùng cho logo, favicon và banner trang chủ.
+      </Typography.Paragraph>
+
+      <Row gutter={16}>
+        <Col xs={24} lg={9}>
+          <Card title="Upload media mới" style={{ marginBottom: 16 }}>
+            <Form form={uploadForm} layout="vertical" onFinish={handleUpload}>
+              <Form.Item
+                name="purpose"
+                label="Mục đích"
+                rules={[{ required: true, message: "Vui lòng chọn mục đích" }]}
+              >
+                <Select options={PURPOSE_OPTIONS} />
+              </Form.Item>
+
+              <Form.Item name="mediaKey" label="Media key (tuỳ chọn)">
+                <Input placeholder="vd: site_logo_main" />
+              </Form.Item>
+
+              <Form.Item name="altText" label="Alt text (tuỳ chọn)">
+                <Input placeholder="Mô tả media" />
+              </Form.Item>
+
+              <Form.Item label="File media">
+                <Upload.Dragger
+                  accept="image/*,video/*"
+                  maxCount={1}
+                  beforeUpload={() => false}
+                  fileList={fileList}
+                  onChange={(info) => setFileList(info.fileList)}
+                  onRemove={() => {
+                    setFileList([]);
+                    return true;
+                  }}
+                >
+                  <p className="ant-upload-drag-icon">
+                    <InboxOutlined />
+                  </p>
+                  <p className="ant-upload-text">
+                    Bấm hoặc kéo thả ảnh vào đây
+                  </p>
+                  <p className="ant-upload-hint">
+                    Logo/Favicon: chỉ ảnh (tối đa 12MB). Banner trang chủ: ảnh
+                    hoặc video (video tối đa 100MB, ảnh nên tỉ lệ ngang gần
+                    16:5).
+                  </p>
+                </Upload.Dragger>
+              </Form.Item>
+
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={uploading}
+                block
+              >
+                Upload
+              </Button>
+            </Form>
+          </Card>
+
+          <Card size="small" title="Cách dùng nhanh">
+            <Typography.Text style={{ display: "block" }}>
+              - Copy URL trực tiếp để set logo/banner.
+            </Typography.Text>
+            <Typography.Text style={{ display: "block" }}>
+              - Hoặc dùng API: /api/media?key=site_logo_main
+            </Typography.Text>
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={15}>
+          <Card
+            title="Thư viện media"
+            extra={
+              <Space>
+                <Input.Search
+                  allowClear
+                  placeholder="Tìm theo tên/key"
+                  onSearch={(value) => {
+                    setSearch(value);
+                    fetchMedia({ q: value });
+                  }}
+                  style={{ width: 220 }}
+                />
+                <Select
+                  value={purposeFilter}
+                  style={{ width: 180 }}
+                  options={[
+                    { value: "all", label: "Tất cả" },
+                    ...PURPOSE_OPTIONS,
+                  ]}
+                  onChange={(value) => {
+                    setPurposeFilter(value);
+                    fetchMedia({ purpose: value });
+                  }}
+                />
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => fetchMedia()}
+                />
+              </Space>
+            }
+          >
+            <Table<MediaItem>
+              rowKey="id"
+              columns={columns}
+              dataSource={items}
+              loading={loading}
+              pagination={{ pageSize: 8 }}
+              scroll={{ x: 980 }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Modal
+        open={Boolean(editingItem)}
+        title="Cập nhật metadata media"
+        onCancel={() => setEditingItem(null)}
+        onOk={() => editForm.submit()}
+        okText="Lưu"
+        cancelText="Hủy"
+        confirmLoading={saving}
+        okButtonProps={{ icon: <SaveOutlined /> }}
+        destroyOnHidden
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleSaveMetadata}>
+          <Form.Item
+            name="purpose"
+            label="Mục đích"
+            rules={[{ required: true, message: "Vui lòng chọn mục đích" }]}
+          >
+            <Select options={PURPOSE_OPTIONS} />
+          </Form.Item>
+          <Form.Item name="mediaKey" label="Media key (tuỳ chọn)">
+            <Input placeholder="vd: homepage_banner_1" />
+          </Form.Item>
+          <Form.Item name="altText" label="Alt text (tuỳ chọn)">
+            <Input placeholder="Mô tả media" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}

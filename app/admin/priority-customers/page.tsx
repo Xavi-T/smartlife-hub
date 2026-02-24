@@ -849,7 +849,7 @@ export default function PriorityCustomersPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center">
-          <Space direction="vertical" align="center">
+          <Space orientation="vertical" align="center">
             <SyncOutlined spin />
             <Typography.Text type="secondary">
               Đang tải dữ liệu...

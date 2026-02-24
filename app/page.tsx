@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/home/Header";
 import { ProductGrid } from "@/components/home/ProductGrid";
 import { CartModal } from "@/components/home/CartModal";
@@ -21,7 +21,38 @@ import {
 import { useRouter } from "next/navigation";
 import { trackBeginCheckout, trackSelectItem } from "@/lib/analytics";
 
-export default function Home() {
+type HomeBanner = {
+  image_url: string;
+  alt_text: string | null;
+  mime_type?: string;
+};
+
+const DEFAULT_CAROUSEL_ITEMS = [
+  { image: "/banners/banner-1.svg", alt: "Ưu đãi gia dụng", type: "image" },
+  {
+    image: "/banners/banner-2.svg",
+    alt: "Mua sắm nhanh chóng",
+    type: "image",
+  },
+  {
+    image: "/banners/banner-3.svg",
+    alt: "Chính hãng giá tốt",
+    type: "image",
+  },
+  { image: "/banners/banner-1.svg", alt: "Ưu đãi gia dụng", type: "image" },
+  {
+    image: "/banners/banner-2.svg",
+    alt: "Mua sắm nhanh chóng",
+    type: "image",
+  },
+  {
+    image: "/banners/banner-3.svg",
+    alt: "Chính hãng giá tốt",
+    type: "image",
+  },
+];
+
+function HomeContent() {
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,6 +64,7 @@ export default function Home() {
   const [priceSort, setPriceSort] = useState<"asc" | "desc" | undefined>(
     undefined,
   );
+  const [carouselItems, setCarouselItems] = useState(DEFAULT_CAROUSEL_ITEMS);
 
   const {
     cart,
@@ -47,6 +79,7 @@ export default function Home() {
   // Fetch products
   useEffect(() => {
     fetchProducts();
+    fetchHomepageBanners();
   }, []);
 
   const fetchProducts = async () => {
@@ -60,6 +93,37 @@ export default function Home() {
       console.error("Error fetching products:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchHomepageBanners = async () => {
+    try {
+      const response = await fetch("/api/media?purpose=homepage_banner", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) return;
+
+      const result = await response.json();
+      const banners = (
+        Array.isArray(result.media) ? result.media : []
+      ) as HomeBanner[];
+
+      if (banners.length === 0) return;
+
+      const mapped = banners
+        .filter((item) => item.image_url)
+        .map((item, index) => ({
+          image: item.image_url,
+          alt: item.alt_text || `Banner trang chủ ${index + 1}`,
+          type: item.mime_type?.startsWith("video/") ? "video" : "image",
+        }));
+
+      if (mapped.length > 0) {
+        setCarouselItems(mapped);
+      }
+    } catch {
+      // Keep fallback carousel items
     }
   };
 
@@ -78,15 +142,6 @@ export default function Home() {
     trackSelectItem(product, "home_product_grid");
     router.push(`/products/${product.id}`);
   };
-
-  const carouselItems = [
-    { image: "/banners/banner-1.svg", alt: "Ưu đãi gia dụng" },
-    { image: "/banners/banner-2.svg", alt: "Mua sắm nhanh chóng" },
-    { image: "/banners/banner-3.svg", alt: "Chính hãng giá tốt" },
-    { image: "/banners/banner-1.svg", alt: "Ưu đãi gia dụng" },
-    { image: "/banners/banner-2.svg", alt: "Mua sắm nhanh chóng" },
-    { image: "/banners/banner-3.svg", alt: "Chính hãng giá tốt" },
-  ];
 
   const sortedProducts = useMemo(() => {
     const getFinalPrice = (item: Product) =>
@@ -160,13 +215,36 @@ export default function Home() {
                     width: "100%",
                     overflow: "hidden",
                     borderRadius: 8,
+                    aspectRatio: "16 / 5",
+                    background: "#f5f5f5",
                   }}
                 >
-                  <img
-                    src={item.image}
-                    alt={item.alt}
-                    style={{ width: "100%", height: "auto", display: "block" }}
-                  />
+                  {item.type === "video" ? (
+                    <video
+                      src={item.image}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "block",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={item.image}
+                      alt={item.alt}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "block",
+                        objectFit: "cover",
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -234,5 +312,22 @@ export default function Home() {
         totalPrice={getTotalPrice()}
       />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 grid place-items-center">
+          <Space orientation="vertical" align="center" size="middle">
+            <Spin size="large" />
+            <Typography.Text type="secondary">Đang tải...</Typography.Text>
+          </Space>
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }
