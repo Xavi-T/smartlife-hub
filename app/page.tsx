@@ -219,7 +219,7 @@ function HomeContent() {
           style={{ marginBottom: 24, padding: 0 }}
           styles={{ body: { padding: 0 } }}
         >
-          <Carousel autoplay dots>
+          <Carousel autoplay dots infinite>
             {carouselItems.map((item) => (
               <div key={item.image}>
                 <div
