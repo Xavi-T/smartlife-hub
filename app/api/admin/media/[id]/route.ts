@@ -74,18 +74,27 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    const displayOrder =
+      typeof body.displayOrder === "number" &&
+      Number.isFinite(body.displayOrder)
+        ? Math.max(1, Math.trunc(body.displayOrder))
+        : null;
+    const normalizedPurpose = normalizePurpose(
+      typeof body.purpose === "string" ? body.purpose : null,
+    );
+
     const updates = {
       media_key:
         typeof body.mediaKey === "string" && body.mediaKey.trim()
           ? body.mediaKey.trim()
           : null,
-      purpose: normalizePurpose(
-        typeof body.purpose === "string" ? body.purpose : null,
-      ),
+      purpose: normalizedPurpose,
       alt_text:
         typeof body.altText === "string" && body.altText.trim()
           ? body.altText.trim()
           : null,
+      display_order:
+        normalizedPurpose === "homepage_banner" ? displayOrder : null,
     };
 
     const dbClient = authClient as any;
@@ -94,7 +103,7 @@ export async function PATCH(
       .update(updates)
       .eq("id", id)
       .select(
-        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, created_at",
+        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
       )
       .single();
 

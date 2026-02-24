@@ -79,12 +79,21 @@ export async function GET(request: NextRequest) {
     let query = authClient
       .from("site_media_assets")
       .select(
-        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, created_at",
-      )
-      .order("created_at", { ascending: false });
+        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
+      );
 
     if (purpose && purpose !== "all") {
       query = query.eq("purpose", purpose);
+
+      if (purpose === "homepage_banner") {
+        query = query
+          .order("display_order", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: false });
+      } else {
+        query = query.order("created_at", { ascending: false });
+      }
+    } else {
+      query = query.order("created_at", { ascending: false });
     }
 
     const { data, error } = await query;
@@ -129,8 +138,12 @@ export async function POST(request: NextRequest) {
     const altTextRaw = (formData.get("altText") as string | null) || "";
     const widthRaw = formData.get("width");
     const heightRaw = formData.get("height");
+    const displayOrderRaw = formData.get("displayOrder");
     const width = widthRaw ? parseInt(String(widthRaw), 10) : NaN;
     const height = heightRaw ? parseInt(String(heightRaw), 10) : NaN;
+    const displayOrder = displayOrderRaw
+      ? parseInt(String(displayOrderRaw), 10)
+      : NaN;
     const purpose = normalizePurpose(
       (formData.get("purpose") as string | null) || "site_logo",
     );
@@ -201,10 +214,14 @@ export async function POST(request: NextRequest) {
         storage_path: filePath,
         width: Number.isFinite(width) ? width : null,
         height: Number.isFinite(height) ? height : null,
+        display_order:
+          purpose === "homepage_banner" && Number.isFinite(displayOrder)
+            ? Math.max(1, displayOrder)
+            : null,
         created_by: user.id,
       })
       .select(
-        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, created_at",
+        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
       )
       .single();
 

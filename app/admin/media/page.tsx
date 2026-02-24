@@ -8,6 +8,7 @@ import {
   Form,
   Image as AntImage,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Row,
@@ -30,8 +31,8 @@ import {
 } from "@ant-design/icons";
 import { formatFileSize, getImageDimensions } from "@/lib/imageUtils";
 
-const HOMEPAGE_BANNER_MIN_RATIO = 2.2;
-const HOMEPAGE_BANNER_MAX_RATIO = 4.2;
+// const HOMEPAGE_BANNER_MIN_RATIO = 2.2;
+// const HOMEPAGE_BANNER_MAX_RATIO = 4.2;
 
 type MediaItem = {
   id: string;
@@ -45,6 +46,7 @@ type MediaItem = {
   storage_path: string;
   width: number | null;
   height: number | null;
+  display_order: number | null;
   created_at: string;
 };
 
@@ -52,12 +54,14 @@ type UploadFormValues = {
   purpose: string;
   mediaKey?: string;
   altText?: string;
+  displayOrder?: number;
 };
 
 type EditFormValues = {
   purpose: string;
   mediaKey?: string;
   altText?: string;
+  displayOrder?: number;
 };
 
 const PURPOSE_OPTIONS = [
@@ -114,7 +118,7 @@ export default function MediaManagerPage() {
   };
 
   useEffect(() => {
-    uploadForm.setFieldsValue({ purpose: "site_logo" });
+    uploadForm.setFieldsValue({ purpose: "site_logo", displayOrder: 1 });
     fetchMedia({ q: "", purpose: "all" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -143,23 +147,22 @@ export default function MediaManagerPage() {
 
     if (!isVideoFile) {
       try {
-        const dimensions = await getImageDimensions(rawFile);
-        imageWidth = dimensions.width;
-        imageHeight = dimensions.height;
-
-        if (values.purpose === "homepage_banner") {
-          const ratio = dimensions.width / dimensions.height;
-          if (
-            ratio < HOMEPAGE_BANNER_MIN_RATIO ||
-            ratio > HOMEPAGE_BANNER_MAX_RATIO
-          ) {
-            messageApi.error(
-              "Banner trang chủ cần ảnh ngang (khuyến nghị tỉ lệ khoảng 16:5). Vui lòng chọn ảnh khác để tránh vỡ layout.",
-            );
-            return;
-          }
-        }
-      } catch {
+        // const dimensions = await getImageDimensions(rawFile);
+        // imageWidth = dimensions.width;
+        // imageHeight = dimensions.height;
+        // if (values.purpose === "homepage_banner") {
+        //   const ratio = dimensions.width / dimensions.height;
+        //   if (
+        //     ratio < HOMEPAGE_BANNER_MIN_RATIO ||
+        //     ratio > HOMEPAGE_BANNER_MAX_RATIO
+        //   ) {
+        //     messageApi.error(
+        //       "Banner trang chủ cần ảnh ngang (khuyến nghị tỉ lệ khoảng 16:5). Vui lòng chọn ảnh khác để tránh vỡ layout.",
+        //     );
+        //     return;
+        //   }
+        // }
+      } catch (error) {
         messageApi.error(
           "Không thể đọc kích thước ảnh. Vui lòng thử lại file khác.",
         );
@@ -176,6 +179,15 @@ export default function MediaManagerPage() {
         formData.append("mediaKey", values.mediaKey.trim());
       if (values.altText?.trim())
         formData.append("altText", values.altText.trim());
+      if (
+        values.purpose === "homepage_banner" &&
+        typeof values.displayOrder === "number"
+      ) {
+        formData.append(
+          "displayOrder",
+          String(Math.max(1, values.displayOrder)),
+        );
+      }
       if (imageWidth && imageHeight) {
         formData.append("width", String(imageWidth));
         formData.append("height", String(imageHeight));
@@ -194,7 +206,7 @@ export default function MediaManagerPage() {
       messageApi.success("Upload media thành công");
       setFileList([]);
       uploadForm.resetFields();
-      uploadForm.setFieldsValue({ purpose: "site_logo" });
+      uploadForm.setFieldsValue({ purpose: "site_logo", displayOrder: 1 });
       fetchMedia();
     } catch (error: unknown) {
       messageApi.error(
@@ -231,6 +243,7 @@ export default function MediaManagerPage() {
       purpose: item.purpose,
       mediaKey: item.media_key || undefined,
       altText: item.alt_text || undefined,
+      displayOrder: item.display_order || undefined,
     });
   };
 
@@ -242,7 +255,14 @@ export default function MediaManagerPage() {
       const response = await fetch(`/api/admin/media/${editingItem.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          displayOrder:
+            values.purpose === "homepage_banner" &&
+            typeof values.displayOrder === "number"
+              ? Math.max(1, values.displayOrder)
+              : null,
+        }),
       });
 
       const result = await response.json();
@@ -309,6 +329,9 @@ export default function MediaManagerPage() {
               {formatFileSize(record.file_size)}
               {record.width && record.height
                 ? ` • ${record.width}x${record.height}`
+                : ""}
+              {record.purpose === "homepage_banner" && record.display_order
+                ? ` • Thứ tự: ${record.display_order}`
                 : ""}
             </Typography.Text>
             <Typography.Text code>
@@ -400,6 +423,29 @@ export default function MediaManagerPage() {
 
               <Form.Item name="altText" label="Alt text (tuỳ chọn)">
                 <Input placeholder="Mô tả media" />
+              </Form.Item>
+
+              <Form.Item shouldUpdate noStyle>
+                {() =>
+                  uploadForm.getFieldValue("purpose") === "homepage_banner" ? (
+                    <Form.Item
+                      name="displayOrder"
+                      label="Thứ tự banner"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập thứ tự banner",
+                        },
+                      ]}
+                    >
+                      <InputNumber<number>
+                        min={1}
+                        style={{ width: "100%" }}
+                        placeholder="1, 2, 3..."
+                      />
+                    </Form.Item>
+                  ) : null
+                }
               </Form.Item>
 
               <Form.Item label="File media">
@@ -518,6 +564,25 @@ export default function MediaManagerPage() {
           </Form.Item>
           <Form.Item name="altText" label="Alt text (tuỳ chọn)">
             <Input placeholder="Mô tả media" />
+          </Form.Item>
+          <Form.Item shouldUpdate noStyle>
+            {() =>
+              editForm.getFieldValue("purpose") === "homepage_banner" ? (
+                <Form.Item
+                  name="displayOrder"
+                  label="Thứ tự banner"
+                  rules={[
+                    { required: true, message: "Vui lòng nhập thứ tự banner" },
+                  ]}
+                >
+                  <InputNumber<number>
+                    min={1}
+                    style={{ width: "100%" }}
+                    placeholder="1, 2, 3..."
+                  />
+                </Form.Item>
+              ) : null
+            }
           </Form.Item>
         </Form>
       </Modal>

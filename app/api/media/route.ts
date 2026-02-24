@@ -16,9 +16,8 @@ export async function GET(request: NextRequest) {
     let query = (supabase as any)
       .from("site_media_assets")
       .select(
-        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, width, height, created_at",
-      )
-      .order("created_at", { ascending: false });
+        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, width, height, display_order, created_at",
+      );
 
     if (mediaKey) {
       query = query.eq("media_key", mediaKey);
@@ -26,6 +25,16 @@ export async function GET(request: NextRequest) {
 
     if (purpose) {
       query = query.eq("purpose", purpose);
+
+      if (purpose === "homepage_banner") {
+        query = query
+          .order("display_order", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: false });
+      } else {
+        query = query.order("created_at", { ascending: false });
+      }
+    } else {
+      query = query.order("created_at", { ascending: false });
     }
 
     const { data, error } = await query;

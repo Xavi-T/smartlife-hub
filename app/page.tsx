@@ -25,6 +25,7 @@ type HomeBanner = {
   image_url: string;
   alt_text: string | null;
   mime_type?: string;
+  display_order?: number | null;
 };
 
 const DEFAULT_CAROUSEL_ITEMS = [
@@ -113,6 +114,17 @@ function HomeContent() {
 
       const mapped = banners
         .filter((item) => item.image_url)
+        .sort((a, b) => {
+          const orderA =
+            typeof a.display_order === "number"
+              ? a.display_order
+              : Number.MAX_SAFE_INTEGER;
+          const orderB =
+            typeof b.display_order === "number"
+              ? b.display_order
+              : Number.MAX_SAFE_INTEGER;
+          return orderA - orderB;
+        })
         .map((item, index) => ({
           image: item.image_url,
           alt: item.alt_text || `Banner trang chủ ${index + 1}`,
@@ -215,7 +227,7 @@ function HomeContent() {
                     width: "100%",
                     overflow: "hidden",
                     borderRadius: 8,
-                    aspectRatio: "16 / 5",
+                    aspectRatio: "16 / 6.5", // Increased height for banner
                     background: "#f5f5f5",
                   }}
                 >
