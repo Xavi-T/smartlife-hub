@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -21,6 +21,7 @@ import { useCart } from "@/hooks/useCart";
 import { createOrder, checkStockAvailability } from "@/actions/orders";
 import { formatCurrency } from "@/lib/utils";
 import type { CheckoutMethod } from "@/types/order";
+import { trackBeginCheckout, trackPurchase } from "@/lib/analytics";
 
 const BANK_INFO = {
   bankName: "Vietcombank",
@@ -49,8 +50,18 @@ export default function CheckoutPage() {
     isLoaded,
   } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasTrackedBeginCheckout = useRef(false);
 
   const checkoutMethod = Form.useWatch("checkoutMethod", form) || "cod";
+
+  useEffect(() => {
+    if (!isLoaded || cart.length === 0 || hasTrackedBeginCheckout.current) {
+      return;
+    }
+
+    trackBeginCheckout(cart);
+    hasTrackedBeginCheckout.current = true;
+  }, [cart, isLoaded]);
 
   const stepItems = useMemo(
     () => [
@@ -112,6 +123,13 @@ export default function CheckoutPage() {
       });
 
       if (result.success) {
+        trackPurchase({
+          transactionId: result.orderId || `order-${Date.now()}`,
+          value: Number(result.totalAmount || getTotalPrice()),
+          paymentType: values.checkoutMethod,
+          items: cart,
+        });
+
         messageApi.success("Đặt hàng thành công");
         const normalizedPhone = values.phone.replace(/\D/g, "");
         clearCart();

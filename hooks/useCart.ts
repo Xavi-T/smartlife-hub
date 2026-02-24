@@ -6,6 +6,7 @@ import {
   calculateDiscountedPrice,
   getEffectiveDiscountPercent,
 } from "@/lib/utils";
+import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics";
 
 export interface CartItem {
   product: Product;
@@ -65,22 +66,40 @@ export function useCart() {
       }
       return [...prev, { product: normalizedProduct, quantity: safeQuantity }];
     });
+
+    trackAddToCart(normalizedProduct, safeQuantity);
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
+    const existing = cart.find((item) => item.product.id === productId);
+
     if (quantity <= 0) {
       removeFromCart(productId);
       return;
     }
+
     setCart((prev) =>
       prev.map((item) =>
         item.product.id === productId ? { ...item, quantity } : item,
       ),
     );
+
+    if (existing) {
+      const delta = quantity - existing.quantity;
+      if (delta > 0) {
+        trackAddToCart(existing.product, delta);
+      } else if (delta < 0) {
+        trackRemoveFromCart(existing.product, Math.abs(delta));
+      }
+    }
   };
 
   const removeFromCart = (productId: string) => {
+    const existing = cart.find((item) => item.product.id === productId);
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    if (existing) {
+      trackRemoveFromCart(existing.product, existing.quantity);
+    }
   };
 
   const clearCart = () => {

@@ -15,6 +15,11 @@ import {
   getEffectiveDiscountPercent,
 } from "@/lib/utils";
 import type { Product } from "@/types/database";
+import {
+  trackBeginCheckout,
+  trackSelectItem,
+  trackViewItem,
+} from "@/lib/analytics";
 
 interface ProductMedia {
   id: string;
@@ -123,6 +128,11 @@ export default function ProductDetailPage() {
     };
   }, [product]);
 
+  useEffect(() => {
+    if (!product) return;
+    trackViewItem(product);
+  }, [product]);
+
   const categoryNames = useMemo(() => {
     if (!product) return [];
     if (product.categories && product.categories.length > 0) {
@@ -140,6 +150,7 @@ export default function ProductDetailPage() {
   };
 
   const handleCheckout = () => {
+    trackBeginCheckout(cart);
     setIsCartOpen(false);
     router.push("/checkout");
   };
@@ -372,7 +383,10 @@ export default function ProductDetailPage() {
               {relatedProducts.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => router.push(`/products/${item.id}`)}
+                  onClick={() => {
+                    trackSelectItem(item, "related_products");
+                    router.push(`/products/${item.id}`);
+                  }}
                   className="text-left border rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-sm transition-all"
                 >
                   <div className="aspect-square bg-gray-100">
