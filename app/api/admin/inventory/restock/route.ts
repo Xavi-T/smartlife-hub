@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export async function PATCH(request: NextRequest) {
   try {
+    const sb = supabase as any;
     const { productId, quantityToAdd } = await request.json();
 
     if (!productId || !quantityToAdd || quantityToAdd <= 0) {
@@ -13,7 +14,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Lấy số lượng hiện tại
-    const { data: product, error: fetchError } = await supabase
+    const { data: product, error: fetchError } = await sb
       .from("products")
       .select("stock_quantity, name")
       .eq("id", productId)
@@ -21,14 +22,18 @@ export async function PATCH(request: NextRequest) {
 
     if (fetchError) throw fetchError;
 
-    // Cộng thêm số lượng
-    const newQuantity = (product?.stock_quantity || 0) + quantityToAdd;
+    const productRow = (product || null) as {
+      stock_quantity: number;
+      name: string;
+    } | null;
 
-    const { data, error: updateError } = await supabase
+    // Cộng thêm số lượng
+    const newQuantity = (productRow?.stock_quantity || 0) + quantityToAdd;
+
+    const { data, error: updateError } = await sb
       .from("products")
       .update({
         stock_quantity: newQuantity,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", productId)
       .select()
@@ -38,7 +43,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Đã nhập thêm ${quantityToAdd} ${product?.name}`,
+      message: `Đã nhập thêm ${quantityToAdd} ${productRow?.name || "sản phẩm"}`,
       product: data,
     });
   } catch (error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Button,
@@ -69,7 +69,7 @@ type FormValues = {
   isActive: boolean;
 };
 
-export default function PriorityCustomersPage() {
+function PriorityCustomersContent() {
   const searchParams = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
   const [customers, setCustomers] = useState<PriorityCustomer[]>([]);
@@ -841,5 +841,24 @@ export default function PriorityCustomersPage() {
         </Form>
       </Modal>
     </div>
+  );
+}
+
+export default function PriorityCustomersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Space direction="vertical" align="center">
+            <SyncOutlined spin />
+            <Typography.Text type="secondary">
+              Đang tải dữ liệu...
+            </Typography.Text>
+          </Space>
+        </div>
+      }
+    >
+      <PriorityCustomersContent />
+    </Suspense>
   );
 }

@@ -14,6 +14,7 @@ function isVideoUrl(url: string): boolean {
 // PATCH: Cập nhật thứ tự ảnh
 export async function PATCH(request: NextRequest) {
   try {
+    const sb = supabase as any;
     const body = await request.json();
     const { images } = body as { images?: ReorderItem[] }; // Array of { id, display_order, is_cover }
 
@@ -26,7 +27,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update each image
     const updatePromises = images.map((img) =>
-      supabase
+      sb
         .from("product_images")
         .update({
           display_order: img.display_order,
@@ -45,7 +46,7 @@ export async function PATCH(request: NextRequest) {
 
     const coverImage = images.find((img) => img.is_cover);
     if (coverImage) {
-      const { data: coverRow, error: coverFetchError } = await supabase
+      const { data: coverRow, error: coverFetchError } = await sb
         .from("product_images")
         .select("product_id, image_url")
         .eq("id", coverImage.id)
@@ -53,7 +54,7 @@ export async function PATCH(request: NextRequest) {
 
       if (!coverFetchError && coverRow?.product_id && coverRow?.image_url) {
         if (!isVideoUrl(coverRow.image_url)) {
-          const { error: productUpdateError } = await supabase
+          const { error: productUpdateError } = await sb
             .from("products")
             .update({ image_url: coverRow.image_url })
             .eq("id", coverRow.product_id);

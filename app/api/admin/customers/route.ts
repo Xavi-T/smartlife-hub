@@ -44,6 +44,16 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const orderRows = (orders || []) as Array<{
+      id: string;
+      customer_name: string;
+      customer_phone: string;
+      total_amount: number;
+      status: "pending" | "processing" | "delivered" | "cancelled";
+      created_at: string;
+      [key: string]: unknown;
+    }>;
+
     // Gom nhóm theo số điện thoại
     const customerMap = new Map<
       string,
@@ -59,7 +69,7 @@ export async function GET(request: NextRequest) {
       }
     >();
 
-    orders.forEach((order) => {
+    orderRows.forEach((order) => {
       const phone = order.customer_phone;
 
       if (customerMap.has(phone)) {

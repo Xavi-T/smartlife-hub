@@ -149,7 +149,7 @@ export function QuickStockForm({
               { type: "number", min: 1, message: "Số lượng phải lớn hơn 0" },
             ]}
           >
-            <InputNumber
+            <InputNumber<number>
               placeholder="Nhập số lượng..."
               style={{ width: "100%" }}
               min={1}
@@ -169,14 +169,16 @@ export function QuickStockForm({
             ]}
             tooltip="Giá vốn của lô hàng đang nhập. Hệ thống sẽ tính giá vốn bình quân gia quyền."
           >
-            <InputNumber
+            <InputNumber<number>
               placeholder="Nhập giá vốn..."
               style={{ width: "100%" }}
               min={0}
               formatter={(value) =>
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
               }
-              parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
+              parser={(value) =>
+                Number((value ?? "").replace(/\$\s?|(,*)/g, ""))
+              }
             />
           </Form.Item>
 

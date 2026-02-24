@@ -484,7 +484,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                     type="info"
                     showIcon
                     style={{ marginBottom: 16 }}
-                    tittle="Tồn kho ban đầu"
+                    title="Tồn kho ban đầu"
                     description="Tồn kho ban đầu mặc định bằng 0. Sau khi tạo sản phẩm, dùng chức năng Nhập kho để thêm hàng vào kho."
                   />
                 )}
@@ -493,7 +493,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  tittle="Ảnh sản phẩm"
+                  title="Ảnh sản phẩm"
                   description="Sản phẩm mới mặc định chưa có ảnh đại diện. Sau khi tạo, vào phần media của sản phẩm để upload và đặt ảnh cover."
                 />
 

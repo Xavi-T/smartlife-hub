@@ -54,6 +54,12 @@ export async function GET() {
 
     if (error) throw error;
 
+    const orders = (ordersData || []) as Array<{
+      created_at: string;
+      total_amount: number;
+      status: string;
+    }>;
+
     // Group by date và tính tổng
     const chartData: { [key: string]: ChartData } = {};
 
@@ -72,7 +78,7 @@ export async function GET() {
     }
 
     // Aggregate data
-    ordersData?.forEach((order) => {
+    orders.forEach((order) => {
       const dateStr = order.created_at.split("T")[0];
       if (chartData[dateStr]) {
         chartData[dateStr].revenue += Number(order.total_amount);

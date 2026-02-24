@@ -64,7 +64,18 @@ export async function GET(
 
     if (error) throw error;
 
-    const deliveredOrders = orders.filter((o) => o.status === "delivered");
+    const orderRows = (orders || []) as Array<{
+      id: string;
+      customer_name: string;
+      customer_phone: string;
+      customer_address: string;
+      total_amount: number;
+      status: "pending" | "processing" | "delivered" | "cancelled";
+      created_at: string;
+      [key: string]: unknown;
+    }>;
+
+    const deliveredOrders = orderRows.filter((o) => o.status === "delivered");
     const deliveredRevenue = deliveredOrders.reduce(
       (sum, o) => sum + o.total_amount,
       0,
@@ -72,19 +83,22 @@ export async function GET(
 
     // Tính thống kê
     const stats = {
-      totalOrders: orders.length,
+      totalOrders: orderRows.length,
       totalSpent: deliveredRevenue,
-      pendingOrders: orders.filter((o) => o.status === "pending").length,
-      processingOrders: orders.filter((o) => o.status === "processing").length,
+      pendingOrders: orderRows.filter((o) => o.status === "pending").length,
+      processingOrders: orderRows.filter((o) => o.status === "processing")
+        .length,
       deliveredOrders: deliveredOrders.length,
-      cancelledOrders: orders.filter((o) => o.status === "cancelled").length,
+      cancelledOrders: orderRows.filter((o) => o.status === "cancelled").length,
       averageOrderValue:
         deliveredOrders.length > 0
           ? deliveredRevenue / deliveredOrders.length
           : 0,
       firstOrderDate:
-        orders.length > 0 ? orders[orders.length - 1].created_at : null,
-      lastOrderDate: orders.length > 0 ? orders[0].created_at : null,
+        orderRows.length > 0
+          ? orderRows[orderRows.length - 1].created_at
+          : null,
+      lastOrderDate: orderRows.length > 0 ? orderRows[0].created_at : null,
     };
 
     // Phân loại
@@ -101,14 +115,14 @@ export async function GET(
 
     return NextResponse.json({
       customer: {
-        name: orders[0]?.customer_name || "N/A",
+        name: orderRows[0]?.customer_name || "N/A",
         phone: phone,
-        address: orders[0]?.customer_address || "N/A",
+        address: orderRows[0]?.customer_address || "N/A",
         customerType,
         typeColor,
       },
       stats,
-      orders,
+      orders: orderRows,
     });
   } catch (error: any) {
     console.error("Error fetching customer detail:", error);

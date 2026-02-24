@@ -135,10 +135,11 @@ function createServiceRoleSupabaseClient() {
 async function clearExpiredProductDiscounts() {
   const serviceRoleClient = createServiceRoleSupabaseClient();
   if (!serviceRoleClient) return;
+  const sb = serviceRoleClient as any;
 
   const nowIso = new Date().toISOString();
 
-  const { error } = await serviceRoleClient
+  const { error } = await sb
     .from("products")
     .update({
       discount_percent: 0,

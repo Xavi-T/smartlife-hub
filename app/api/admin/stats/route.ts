@@ -58,11 +58,14 @@ export async function GET() {
 
     if (revenueError) throw revenueError;
 
-    const totalRevenue =
-      revenueData?.reduce(
-        (sum, order) => sum + Number(order.total_amount),
-        0,
-      ) || 0;
+    const deliveredRevenueRows = (revenueData || []) as Array<{
+      total_amount: number;
+    }>;
+
+    const totalRevenue = deliveredRevenueRows.reduce(
+      (sum, order) => sum + Number(order.total_amount),
+      0,
+    );
 
     // 2. Tổng lợi nhuận: SUM((unit_price - cost_price) * quantity)
     const { data: profitData, error: profitError } = await sb.from(
@@ -97,11 +100,14 @@ export async function GET() {
 
     if (thisMonthError) throw thisMonthError;
 
-    const monthlyRevenue =
-      thisMonthData?.reduce(
-        (sum, order) => sum + Number(order.total_amount),
-        0,
-      ) || 0;
+    const thisMonthRevenueRows = (thisMonthData || []) as Array<{
+      total_amount: number;
+    }>;
+
+    const monthlyRevenue = thisMonthRevenueRows.reduce(
+      (sum, order) => sum + Number(order.total_amount),
+      0,
+    );
 
     // 4. Doanh thu tháng trước
     const { data: lastMonthData, error: lastMonthError } = await sb
@@ -113,11 +119,14 @@ export async function GET() {
 
     if (lastMonthError) throw lastMonthError;
 
-    const previousMonthRevenue =
-      lastMonthData?.reduce(
-        (sum, order) => sum + Number(order.total_amount),
-        0,
-      ) || 0;
+    const lastMonthRevenueRows = (lastMonthData || []) as Array<{
+      total_amount: number;
+    }>;
+
+    const previousMonthRevenue = lastMonthRevenueRows.reduce(
+      (sum, order) => sum + Number(order.total_amount),
+      0,
+    );
 
     // 5. Tỷ lệ tăng trưởng
     const growthRate =

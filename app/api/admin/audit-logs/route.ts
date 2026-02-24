@@ -32,9 +32,16 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const logs = (data || []) as Array<{
+      created_at: string;
+      entity_type?: string;
+      event_type?: string;
+      [key: string]: unknown;
+    }>;
+
     // Group by date for timeline
     const groupedLogs: Record<string, any[]> = {};
-    data.forEach((log) => {
+    logs.forEach((log) => {
       const date = new Date(log.created_at).toLocaleDateString("vi-VN");
       if (!groupedLogs[date]) {
         groupedLogs[date] = [];
@@ -44,11 +51,11 @@ export async function GET(request: NextRequest) {
 
     // Calculate stats
     const stats = {
-      totalLogs: data.length,
-      productEvents: data.filter((l) => l.entity_type === "product").length,
-      orderEvents: data.filter((l) => l.entity_type === "order").length,
-      stockEvents: data.filter((l) => l.event_type?.includes("stock")).length,
-      todayLogs: data.filter((l) => {
+      totalLogs: logs.length,
+      productEvents: logs.filter((l) => l.entity_type === "product").length,
+      orderEvents: logs.filter((l) => l.entity_type === "order").length,
+      stockEvents: logs.filter((l) => l.event_type?.includes("stock")).length,
+      todayLogs: logs.filter((l) => {
         const logDate = new Date(l.created_at).toDateString();
         const today = new Date().toDateString();
         return logDate === today;
@@ -56,7 +63,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({
-      logs: data,
+      logs,
       groupedLogs,
       stats,
     });

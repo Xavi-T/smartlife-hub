@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export async function PATCH(request: NextRequest) {
   try {
+    const sb = supabase as any;
     const { productId, quantity } = await request.json();
 
     if (!productId || quantity === undefined) {
@@ -13,7 +14,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Lấy số lượng hiện tại
-    const { data: product, error: fetchError } = await supabase
+    const { data: product, error: fetchError } = await sb
       .from("products")
       .select("stock_quantity")
       .eq("id", productId)
@@ -21,10 +22,12 @@ export async function PATCH(request: NextRequest) {
 
     if (fetchError) throw fetchError;
 
-    // Cộng thêm số lượng
-    const newQuantity = (product?.stock_quantity || 0) + quantity;
+    const productRow = (product || null) as { stock_quantity: number } | null;
 
-    const { data, error: updateError } = await supabase
+    // Cộng thêm số lượng
+    const newQuantity = (productRow?.stock_quantity || 0) + quantity;
+
+    const { data, error: updateError } = await sb
       .from("products")
       .update({ stock_quantity: newQuantity })
       .eq("id", productId)

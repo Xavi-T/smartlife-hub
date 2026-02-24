@@ -18,7 +18,8 @@ export interface AuditLogParams {
 
 export async function logAudit(params: AuditLogParams): Promise<void> {
   try {
-    const { error } = await supabase.rpc("log_audit_event", {
+    const rpcClient = supabase as any;
+    const { error } = await rpcClient.rpc("log_audit_event", {
       p_event_type: params.eventType,
       p_entity_type: params.entityType,
       p_entity_id: params.entityId || null,

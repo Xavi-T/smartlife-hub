@@ -377,7 +377,7 @@ export default function AdminUsersPage() {
             type="error"
             showIcon
             style={{ marginBottom: 16 }}
-            tittle={fetchError}
+            title={fetchError}
           />
         )}
 

@@ -49,11 +49,14 @@ export function RevenueChart({ data }: RevenueChartProps) {
               borderRadius: "8px",
               padding: "12px",
             }}
-            formatter={(value: number, name: string) => {
+            formatter={(value, name) => {
+              const numericValue =
+                typeof value === "number" ? value : Number(value ?? 0);
+
               if (name === "revenue") {
-                return [formatCurrency(value), "Doanh thu"];
+                return [formatCurrency(numericValue), "Doanh thu"];
               }
-              return [value, "Đơn hàng"];
+              return [numericValue, "Đơn hàng"];
             }}
           />
           <Line

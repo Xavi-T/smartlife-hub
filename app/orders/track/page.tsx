@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
@@ -107,7 +107,7 @@ function getPaymentMeta(order: OrderView): {
   };
 }
 
-export default function OrderTrackingPage() {
+function OrderTrackingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
@@ -348,5 +348,19 @@ export default function OrderTrackingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function OrderTrackingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <Spin size="large" />
+        </div>
+      }
+    >
+      <OrderTrackingContent />
+    </Suspense>
   );
 }

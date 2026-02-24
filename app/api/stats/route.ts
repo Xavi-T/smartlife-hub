@@ -11,11 +11,20 @@ export async function GET() {
 
     if (salesError) throw salesError;
 
+    const salesRows = (salesData || []) as Array<{
+      total_revenue: number;
+      total_profit: number;
+    }>;
+
     // Tính tổng doanh thu và lợi nhuận từ các đơn đã giao
-    const totalRevenue =
-      salesData?.reduce((sum, item) => sum + (item.total_revenue || 0), 0) || 0;
-    const totalProfit =
-      salesData?.reduce((sum, item) => sum + (item.total_profit || 0), 0) || 0;
+    const totalRevenue = salesRows.reduce(
+      (sum, item) => sum + (item.total_revenue || 0),
+      0,
+    );
+    const totalProfit = salesRows.reduce(
+      (sum, item) => sum + (item.total_profit || 0),
+      0,
+    );
 
     // Lấy số đơn hàng trong tháng hiện tại
     const currentMonth = new Date();
@@ -25,7 +34,7 @@ export async function GET() {
       1,
     );
 
-    const { data: ordersData, error: ordersError } = await supabase
+    const { count: monthlyOrdersCount, error: ordersError } = await supabase
       .from("orders")
       .select("id", { count: "exact", head: true })
       .gte("created_at", firstDayOfMonth.toISOString())
@@ -34,7 +43,7 @@ export async function GET() {
     if (ordersError) throw ordersError;
 
     // Đếm sản phẩm có tồn kho < 5
-    const { data: lowStockData, error: lowStockError } = await supabase
+    const { count: lowStockCount, error: lowStockError } = await supabase
       .from("products")
       .select("id", { count: "exact", head: true })
       .lt("stock_quantity", 5)
@@ -45,8 +54,8 @@ export async function GET() {
     const stats: DashboardStats = {
       totalRevenue,
       totalProfit,
-      monthlyOrders: ordersData?.length || 0,
-      lowStockProducts: lowStockData?.length || 0,
+      monthlyOrders: monthlyOrdersCount || 0,
+      lowStockProducts: lowStockCount || 0,
     };
 
     return NextResponse.json(stats);
