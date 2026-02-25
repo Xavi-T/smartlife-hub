@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Space, Typography } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
+import { APP_CONFIG } from "@/lib/appConfig";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -82,14 +83,18 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 placeItems: "center",
               }}
             >
-              <img src={logoSrc} alt="SmartLife Hub Logo" className="w-6 h-6" />
+              <img
+                src={logoSrc}
+                alt={`${APP_CONFIG.shopName} Logo`}
+                className="w-6 h-6"
+              />
             </div>
             <div>
               <Typography.Title level={4} style={{ margin: 0 }}>
-                SmartLife Hub
+                {APP_CONFIG.shopName}
               </Typography.Title>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                Đồ gia dụng thông minh
+                {APP_CONFIG.shopTagline}
               </Typography.Text>
             </div>
           </Link>

@@ -33,6 +33,7 @@ import {
   SaveOutlined,
 } from "@ant-design/icons";
 import { formatCurrency } from "@/lib/utils";
+import { APP_CONFIG } from "@/lib/appConfig";
 
 type PriorityCustomer = {
   id: string;
@@ -95,6 +96,11 @@ function PriorityCustomersContent() {
   }>();
 
   const [segmentDrafts, setSegmentDrafts] = useState<SegmentSetting[]>([]);
+
+  const examplePhone = useMemo(
+    () => APP_CONFIG.shopPhone.replace(/\D/g, "") || "0901234567",
+    [],
+  );
 
   useEffect(() => {
     const initialSearch = searchParams.get("search") || "";
@@ -758,7 +764,7 @@ function PriorityCustomersContent() {
             label="Số điện thoại"
             rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
           >
-            <Input placeholder="0901234567" />
+            <Input placeholder={examplePhone} />
           </Form.Item>
 
           <Form.Item

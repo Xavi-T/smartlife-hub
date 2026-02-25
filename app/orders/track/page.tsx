@@ -18,6 +18,7 @@ import {
 import { Header } from "@/components/home/Header";
 import { getOrdersByPhone } from "@/actions/orders";
 import { formatCurrency } from "@/lib/utils";
+import { APP_CONFIG } from "@/lib/appConfig";
 
 type OrderStatus = "pending" | "processing" | "delivered" | "cancelled";
 
@@ -116,6 +117,11 @@ function OrderTrackingContent() {
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [searched, setSearched] = useState(false);
 
+  const examplePhone = useMemo(
+    () => APP_CONFIG.shopPhone.replace(/\D/g, "") || "0901234567",
+    [],
+  );
+
   const hasCreatedFlag = searchParams.get("created") === "1";
 
   useEffect(() => {
@@ -179,7 +185,7 @@ function OrderTrackingContent() {
             <Input
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
-              placeholder="Nhập số điện thoại, ví dụ 0901234567"
+              placeholder={`Nhập số điện thoại, ví dụ ${examplePhone}`}
               onPressEnter={() => handleSearch()}
             />
             <Button

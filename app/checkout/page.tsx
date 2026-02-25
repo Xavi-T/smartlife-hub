@@ -22,12 +22,7 @@ import { createOrder, checkStockAvailability } from "@/actions/orders";
 import { formatCurrency } from "@/lib/utils";
 import type { CheckoutMethod } from "@/types/order";
 import { trackBeginCheckout, trackPurchase } from "@/lib/analytics";
-
-const BANK_INFO = {
-  bankName: "Vietcombank",
-  accountNumber: "0123456789",
-  accountName: "CONG TY SMARTLIFE HUB",
-};
+import { APP_CONFIG } from "@/lib/appConfig";
 
 interface CheckoutFormValues {
   name: string;
@@ -51,6 +46,11 @@ export default function CheckoutPage() {
   } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasTrackedBeginCheckout = useRef(false);
+
+  const examplePhone = useMemo(
+    () => APP_CONFIG.shopPhone.replace(/\D/g, "") || "0901234567",
+    [],
+  );
 
   const checkoutMethod = Form.useWatch("checkoutMethod", form) || "cod";
 
@@ -287,7 +287,7 @@ export default function CheckoutPage() {
                     },
                   ]}
                 >
-                  <Input placeholder="0901234567" />
+                  <Input placeholder={examplePhone} />
                 </Form.Item>
 
                 <Form.Item
@@ -321,9 +321,9 @@ export default function CheckoutPage() {
                           }}
                         >
                           <div style={{ flex: 1, minWidth: 220 }}>
-                            <div>Ngân hàng: {BANK_INFO.bankName}</div>
-                            <div>Số tài khoản: {BANK_INFO.accountNumber}</div>
-                            <div>Chủ tài khoản: {BANK_INFO.accountName}</div>
+                            <div>Ngân hàng: {APP_CONFIG.bank.name}</div>
+                            <div>Số tài khoản: {APP_CONFIG.bank.accountNumber}</div>
+                            <div>Chủ tài khoản: {APP_CONFIG.bank.accountName}</div>
                             <div style={{ marginTop: 6 }}>
                               Nội dung CK: <strong>SDT của bạn</strong>
                             </div>

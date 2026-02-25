@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, Input, List, Space, Tag, Typography } from "antd";
 import { Header } from "@/components/home/Header";
 import { useCart } from "@/hooks/useCart";
+import { APP_CONFIG } from "@/lib/appConfig";
 
 type PublicPriorityCustomer = {
   id: string;
@@ -61,8 +62,8 @@ export default function PriorityCustomersPublicPage() {
               Danh sách khách hàng ưu tiên
             </Typography.Title>
             <Typography.Text type="secondary">
-              Danh sách công khai khách hàng ưu tiên của SmartLife Hub (SĐT đã
-              được ẩn).
+              Danh sách công khai khách hàng ưu tiên của {APP_CONFIG.shopName}{" "}
+              (SĐT đã được ẩn).
             </Typography.Text>
           </div>
 

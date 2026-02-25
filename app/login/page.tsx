@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { login } from "@/actions/auth";
 import { Lock, Mail, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { APP_CONFIG } from "@/lib/appConfig";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +33,7 @@ export default function LoginPage() {
             <Lock className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            SmartLife Hub
+            {APP_CONFIG.shopName}
           </h1>
           <p className="text-gray-700 font-medium">
             Đăng nhập vào trang quản trị
@@ -147,7 +148,7 @@ export default function LoginPage() {
 
         {/* Version Info */}
         <p className="text-center text-xs text-gray-500 mt-6">
-          SmartLife Hub v1.0 © 2026
+          {APP_CONFIG.shopName} v1.0 © {new Date().getFullYear()}
         </p>
       </div>
     </div>
