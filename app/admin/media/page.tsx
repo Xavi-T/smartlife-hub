@@ -88,6 +88,38 @@ export default function MediaManagerPage() {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
 
+  const handlePasteToDragger = (
+    event: React.ClipboardEvent<HTMLDivElement>,
+  ) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const nextFiles: UploadFile[] = [];
+    Array.from(items).forEach((item) => {
+      if (item.kind !== "file") return;
+      const file = item.getAsFile();
+      if (!file) return;
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+        return;
+      }
+
+      const uid = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      nextFiles.push({
+        uid,
+        name: file.name || `pasted-${uid}`,
+        originFileObj: file as any,
+        size: file.size,
+        type: file.type,
+        status: "done",
+      });
+    });
+
+    if (nextFiles.length === 0) return;
+
+    event.preventDefault();
+    setFileList(nextFiles.slice(0, 1));
+  };
+
   const fetchMedia = async (params?: { q?: string; purpose?: string }) => {
     const q = params?.q ?? search;
     const purpose = params?.purpose ?? purposeFilter;
@@ -472,6 +504,17 @@ export default function MediaManagerPage() {
                     16:5).
                   </p>
                 </Upload.Dragger>
+                <div
+                  onPaste={handlePasteToDragger}
+                  tabIndex={0}
+                  style={{ marginTop: 8 }}
+                  className="inline-flex cursor-text items-center justify-center rounded border border-dashed border-blue-300 bg-blue-50 px-3 py-1 text-xs text-blue-700"
+                >
+                  Bấm vào vùng này rồi dùng
+                  <span className="mx-1 font-semibold">Ctrl+V</span>/
+                  <span className="mx-1 font-semibold">Cmd+V</span> để dán ảnh/
+                  video từ clipboard (chụp màn hình, copy từ trình duyệt,...).
+                </div>
               </Form.Item>
 
               <Button

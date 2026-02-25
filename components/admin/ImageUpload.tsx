@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   Upload,
   X,
@@ -69,11 +69,16 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const pasteAreaRef = useRef<HTMLDivElement | null>(null);
 
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFiles = async (files: FileList | File[] | null) => {
+    if (!files) return;
 
-    const fileArray = Array.from(files).slice(0, maxFiles);
+    const fileArray = (Array.isArray(files) ? files : Array.from(files)).slice(
+      0,
+      maxFiles,
+    );
+    if (fileArray.length === 0) return;
 
     // Validate files
     const validatedFiles = fileArray.map((file) => {
@@ -184,6 +189,26 @@ export function ImageUpload({
     URL.revokeObjectURL(file.preview);
   };
 
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const files: File[] = [];
+    Array.from(items).forEach((item) => {
+      if (item.kind !== "file") return;
+      const file = item.getAsFile();
+      if (!file) return;
+      if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
+        files.push(file);
+      }
+    });
+
+    if (files.length === 0) return;
+
+    event.preventDefault();
+    void handleFiles(files);
+  };
+
   return (
     <div className="space-y-4">
       {/* Drop Zone */}
@@ -226,6 +251,18 @@ export function ImageUpload({
             </p>
           </div>
         </label>
+      </div>
+
+      <div
+        ref={pasteAreaRef}
+        tabIndex={0}
+        onPaste={handlePaste}
+        className="mt-3 inline-flex items-center justify-center rounded border border-dashed border-blue-300 bg-blue-50 px-3 py-1 text-[11px] text-blue-700 cursor-text"
+      >
+        Click vùng này rồi dùng{" "}
+        <span className="mx-1 font-semibold">Ctrl+V</span> /
+        <span className="mx-1 font-semibold">Cmd+V</span> để dán ảnh/video từ
+        clipboard.
       </div>
 
       {/* Uploading Files */}
