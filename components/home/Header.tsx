@@ -60,6 +60,8 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             alignItems: "center",
             justifyContent: "space-between",
             minHeight: 64,
+            flexWrap: "wrap",
+            rowGap: 8,
           }}
         >
           <Link
@@ -92,7 +94,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             </div>
           </Link>
 
-          <Space size="small">
+          <Space size="small" wrap>
             <Link href="/priority-customers">
               <Button type="text">Danh sách KH ưu tiên</Button>
             </Link>

@@ -94,6 +94,7 @@ export function CartModal({
                     alt={item.product.name}
                     width={76}
                     height={76}
+                    loading="lazy"
                     style={{ objectFit: "cover" }}
                     preview={false}
                   />

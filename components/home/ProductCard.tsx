@@ -75,6 +75,7 @@ export function ProductCard({
             preview={false}
             width="100%"
             height="100%"
+            loading="lazy"
             style={{ objectFit: "cover" }}
           />
         ) : (
@@ -156,7 +157,7 @@ export function ProductCard({
       <Space
         orientation="vertical"
         size={10}
-        style={{ width: "100%", flex: 1 }}
+        className="w-full flex-1"
       >
         <div style={{ minHeight: 24 }}>
           <Tag color="blue" style={{ margin: 0 }}>
@@ -173,7 +174,7 @@ export function ProductCard({
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              fontSize: 15,
+              fontSize: 14,
               lineHeight: 1.35,
             }}
           >
@@ -181,22 +182,11 @@ export function ProductCard({
           </Typography.Text>
         </div>
 
-        <div
-          style={{
-            marginTop: "auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-          }}
-        >
-          <div style={{ minHeight: 58 }}>
-            <Typography.Text
-              strong
-              style={{ color: "#ff4d4f", fontSize: 22, lineHeight: 1.05 }}
-            >
+        <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold leading-tight text-red-500 whitespace-nowrap">
               {formatCurrency(finalPrice)}
-            </Typography.Text>
+            </div>
             {hasDiscount && (
               <Space orientation="vertical" size={0} style={{ marginTop: 2 }}>
                 <Typography.Text
@@ -207,7 +197,7 @@ export function ProductCard({
                   {formatCurrency(product.price)}
                 </Typography.Text>
                 <Typography.Text
-                  style={{ fontSize: 14, fontWeight: 700, color: "#ff4d4f" }}
+                  style={{ fontSize: 13, fontWeight: 700, color: "#ff4d4f" }}
                 >
                   Tiết kiệm {formatCurrency(savingAmount)}
                 </Typography.Text>
@@ -218,6 +208,7 @@ export function ProductCard({
           <Button
             type="primary"
             icon={<ShoppingCartOutlined />}
+            className="w-full sm:w-auto"
             onClick={(event) => {
               event.stopPropagation();
               onAddToCart(product);

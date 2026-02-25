@@ -332,6 +332,7 @@ export default function CheckoutPage() {
                             <img
                               src="/qrcode.png"
                               alt="Mã QR chuyển khoản"
+                              loading="lazy"
                               style={{
                                 width: 140,
                                 height: 140,

@@ -242,6 +242,7 @@ export default function ProductDetailPage() {
                     <img
                       src={activeMedia.image_url}
                       alt={product.name}
+                      loading="lazy"
                       className="w-full h-full object-cover"
                     />
                   )
@@ -249,6 +250,7 @@ export default function ProductDetailPage() {
                   <img
                     src={fallbackMediaUrl}
                     alt={product.name}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -280,6 +282,7 @@ export default function ProductDetailPage() {
                         <img
                           src={media.image_url}
                           alt={`${product.name}-${index + 1}`}
+                          loading="lazy"
                           className="w-full h-full object-cover"
                         />
                       )}
@@ -299,12 +302,12 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
 
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                   {product.name}
                 </h1>
 
                 <div className="space-y-2">
-                  <div className="text-4xl font-extrabold text-red-600 leading-none">
+                  <div className="text-2xl md:text-4xl font-extrabold text-red-600 leading-none">
                     {formatCurrency(finalPrice)}
                   </div>
                   {hasDiscount && (
@@ -394,6 +397,7 @@ export default function ProductDetailPage() {
                       <img
                         src={item.image_url}
                         alt={item.name}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     ) : (
