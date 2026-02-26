@@ -45,6 +45,7 @@ export default function CheckoutPage() {
     isLoaded,
   } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bankQrSrc, setBankQrSrc] = useState("/qrcode.png");
   const hasTrackedBeginCheckout = useRef(false);
 
   const examplePhone = useMemo(
@@ -62,6 +63,35 @@ export default function CheckoutPage() {
     trackBeginCheckout(cart);
     hasTrackedBeginCheckout.current = true;
   }, [cart, isLoaded]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadBankQrCode = async () => {
+      try {
+        const response = await fetch("/api/media?purpose=bank_qrcode", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) return;
+
+        const result = await response.json();
+        const firstQrCode = Array.isArray(result.media) ? result.media[0] : null;
+
+        if (active && firstQrCode?.image_url) {
+          setBankQrSrc(firstQrCode.image_url);
+        }
+      } catch {
+        // Keep default QR code fallback
+      }
+    };
+
+    loadBankQrCode();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const stepItems = useMemo(
     () => [
@@ -330,7 +360,7 @@ export default function CheckoutPage() {
                           </div>
                           <div>
                             <img
-                              src="/qrcode.png"
+                              src={bankQrSrc}
                               alt="Mã QR chuyển khoản"
                               loading="lazy"
                               style={{

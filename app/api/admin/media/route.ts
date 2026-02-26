@@ -7,6 +7,20 @@ const STORAGE_BUCKET = "product-images";
 const STORAGE_PREFIX = "site-media";
 const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+const SINGLE_MEDIA_PURPOSES = new Set([
+  "site_logo",
+  "site_favicon",
+  "bank_qrcode",
+]);
+type SiteMediaSearchRow = {
+  file_name?: string | null;
+  media_key?: string | null;
+  alt_text?: string | null;
+};
+type SiteMediaRefRow = {
+  id: string;
+  storage_path: string | null;
+};
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
@@ -52,7 +66,12 @@ function createStorageAdminClient() {
 }
 
 function normalizePurpose(value: string | null): string {
-  const supported = new Set(["site_logo", "site_favicon", "homepage_banner"]);
+  const supported = new Set([
+    "site_logo",
+    "site_favicon",
+    "homepage_banner",
+    "bank_qrcode",
+  ]);
 
   if (!value) return "site_logo";
   return supported.has(value) ? value : "site_logo";
@@ -100,7 +119,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const rows = ((data || []) as any[]).filter((item) => {
+    const rows = ((data || []) as SiteMediaSearchRow[]).filter((item) => {
       if (!keyword) return true;
       const haystack =
         `${item.file_name || ""} ${item.media_key || ""} ${item.alt_text || ""}`.toLowerCase();
@@ -157,7 +176,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Logo/Favicon chỉ hỗ trợ ảnh. Banner trang chủ hỗ trợ ảnh hoặc video",
+              "Logo/Favicon/QR ngân hàng chỉ hỗ trợ ảnh. Banner trang chủ hỗ trợ ảnh hoặc video",
           },
           { status: 400 },
         );
@@ -200,37 +219,136 @@ export async function POST(request: NextRequest) {
       .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
 
-    const dbClient = authClient as any;
-    const { data: inserted, error: insertError } = await dbClient
-      .from("site_media_assets")
-      .insert({
-        media_key: mediaKey,
-        purpose,
-        alt_text: altText,
-        file_name: file.name,
-        mime_type: file.type,
-        file_size: file.size,
-        image_url: urlData.publicUrl,
-        storage_path: filePath,
-        width: Number.isFinite(width) ? width : null,
-        height: Number.isFinite(height) ? height : null,
-        display_order:
-          purpose === "homepage_banner" && Number.isFinite(displayOrder)
-            ? Math.max(1, displayOrder)
-            : null,
-        created_by: user.id,
-      })
-      .select(
-        "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
-      )
-      .single();
+    let savedMedia = null;
+    const storagePathsToDelete: string[] = [];
 
-    if (insertError) {
+    try {
+      if (SINGLE_MEDIA_PURPOSES.has(purpose)) {
+        const { data: existingRows, error: existingError } = await authClient
+          .from("site_media_assets")
+          .select("id, storage_path")
+          .eq("purpose", purpose)
+          .order("created_at", { ascending: false });
+
+        if (existingError) throw existingError;
+
+        const existingList = Array.isArray(existingRows)
+          ? (existingRows as SiteMediaRefRow[])
+          : [];
+        const latest = existingList[0] || null;
+        const staleRows = existingList.slice(1);
+        const staleIds = staleRows.map((item) => item.id);
+        const stalePaths = staleRows
+          .map((item) => item.storage_path)
+          .filter((path): path is string => Boolean(path));
+
+        if (staleIds.length > 0) {
+          const { error: deleteStaleError } = await authClient
+            .from("site_media_assets")
+            .delete()
+            .in("id", staleIds);
+
+          if (deleteStaleError) throw deleteStaleError;
+          storagePathsToDelete.push(...stalePaths);
+        }
+
+        if (latest) {
+          const oldStoragePath = latest.storage_path;
+          const { data: updated, error: updateError } = await authClient
+            .from("site_media_assets")
+            .update({
+              media_key: mediaKey,
+              purpose,
+              alt_text: altText,
+              file_name: file.name,
+              mime_type: file.type,
+              file_size: file.size,
+              image_url: urlData.publicUrl,
+              storage_path: filePath,
+              width: Number.isFinite(width) ? width : null,
+              height: Number.isFinite(height) ? height : null,
+              display_order: null,
+              created_by: user.id,
+            })
+            .eq("id", latest.id)
+            .select(
+              "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
+            )
+            .single();
+
+          if (updateError) throw updateError;
+          savedMedia = updated;
+          if (oldStoragePath) {
+            storagePathsToDelete.push(oldStoragePath);
+          }
+        } else {
+          const { data: inserted, error: insertError } = await authClient
+            .from("site_media_assets")
+            .insert({
+              media_key: mediaKey,
+              purpose,
+              alt_text: altText,
+              file_name: file.name,
+              mime_type: file.type,
+              file_size: file.size,
+              image_url: urlData.publicUrl,
+              storage_path: filePath,
+              width: Number.isFinite(width) ? width : null,
+              height: Number.isFinite(height) ? height : null,
+              display_order: null,
+              created_by: user.id,
+            })
+            .select(
+              "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
+            )
+            .single();
+
+          if (insertError) throw insertError;
+          savedMedia = inserted;
+        }
+      } else {
+        const { data: inserted, error: insertError } = await authClient
+          .from("site_media_assets")
+          .insert({
+            media_key: mediaKey,
+            purpose,
+            alt_text: altText,
+            file_name: file.name,
+            mime_type: file.type,
+            file_size: file.size,
+            image_url: urlData.publicUrl,
+            storage_path: filePath,
+            width: Number.isFinite(width) ? width : null,
+            height: Number.isFinite(height) ? height : null,
+            display_order:
+              purpose === "homepage_banner" && Number.isFinite(displayOrder)
+                ? Math.max(1, displayOrder)
+                : null,
+            created_by: user.id,
+          })
+          .select(
+            "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, storage_path, width, height, display_order, created_at",
+          )
+          .single();
+
+        if (insertError) throw insertError;
+        savedMedia = inserted;
+      }
+    } catch (dbError) {
       await storageClient.storage.from(STORAGE_BUCKET).remove([filePath]);
-      throw insertError;
+      throw dbError;
     }
 
-    return NextResponse.json({ success: true, media: inserted });
+    if (storagePathsToDelete.length > 0) {
+      const { error: removeOldStorageError } = await storageClient.storage
+        .from(STORAGE_BUCKET)
+        .remove(storagePathsToDelete);
+      if (removeOldStorageError) {
+        console.error("Error removing old site media files:", removeOldStorageError);
+      }
+    }
+
+    return NextResponse.json({ success: true, media: savedMedia });
   } catch (error: unknown) {
     console.error("Error uploading media:", error);
     return NextResponse.json(

@@ -20,7 +20,7 @@ import {
   Upload,
   message,
 } from "antd";
-import type { UploadFile } from "antd/es/upload/interface";
+import type { RcFile, UploadFile } from "antd/es/upload/interface";
 import {
   CopyOutlined,
   DeleteOutlined,
@@ -29,7 +29,7 @@ import {
   ReloadOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
-import { formatFileSize, getImageDimensions } from "@/lib/imageUtils";
+import { formatFileSize } from "@/lib/imageUtils";
 
 // const HOMEPAGE_BANNER_MIN_RATIO = 2.2;
 // const HOMEPAGE_BANNER_MAX_RATIO = 4.2;
@@ -67,6 +67,7 @@ type EditFormValues = {
 const PURPOSE_OPTIONS = [
   { value: "site_logo", label: "Logo website" },
   { value: "site_favicon", label: "Favicon" },
+  { value: "bank_qrcode", label: "QR chuyển khoản ngân hàng" },
   { value: "homepage_banner", label: "Banner trang chủ" },
 ];
 
@@ -87,6 +88,7 @@ export default function MediaManagerPage() {
   const [purposeFilter, setPurposeFilter] = useState<string>("all");
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+  const selectedUploadPurpose = Form.useWatch("purpose", uploadForm);
 
   const handlePasteToDragger = (
     event: React.ClipboardEvent<HTMLDivElement>,
@@ -107,7 +109,7 @@ export default function MediaManagerPage() {
       nextFiles.push({
         uid,
         name: file.name || `pasted-${uid}`,
-        originFileObj: file as any,
+        originFileObj: file as RcFile,
         size: file.size,
         type: file.type,
         status: "done",
@@ -117,7 +119,9 @@ export default function MediaManagerPage() {
     if (nextFiles.length === 0) return;
 
     event.preventDefault();
-    setFileList(nextFiles.slice(0, 1));
+    setFileList(
+      selectedUploadPurpose === "homepage_banner" ? nextFiles : nextFiles.slice(0, 1),
+    );
   };
 
   const fetchMedia = async (params?: { q?: string; purpose?: string }) => {
@@ -155,87 +159,82 @@ export default function MediaManagerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (selectedUploadPurpose !== "homepage_banner" && fileList.length > 1) {
+      setFileList(fileList.slice(-1));
+    }
+  }, [fileList, selectedUploadPurpose]);
+
   const handleUpload = async (values: UploadFormValues) => {
-    const rawFile = fileList[0]?.originFileObj;
-    if (!rawFile) {
+    const isBanner = values.purpose === "homepage_banner";
+    const selectedFiles = fileList
+      .map((item) => item.originFileObj)
+      .filter(Boolean) as File[];
+
+    if (selectedFiles.length === 0) {
       messageApi.error("Vui lòng chọn file trước khi upload");
       return;
     }
+    const filesToUpload = isBanner ? selectedFiles : [selectedFiles[0]];
 
-    const isVideoFile = rawFile.type.startsWith("video/");
-
-    if (isVideoFile && values.purpose !== "homepage_banner") {
-      messageApi.error("Video chỉ được phép upload cho Banner trang chủ");
-      return;
-    }
-
-    if (!isVideoFile && !rawFile.type.startsWith("image/")) {
-      messageApi.error("Chỉ hỗ trợ file ảnh hoặc video");
-      return;
-    }
-
-    let imageWidth: number | null = null;
-    let imageHeight: number | null = null;
-
-    if (!isVideoFile) {
-      try {
-        // const dimensions = await getImageDimensions(rawFile);
-        // imageWidth = dimensions.width;
-        // imageHeight = dimensions.height;
-        // if (values.purpose === "homepage_banner") {
-        //   const ratio = dimensions.width / dimensions.height;
-        //   if (
-        //     ratio < HOMEPAGE_BANNER_MIN_RATIO ||
-        //     ratio > HOMEPAGE_BANNER_MAX_RATIO
-        //   ) {
-        //     messageApi.error(
-        //       "Banner trang chủ cần ảnh ngang (khuyến nghị tỉ lệ khoảng 16:5). Vui lòng chọn ảnh khác để tránh vỡ layout.",
-        //     );
-        //     return;
-        //   }
-        // }
-      } catch (error) {
-        messageApi.error(
-          "Không thể đọc kích thước ảnh. Vui lòng thử lại file khác.",
-        );
+    for (const currentFile of filesToUpload) {
+      const isVideoFile = currentFile.type.startsWith("video/");
+      if (isVideoFile && !isBanner) {
+        messageApi.error("Video chỉ được phép upload cho Banner trang chủ");
+        return;
+      }
+      if (!isVideoFile && !currentFile.type.startsWith("image/")) {
+        messageApi.error("Chỉ hỗ trợ file ảnh hoặc video");
         return;
       }
     }
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", rawFile);
-      formData.append("purpose", values.purpose || "site_logo");
-      if (values.mediaKey?.trim())
-        formData.append("mediaKey", values.mediaKey.trim());
-      if (values.altText?.trim())
-        formData.append("altText", values.altText.trim());
-      if (
-        values.purpose === "homepage_banner" &&
-        typeof values.displayOrder === "number"
-      ) {
-        formData.append(
-          "displayOrder",
-          String(Math.max(1, values.displayOrder)),
-        );
-      }
-      if (imageWidth && imageHeight) {
-        formData.append("width", String(imageWidth));
-        formData.append("height", String(imageHeight));
+      for (let index = 0; index < filesToUpload.length; index += 1) {
+        const file = filesToUpload[index];
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("purpose", values.purpose || "site_logo");
+        if (values.mediaKey?.trim()) {
+          formData.append("mediaKey", values.mediaKey.trim());
+        }
+        if (values.altText?.trim()) {
+          formData.append("altText", values.altText.trim());
+        }
+        if (isBanner && typeof values.displayOrder === "number") {
+          formData.append(
+            "displayOrder",
+            String(Math.max(1, values.displayOrder + index)),
+          );
+        }
+
+        // if (!file.type.startsWith("video/")) {
+        //   try {
+        //     const dimensions = await getImageDimensions(file);
+        //     formData.append("width", String(dimensions.width));
+        //     formData.append("height", String(dimensions.height));
+        //   } catch {
+        //     // Keep width/height empty if browser cannot parse the image
+        //   }
+        // }
+
+        const response = await fetch("/api/admin/media", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || "Upload thất bại");
+        }
       }
 
-      const response = await fetch("/api/admin/media", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Upload thất bại");
-      }
-
-      messageApi.success("Upload media thành công");
+      messageApi.success(
+        isBanner && filesToUpload.length > 1
+          ? `Upload thành công ${filesToUpload.length} banner`
+          : "Upload media thành công",
+      );
       setFileList([]);
       uploadForm.resetFields();
       uploadForm.setFieldsValue({ purpose: "site_logo", displayOrder: 1 });
@@ -434,7 +433,8 @@ export default function MediaManagerPage() {
         Quản lý Media
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-        Upload và quản lý ảnh dùng cho logo, favicon và banner trang chủ.
+        Upload và quản lý ảnh dùng cho logo, favicon, QR chuyển khoản và banner
+        trang chủ.
       </Typography.Paragraph>
 
       <Row gutter={16}>
@@ -483,10 +483,18 @@ export default function MediaManagerPage() {
               <Form.Item label="File media">
                 <Upload.Dragger
                   accept="image/*,video/*"
-                  maxCount={1}
+                  multiple={selectedUploadPurpose === "homepage_banner"}
+                  maxCount={
+                    selectedUploadPurpose === "homepage_banner"
+                      ? undefined
+                      : 1
+                  }
                   beforeUpload={() => false}
                   fileList={fileList}
-                  onChange={(info) => setFileList(info.fileList)}
+                  onChange={(info) => {
+                    const isBanner = selectedUploadPurpose === "homepage_banner";
+                    setFileList(isBanner ? info.fileList : info.fileList.slice(-1));
+                  }}
                   onRemove={() => {
                     setFileList([]);
                     return true;
@@ -499,9 +507,9 @@ export default function MediaManagerPage() {
                     Bấm hoặc kéo thả ảnh vào đây
                   </p>
                   <p className="ant-upload-hint">
-                    Logo/Favicon: chỉ ảnh (tối đa 12MB). Banner trang chủ: ảnh
-                    hoặc video (video tối đa 100MB, ảnh nên tỉ lệ ngang gần
-                    16:5).
+                    Logo/Favicon/QR ngân hàng: chỉ ảnh (tối đa 12MB, upload sau
+                    sẽ ghi đè). Banner trang chủ: ảnh hoặc video (video tối đa
+                    100MB, upload nhiều file được).
                   </p>
                 </Upload.Dragger>
                 <div

@@ -49,7 +49,12 @@ function createStorageAdminClient() {
 }
 
 function normalizePurpose(value: string | null): string {
-  const supported = new Set(["site_logo", "site_favicon", "homepage_banner"]);
+  const supported = new Set([
+    "site_logo",
+    "site_favicon",
+    "homepage_banner",
+    "bank_qrcode",
+  ]);
 
   if (!value) return "site_logo";
   return supported.has(value) ? value : "site_logo";
@@ -97,8 +102,7 @@ export async function PATCH(
         normalizedPurpose === "homepage_banner" ? displayOrder : null,
     };
 
-    const dbClient = authClient as any;
-    const { data, error } = await dbClient
+    const { data, error } = await authClient
       .from("site_media_assets")
       .update(updates)
       .eq("id", id)
@@ -137,8 +141,7 @@ export async function DELETE(
       );
     }
 
-    const dbClient = authClient as any;
-    const { data: existing, error: fetchError } = await dbClient
+    const { data: existing, error: fetchError } = await authClient
       .from("site_media_assets")
       .select("id, storage_path")
       .eq("id", id)
@@ -160,7 +163,7 @@ export async function DELETE(
       console.error("Error removing media from storage:", removeError);
     }
 
-    const { error: deleteError } = await dbClient
+    const { error: deleteError } = await authClient
       .from("site_media_assets")
       .delete()
       .eq("id", id);
