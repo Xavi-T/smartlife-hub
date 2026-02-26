@@ -30,15 +30,7 @@ const chatItems = [
 export function FloatingChatButtons() {
   return (
     <div
-      style={{
-        position: "fixed",
-        right: 16,
-        bottom: 20,
-        zIndex: 1000,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
+      className="fixed bottom-5 right-7 sm:right-4 z-[1000] flex flex-col gap-2.5"
     >
       {chatItems.map((item) => (
         <a

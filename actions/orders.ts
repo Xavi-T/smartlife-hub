@@ -50,38 +50,6 @@ function calculateEffectivePrice(
   return Math.round(price * (1 - discount / 100));
 }
 
-async function getCustomerSegmentDiscountPercent(
-  db: any,
-  customerPhone: string,
-): Promise<{ segmentLabel: string | null; discountPercent: number }> {
-  const { data: priorityCustomer } = await db
-    .from("priority_customers")
-    .select("customer_segment")
-    .eq("customer_phone", customerPhone)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!priorityCustomer?.customer_segment) {
-    return { segmentLabel: null, discountPercent: 0 };
-  }
-
-  const { data: segment } = await db
-    .from("customer_segment_settings")
-    .select("segment_label, discount_percent")
-    .eq("segment_key", priorityCustomer.customer_segment)
-    .maybeSingle();
-
-  const discountPercent = Math.min(
-    100,
-    Math.max(0, Number(segment?.discount_percent || 0)),
-  );
-
-  return {
-    segmentLabel: segment?.segment_label || priorityCustomer.customer_segment,
-    discountPercent,
-  };
-}
-
 async function createOrderDirectly(params: {
   db: any;
   customerName: string;
@@ -297,8 +265,7 @@ async function createOrderDirectly(params: {
  *
  * Logic:
  * 1. Validate input
- * 2. Xác định % giảm theo phân loại khách hàng ưu tiên (qua SĐT)
- * 3. Tạo đơn hàng trực tiếp trong DB:
+ * 2. Tạo đơn hàng trực tiếp trong DB:
  *    - Kiểm tra tồn kho từng sản phẩm
  *    - Tạo order + order_items (đã áp giảm giá)
  *    - Trigger DB tự cập nhật (trừ) tồn kho
@@ -455,27 +422,16 @@ export async function createOrder(
 
     const finalNotes = extraNotes.join("\n");
 
-    const customerDiscountInfo = await getCustomerSegmentDiscountPercent(
-      orderWriteClient,
-      normalizedPhone,
-    );
-
-    const notesWithPriorityDiscount =
-      customerDiscountInfo.discountPercent > 0
-        ? `${finalNotes}\nGiảm theo phân loại khách hàng ưu tiên (${customerDiscountInfo.segmentLabel}): ${customerDiscountInfo.discountPercent}%`
-        : finalNotes;
-
     const createResult = await createOrderDirectly({
       db: orderWriteClient,
       customerName: request.customer.name.trim(),
       customerPhone: normalizedPhone,
       customerAddress: resolvedAddress,
-      notes: notesWithPriorityDiscount,
+      notes: finalNotes,
       checkoutMethod,
       paymentMethod,
       isCounterSale,
       items: request.items,
-      customerDiscountPercent: customerDiscountInfo.discountPercent,
       manualDiscountPercent,
       manualDiscountMode,
       manualProductDiscounts,

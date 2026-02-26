@@ -65,7 +65,7 @@ export function SiteFooter() {
 
           <div>
             <Typography.Title level={5} style={{ marginTop: 0 }}>
-              Kênh Social
+              Kết nối với chúng tôi
             </Typography.Title>
             <Space orientation="vertical" size={8}>
               {socialItems.map((item) => {
@@ -75,7 +75,13 @@ export function SiteFooter() {
                     href={item.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: "#111111",
+                      textDecoration: "none",
+                    }}
                   >
                     <img
                       src={item.iconSrc}
@@ -90,7 +96,7 @@ export function SiteFooter() {
                         borderRadius: 4,
                       }}
                     />
-                    <span>{item.label}</span>
+                    <span style={{ color: "#111111" }}>{item.label}</span>
                   </a>
                 );
               })}
@@ -98,12 +104,24 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 20 }}>
           <Space wrap size={12}>
-            <Link href="/">Trang chủ</Link>
-            <Link href="/about">Về chúng tôi</Link>
-            <Link href="/orders/track">Tra cứu đơn</Link>
+            <Link href="/" style={{ color: "#111111" }}>
+              Trang chủ
+            </Link>
+            <Link href="/about" style={{ color: "#111111" }}>
+              Về chúng tôi
+            </Link>
+            <Link href="/orders/track" style={{ color: "#111111" }}>
+              Tra cứu đơn
+            </Link>
           </Space>
+          <Typography.Text
+            type="secondary"
+            style={{ display: "block", marginTop: 12, fontSize: 12 }}
+          >
+            {`© ${new Date().getFullYear()} ${APP_CONFIG.shopName}. All rights reserved.`}
+          </Typography.Text>
         </div>
       </div>
     </footer>

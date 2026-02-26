@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Badge, Button, Space, Typography } from "antd";
-import { ShoppingCartOutlined } from "@ant-design/icons";
+import { Badge, Button, Drawer, Space, Typography } from "antd";
+import { MenuOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { APP_CONFIG } from "@/lib/appConfig";
 
 interface HeaderProps {
@@ -13,6 +13,7 @@ interface HeaderProps {
 
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   const [logoSrc, setLogoSrc] = useState("/logo.png");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -99,31 +100,79 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             </div>
           </Link>
 
-          <Space size="small" wrap>
-            <Link href="/about">
-              <Button type="text">Về chúng tôi</Button>
-            </Link>
-            <Link href="/priority-customers">
-              <Button type="text">Danh sách KH ưu tiên</Button>
-            </Link>
-            <Link href="/orders/track">
-              <Button type="text">Tra cứu đơn</Button>
-            </Link>
-            <Badge
-              count={cartItemsCount > 9 ? "9+" : cartItemsCount}
-              size="small"
-            >
+          <div className="hidden md:block">
+            <Space size="small" wrap>
+              <Link href="/about">
+                <Button type="text">Về chúng tôi</Button>
+              </Link>
+              <Link href="/priority-customers">
+                <Button type="text">Danh sách KH ưu tiên</Button>
+              </Link>
+              <Link href="/orders/track">
+                <Button type="text">Tra cứu đơn</Button>
+              </Link>
+              <Badge
+                count={cartItemsCount > 9 ? "9+" : cartItemsCount}
+                size="small"
+              >
+                <Button
+                  type="text"
+                  shape="circle"
+                  icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
+                  onClick={onCartClick}
+                  aria-label="Giỏ hàng"
+                />
+              </Badge>
+            </Space>
+          </div>
+
+          <div className="block md:hidden">
+            <Space size="small">
+              <Badge
+                count={cartItemsCount > 9 ? "9+" : cartItemsCount}
+                size="small"
+              >
+                <Button
+                  type="text"
+                  shape="circle"
+                  icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
+                  onClick={onCartClick}
+                  aria-label="Giỏ hàng"
+                />
+              </Badge>
               <Button
                 type="text"
                 shape="circle"
-                icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
-                onClick={onCartClick}
-                aria-label="Giỏ hàng"
+                icon={<MenuOutlined style={{ fontSize: 20 }} />}
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Mở menu"
               />
-            </Badge>
-          </Space>
+            </Space>
+          </div>
         </div>
       </div>
+
+      <Drawer
+        title="Menu"
+        placement="right"
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      >
+        <Space orientation="vertical" size={8} style={{ width: "100%" }}>
+          <Link href="/about" onClick={() => setMobileMenuOpen(false)}>
+            <Button block>Về chúng tôi</Button>
+          </Link>
+          <Link
+            href="/priority-customers"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Button block>Danh sách KH ưu tiên</Button>
+          </Link>
+          <Link href="/orders/track" onClick={() => setMobileMenuOpen(false)}>
+            <Button block>Tra cứu đơn</Button>
+          </Link>
+        </Space>
+      </Drawer>
     </header>
   );
 }

@@ -6,6 +6,7 @@ import {
   Alert,
   Button,
   Card,
+  Collapse,
   Empty,
   Input,
   Space,
@@ -116,6 +117,7 @@ function OrderTrackingContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [searched, setSearched] = useState(false);
+  const [activeOrderKeys, setActiveOrderKeys] = useState<string[]>([]);
 
   const examplePhone = useMemo(
     () => APP_CONFIG.shopPhone.replace(/\D/g, "") || "0901234567",
@@ -125,9 +127,18 @@ function OrderTrackingContent() {
   const hasCreatedFlag = searchParams.get("created") === "1";
 
   useEffect(() => {
-    if (hasCreatedFlag) {
-      messageApi.success("Đơn hàng đã được tạo. Bạn có thể theo dõi bên dưới.");
+    if (!hasCreatedFlag) return;
+
+    const queryKey =
+      typeof window !== "undefined" ? window.location.search : "";
+    const toastKey = `order-track-created-toast:${queryKey}`;
+    if (typeof window !== "undefined") {
+      const alreadyShown = window.sessionStorage.getItem(toastKey);
+      if (alreadyShown === "1") return;
+      window.sessionStorage.setItem(toastKey, "1");
     }
+
+    messageApi.success("Đơn hàng đã được tạo. Bạn có thể theo dõi bên dưới.");
   }, [hasCreatedFlag, messageApi]);
 
   useEffect(() => {
@@ -155,13 +166,21 @@ function OrderTrackingContent() {
       if (!result.success) {
         messageApi.error(result.message || "Không thể tra cứu đơn hàng");
         setOrders([]);
+        setActiveOrderKeys([]);
         return;
       }
-      setOrders((result.data || []) as OrderView[]);
+      const nextOrders = ((result.data || []) as OrderView[]).sort(
+        (first, second) =>
+          new Date(second.created_at).getTime() -
+          new Date(first.created_at).getTime(),
+      );
+      setOrders(nextOrders);
+      setActiveOrderKeys(nextOrders[0] ? [nextOrders[0].id] : []);
     } catch (error) {
       console.error("Order tracking error:", error);
       messageApi.error("Không thể tra cứu đơn hàng");
       setOrders([]);
+      setActiveOrderKeys([]);
     } finally {
       setIsLoading(false);
     }
@@ -173,10 +192,16 @@ function OrderTrackingContent() {
       <Header cartItemsCount={0} onCartClick={() => router.push("/")} />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Typography.Title level={2} style={{ marginBottom: 8 }}>
+        <Typography.Title
+          level={2}
+          style={{ marginBottom: 8, fontSize: "clamp(24px, 3.6vw, 34px)" }}
+        >
           Kiểm tra đơn hàng
         </Typography.Title>
-        <Typography.Text type="secondary">
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: "clamp(13px, 2.1vw, 15px)" }}
+        >
           Nhập số điện thoại đã đặt hàng để xem danh sách và trạng thái đơn.
         </Typography.Text>
 
@@ -222,135 +247,154 @@ function OrderTrackingContent() {
             />
           )
         ) : (
-          <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-            {orders.map((order) => {
+          <Collapse
+            activeKey={activeOrderKeys}
+            onChange={(keys) =>
+              setActiveOrderKeys(
+                Array.isArray(keys) ? keys.map((item) => String(item)) : [],
+              )
+            }
+            items={orders.map((order) => {
               const statusMeta = getStatusMeta(order.status);
               const paymentMeta = getPaymentMeta(order);
-              return (
-                <Card key={order.id}>
+              return {
+                key: order.id,
+                label: (
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "center",
                       justifyContent: "space-between",
-                      marginBottom: 8,
+                      alignItems: "center",
                       gap: 8,
                       flexWrap: "wrap",
                     }}
                   >
-                    <Typography.Text strong>
-                      Mã đơn: #{order.id.slice(0, 8).toUpperCase()}
-                    </Typography.Text>
-                    <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
-                  </div>
-
-                  <Typography.Text
-                    type="secondary"
-                    style={{ display: "block" }}
-                  >
-                    Ngày đặt:{" "}
-                    {new Date(order.created_at).toLocaleString("vi-VN")}
-                  </Typography.Text>
-                  <Typography.Text style={{ display: "block" }}>
-                    Người nhận: {order.customer_name} - {order.customer_phone}
-                  </Typography.Text>
-                  <Typography.Text
-                    style={{ display: "block", marginBottom: 10 }}
-                  >
-                    Địa chỉ: {order.customer_address}
-                  </Typography.Text>
-
-                  <div style={{ marginBottom: 12 }}>
-                    <Typography.Text type="secondary">
-                      Thanh toán:
-                    </Typography.Text>
-                    <div style={{ marginTop: 4 }}>
-                      <Tag color={paymentMeta.color}>{paymentMeta.label}</Tag>
-                    </div>
-                    {paymentMeta.detail && (
+                    <div>
+                      <Typography.Text strong style={{ fontSize: 14 }}>
+                        #{order.id.slice(0, 8).toUpperCase()}
+                      </Typography.Text>
                       <Typography.Text
                         type="secondary"
-                        style={{ display: "block", marginTop: 4 }}
+                        style={{ display: "block", fontSize: 12 }}
                       >
-                        {paymentMeta.detail}
+                        {new Date(order.created_at).toLocaleString("vi-VN")}
                       </Typography.Text>
+                    </div>
+                    <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
+                  </div>
+                ),
+                children: (
+                  <div>
+                    <Typography.Text
+                      style={{ display: "block", fontSize: "clamp(13px,2vw,15px)" }}
+                    >
+                      Người nhận: {order.customer_name} - {order.customer_phone}
+                    </Typography.Text>
+                    <Typography.Text
+                      style={{
+                        display: "block",
+                        marginBottom: 10,
+                        fontSize: "clamp(13px,2vw,15px)",
+                      }}
+                    >
+                      Địa chỉ: {order.customer_address}
+                    </Typography.Text>
+
+                    <div style={{ marginBottom: 12 }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                        Thanh toán:
+                      </Typography.Text>
+                      <div style={{ marginTop: 4 }}>
+                        <Tag color={paymentMeta.color}>{paymentMeta.label}</Tag>
+                      </div>
+                      {paymentMeta.detail && (
+                        <Typography.Text
+                          type="secondary"
+                          style={{ display: "block", marginTop: 4, fontSize: 12 }}
+                        >
+                          {paymentMeta.detail}
+                        </Typography.Text>
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: 14 }}>
+                      <Steps
+                        size="small"
+                        current={getTimelineCurrent(order.status)}
+                        status={
+                          order.status === "cancelled" ? "error" : "process"
+                        }
+                        items={getDeliveryStepItems(order.status)}
+                      />
+                    </div>
+
+                    {order.status === "cancelled" && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        style={{ marginBottom: 12 }}
+                        title="Đơn hàng đã bị hủy"
+                        description="Vui lòng liên hệ cửa hàng để biết thêm chi tiết hoặc đặt lại đơn mới."
+                      />
+                    )}
+
+                    <Space
+                      orientation="vertical"
+                      size={8}
+                      style={{ width: "100%" }}
+                    >
+                      {order.order_items?.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            borderBottom: "1px solid #f5f5f5",
+                            paddingBottom: 8,
+                            gap: 8,
+                          }}
+                        >
+                          <Typography.Text style={{ fontSize: 14 }}>
+                            {item.products?.name || "Sản phẩm"} × {item.quantity}
+                          </Typography.Text>
+                          <Typography.Text style={{ fontSize: 14 }}>
+                            {formatCurrency(item.subtotal)}
+                          </Typography.Text>
+                        </div>
+                      ))}
+                    </Space>
+
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Typography.Text strong style={{ fontSize: 15 }}>
+                        Tổng thanh toán
+                      </Typography.Text>
+                      <Typography.Text strong style={{ color: "#1677ff", fontSize: 16 }}>
+                        {formatCurrency(order.total_amount)}
+                      </Typography.Text>
+                    </div>
+
+                    {order.notes && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 12 }}
+                        title="Ghi chú đơn hàng"
+                        description={order.notes}
+                      />
                     )}
                   </div>
-
-                  <div style={{ marginBottom: 14 }}>
-                    <Steps
-                      size="small"
-                      current={getTimelineCurrent(order.status)}
-                      status={
-                        order.status === "cancelled" ? "error" : "process"
-                      }
-                      items={getDeliveryStepItems(order.status)}
-                    />
-                  </div>
-
-                  {order.status === "cancelled" && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      style={{ marginBottom: 12 }}
-                      title="Đơn hàng đã bị hủy"
-                      description="Vui lòng liên hệ cửa hàng để biết thêm chi tiết hoặc đặt lại đơn mới."
-                    />
-                  )}
-
-                  <Space
-                    orientation="vertical"
-                    size={8}
-                    style={{ width: "100%" }}
-                  >
-                    {order.order_items?.map((item) => (
-                      <div
-                        key={item.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          borderBottom: "1px solid #f5f5f5",
-                          paddingBottom: 8,
-                        }}
-                      >
-                        <Typography.Text>
-                          {item.products?.name || "Sản phẩm"} × {item.quantity}
-                        </Typography.Text>
-                        <Typography.Text>
-                          {formatCurrency(item.subtotal)}
-                        </Typography.Text>
-                      </div>
-                    ))}
-                  </Space>
-
-                  <div
-                    style={{
-                      marginTop: 12,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography.Text strong>Tổng thanh toán</Typography.Text>
-                    <Typography.Text strong style={{ color: "#1677ff" }}>
-                      {formatCurrency(order.total_amount)}
-                    </Typography.Text>
-                  </div>
-
-                  {order.notes && (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      style={{ marginTop: 12 }}
-                      title="Ghi chú đơn hàng"
-                      description={order.notes}
-                    />
-                  )}
-                </Card>
-              );
+                ),
+              };
             })}
-          </Space>
+          />
         )}
       </div>
     </div>
