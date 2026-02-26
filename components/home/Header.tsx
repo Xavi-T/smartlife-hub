@@ -60,7 +60,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            minHeight: 64,
+            minHeight: 76,
             flexWrap: "wrap",
             rowGap: 8,
           }}
@@ -75,10 +75,10 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           >
             <div
               style={{
-                width: 40,
-                height: 40,
+                width: 56,
+                height: 56,
                 border: "2px solid #1677ff",
-                borderRadius: 8,
+                borderRadius: 12,
                 display: "grid",
                 placeItems: "center",
               }}
@@ -86,7 +86,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
               <img
                 src={logoSrc}
                 alt={`${APP_CONFIG.shopName} Logo`}
-                className="w-6 h-6"
+                className="w-10 h-10"
               />
             </div>
             <div>

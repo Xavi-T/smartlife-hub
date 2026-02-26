@@ -364,8 +364,8 @@ export default function CheckoutPage() {
                               alt="Mã QR chuyển khoản"
                               loading="lazy"
                               style={{
-                                width: 140,
-                                height: 140,
+                                width: "clamp(170px, 24vw, 220px)",
+                                height: "clamp(170px, 24vw, 220px)",
                                 objectFit: "contain",
                                 borderRadius: 8,
                                 border: "1px solid #d9d9d9",

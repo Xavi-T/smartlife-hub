@@ -48,13 +48,13 @@ export function FloatingChatButtons() {
           rel={item.external ? "noopener noreferrer" : undefined}
           aria-label={item.ariaLabel}
           style={{
-            width: 56,
-            height: 56,
+            width: 48,
+            height: 48,
             borderRadius: "999px",
             display: "grid",
             placeItems: "center",
             textDecoration: "none",
-            boxShadow: "0 10px 24px rgba(0,0,0,0.24)",
+            boxShadow: "0 8px 18px rgba(0,0,0,0.2)",
             border: "2px solid #fff",
             background: "#fff",
             overflow: "hidden",
@@ -63,8 +63,8 @@ export function FloatingChatButtons() {
           <Image
             src={item.iconSrc}
             alt={item.ariaLabel}
-            width={52}
-            height={52}
+            width={44}
+            height={44}
             style={{ display: "block" }}
           />
         </a>
