@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { FaviconSync } from "@/components/home/FaviconSync";
+import { PublicSiteWidgets } from "@/components/home/PublicSiteWidgets";
 import { APP_CONFIG } from "@/lib/appConfig";
 import { TitleSync } from "@/components/seo/TitleSync";
 import "./globals.css";
@@ -77,7 +78,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AntdRegistry>{children}</AntdRegistry>
+        <AntdRegistry>
+          {children}
+          <PublicSiteWidgets />
+        </AntdRegistry>
         <FaviconSync />
         <Suspense fallback={null}>
           <GoogleAnalytics />

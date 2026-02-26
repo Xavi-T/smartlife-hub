@@ -11,4 +11,12 @@ export const APP_CONFIG = {
     accountNumber: "0123456789",
     accountName: "CONG TY SMARTLIFE HUB",
   },
+  socials: {
+    zalo: "https://zalo.me/0968390201",
+    messenger: "https://www.facebook.com/profile.php?id=61587876603153",
+    facebook: "https://facebook.com/61587876603153",
+    youtube: "https://www.youtube.com/channel/ucw0Ig-sxjw0wbcsd4hi8n3g",
+    tiktok: "https://www.tiktok.com/@smartlife_hub_",
+    instagram: "https://instagram.com/smartlifehub.work",
+  },
 };
