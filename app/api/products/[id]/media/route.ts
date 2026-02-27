@@ -59,7 +59,11 @@ export async function GET(
       media_type: detectMediaType(item.image_url || ""),
     }));
 
-    return NextResponse.json(mapped);
+    return NextResponse.json(mapped, {
+      headers: {
+        "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+      },
+    });
   } catch (error) {
     console.error("Error fetching product media:", error);
     return NextResponse.json(

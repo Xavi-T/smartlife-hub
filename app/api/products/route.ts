@@ -151,7 +151,21 @@ async function clearExpiredProductDiscounts() {
 
   const nowIso = new Date().toISOString();
 
-  const { error } = await (serviceRoleClient.from("products") as any)
+  type ProductsUpdateQuery = {
+    gt: (column: string, value: number) => ProductsUpdateQuery;
+    not: (column: string, operator: string, value: string | null) => ProductsUpdateQuery;
+    lte: (column: string, value: string) => Promise<{ error: unknown }>;
+  };
+
+  const productsUpdateApi = serviceRoleClient.from("products") as unknown as {
+    update: (values: {
+      discount_percent: number;
+      discount_start_at: null;
+      discount_end_at: null;
+    }) => ProductsUpdateQuery;
+  };
+
+  const { error } = await productsUpdateApi
     .update({
       discount_percent: 0,
       discount_start_at: null,
@@ -424,7 +438,11 @@ export async function GET(request: NextRequest) {
       },
     );
 
-    return NextResponse.json(mappedProducts);
+    return NextResponse.json(mappedProducts, {
+      headers: {
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
     console.error("Error fetching products:", error);
     return NextResponse.json(

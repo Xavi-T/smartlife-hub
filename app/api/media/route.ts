@@ -13,7 +13,25 @@ export async function GET(request: NextRequest) {
     const mediaKey = (searchParams.get("key") || "").trim();
     const purpose = (searchParams.get("purpose") || "").trim();
 
-    let query = (supabase as any)
+    type SiteMediaQuery = {
+      eq: (column: string, value: string) => SiteMediaQuery;
+      order: (
+        column: string,
+        options: { ascending: boolean; nullsFirst?: boolean },
+      ) => SiteMediaQuery;
+      then: PromiseLike<{
+        data: Array<Record<string, unknown>> | null;
+        error: unknown;
+      }>["then"];
+    };
+
+    const siteMediaApi = supabase as unknown as {
+      from: (table: string) => {
+        select: (columns: string) => SiteMediaQuery;
+      };
+    };
+
+    let query = siteMediaApi
       .from("site_media_assets")
       .select(
         "id, media_key, purpose, alt_text, file_name, mime_type, file_size, image_url, width, height, display_order, created_at",
@@ -41,7 +59,14 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ media: data || [] });
+    return NextResponse.json(
+      { media: data || [] },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+        },
+      },
+    );
   } catch (error: unknown) {
     console.error("Error fetching public media:", error);
     return NextResponse.json(

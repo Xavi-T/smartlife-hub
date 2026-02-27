@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Card, Image, Space, Tag, Typography } from "antd";
+import NextImage from "next/image";
+import { Button, Card, Space, Tag, Typography } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import {
   calculateDiscountedPrice,
@@ -8,6 +9,7 @@ import {
   getEffectiveDiscountPercent,
 } from "@/lib/utils";
 import type { Product } from "@/types/database";
+import { getOptimizedImageUrl } from "@/lib/imageUtils";
 
 interface ProductCardProps {
   product: Product;
@@ -29,7 +31,13 @@ export function ProductCard({
   const hasDiscount = discountPercent > 0;
   const finalPrice = calculateDiscountedPrice(product.price, discountPercent);
   const savingAmount = product.price - finalPrice;
-  const imageUrl = product.image_url || undefined;
+  const imageUrl = product.image_url
+    ? getOptimizedImageUrl(product.image_url, {
+        width: 640,
+        quality: 72,
+        format: "webp",
+      })
+    : undefined;
 
   return (
     <Card
@@ -69,12 +77,11 @@ export function ProductCard({
         }}
       >
         {imageUrl ? (
-          <Image
+          <NextImage
             src={imageUrl}
             alt={product.name}
-            preview={false}
-            width="100%"
-            height="100%"
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             loading="lazy"
             style={{ objectFit: "cover" }}
           />

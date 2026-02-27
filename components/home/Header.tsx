@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Badge, Button, Drawer, Space, Typography } from "antd";
 import { MenuOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { APP_CONFIG } from "@/lib/appConfig";
+import { getOptimizedImageUrl } from "@/lib/imageUtils";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -30,7 +32,13 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
         const firstLogo = Array.isArray(result.media) ? result.media[0] : null;
 
         if (active && firstLogo?.image_url) {
-          setLogoSrc(firstLogo.image_url);
+          setLogoSrc(
+            getOptimizedImageUrl(firstLogo.image_url, {
+              width: 96,
+              quality: 80,
+              format: "webp",
+            }),
+          );
         }
       } catch {
         // Keep default logo fallback
@@ -84,10 +92,13 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 placeItems: "center",
               }}
             >
-              <img
+              <Image
                 src={logoSrc}
                 alt={`${APP_CONFIG.shopName} Logo`}
-                className="w-10 h-10"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain"
+                priority
               />
             </div>
             <div>

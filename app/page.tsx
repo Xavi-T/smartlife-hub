@@ -1,9 +1,10 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/home/Header";
 import { ProductGrid } from "@/components/home/ProductGrid";
-import { CartModal } from "@/components/home/CartModal";
 import { useCart } from "@/hooks/useCart";
 import type { Product } from "@/types/database";
 import {
@@ -20,6 +21,12 @@ import {
 } from "antd";
 import { useRouter } from "next/navigation";
 import { trackBeginCheckout, trackSelectItem } from "@/lib/analytics";
+import { getOptimizedImageUrl } from "@/lib/imageUtils";
+
+const CartModal = dynamic(
+  () => import("@/components/home/CartModal").then((module) => module.CartModal),
+  { ssr: false },
+);
 
 type HomeBanner = {
   image_url: string;
@@ -126,7 +133,11 @@ function HomeContent() {
           return orderA - orderB;
         })
         .map((item, index) => ({
-          image: item.image_url,
+          image: getOptimizedImageUrl(item.image_url, {
+            width: 1600,
+            quality: 72,
+            format: "webp",
+          }),
           alt: item.alt_text || `Banner trang chủ ${index + 1}`,
           type: item.mime_type?.startsWith("video/") ? "video" : "image",
         }));
@@ -229,6 +240,7 @@ function HomeContent() {
                     borderRadius: 8,
                     aspectRatio: "16 / 6.5", // Increased height for banner
                     background: "#f5f5f5",
+                    position: "relative",
                   }}
                 >
                   {item.type === "video" ? (
@@ -246,13 +258,13 @@ function HomeContent() {
                       }}
                     />
                   ) : (
-                    <img
+                    <Image
                       src={item.image}
                       alt={item.alt}
-                      loading="lazy"
+                      fill
+                      priority={item === carouselItems[0]}
+                      sizes="(max-width: 768px) 100vw, 1200px"
                       style={{
-                        width: "100%",
-                        height: "100%",
                         display: "block",
                         objectFit: "cover",
                       }}

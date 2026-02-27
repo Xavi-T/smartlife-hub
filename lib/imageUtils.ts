@@ -145,3 +145,43 @@ export function formatFileSize(bytes: number): string {
 
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
+
+/**
+ * Build a smaller delivery URL for image resources.
+ * Works well with Supabase Storage public URLs and other CDNs that support
+ * width/quality query params.
+ */
+export function getOptimizedImageUrl(
+  url: string | null | undefined,
+  options?: { width?: number; quality?: number; format?: "webp" | "origin" },
+): string {
+  if (!url) return "";
+
+  const rawUrl = String(url).trim();
+  if (!rawUrl) return "";
+  if (/^data:|^blob:/i.test(rawUrl)) return rawUrl;
+
+  // Skip obvious video URLs
+  if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(rawUrl)) return rawUrl;
+
+  try {
+    const parsed = new URL(rawUrl);
+    const width = options?.width ?? 1200;
+    const quality = options?.quality ?? 75;
+    const format = options?.format ?? "webp";
+
+    if (!parsed.searchParams.has("width")) {
+      parsed.searchParams.set("width", String(width));
+    }
+    if (!parsed.searchParams.has("quality")) {
+      parsed.searchParams.set("quality", String(quality));
+    }
+    if (format === "webp" && !parsed.searchParams.has("format")) {
+      parsed.searchParams.set("format", "origin");
+    }
+
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
