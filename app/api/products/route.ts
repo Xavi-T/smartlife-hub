@@ -30,6 +30,7 @@ interface ProductVariantRow {
   id: string;
   product_id: string;
   variant_name: string;
+  cost_price: number;
   price: number;
   image_url: string | null;
   sort_order: number;
@@ -258,6 +259,7 @@ async function syncProductCategoriesByName(
 
 function normalizeVariantItems(input: unknown): Array<{
   variant_name: string;
+  cost_price: number;
   price: number;
   image_url: string | null;
   sort_order: number;
@@ -269,16 +271,25 @@ function normalizeVariantItems(input: unknown): Array<{
     .map((item, index) => {
       const source = item as Record<string, unknown>;
       const variantName = String(source.variant_name || source.name || "").trim();
+      const normalizedCostPrice = toOptionalNumber(source.cost_price);
       const normalizedPrice = toOptionalNumber(source.price);
       const imageUrlRaw = String(source.image_url || source.imageUrl || "").trim();
       const sortOrderRaw = toOptionalNumber(source.sort_order);
 
-      if (!variantName || normalizedPrice === null || normalizedPrice < 0) {
+      if (
+        !variantName ||
+        normalizedCostPrice === null ||
+        normalizedCostPrice < 0 ||
+        normalizedPrice === null ||
+        normalizedPrice < 0 ||
+        normalizedPrice < normalizedCostPrice
+      ) {
         return null;
       }
 
       return {
         variant_name: variantName,
+        cost_price: normalizedCostPrice,
         price: normalizedPrice,
         image_url: imageUrlRaw || null,
         sort_order:
@@ -291,6 +302,7 @@ function normalizeVariantItems(input: unknown): Array<{
     .filter(
       (item): item is {
         variant_name: string;
+        cost_price: number;
         price: number;
         image_url: string | null;
         sort_order: number;
@@ -304,6 +316,7 @@ async function syncProductVariants(
   productId: string,
   variants: Array<{
     variant_name: string;
+    cost_price: number;
     price: number;
     image_url: string | null;
     sort_order: number;
@@ -321,6 +334,7 @@ async function syncProductVariants(
   const payload = variants.map((item) => ({
     product_id: productId,
     variant_name: item.variant_name,
+    cost_price: item.cost_price,
     price: item.price,
     image_url: item.image_url,
     sort_order: item.sort_order,
@@ -379,7 +393,7 @@ export async function GET(request: NextRequest) {
       const { data: variantsData } = await supabase
         .from("product_variants")
         .select(
-          "id, product_id, variant_name, price, image_url, sort_order, is_active, created_at, updated_at",
+          "id, product_id, variant_name, cost_price, price, image_url, sort_order, is_active, created_at, updated_at",
         )
         .in("product_id", productIds)
         .order("sort_order", { ascending: true })
@@ -471,11 +485,15 @@ export async function POST(request: NextRequest) {
     // Validation
     const effectiveCreatePrice =
       normalizedVariants.length > 0 ? normalizedVariants[0].price : normalizedPrice;
+    const effectiveCreateCost =
+      normalizedVariants.length > 0
+        ? normalizedVariants[0].cost_price
+        : normalizedCostPrice;
 
     if (
       !name ||
       effectiveCreatePrice === null ||
-      normalizedCostPrice === null ||
+      effectiveCreateCost === null ||
       normalizedCategoryNames.length === 0
     ) {
       return NextResponse.json(
@@ -484,7 +502,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (effectiveCreatePrice < 0 || normalizedCostPrice < 0) {
+    if (effectiveCreatePrice < 0 || effectiveCreateCost < 0) {
       return NextResponse.json({ error: "Giá không được âm" }, { status: 400 });
     }
 
@@ -530,7 +548,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (effectiveCreatePrice < normalizedCostPrice) {
+    if (effectiveCreatePrice < effectiveCreateCost) {
       return NextResponse.json(
         { error: "Giá bán phải lớn hơn hoặc bằng giá vốn" },
         { status: 400 },
@@ -556,6 +574,8 @@ export async function POST(request: NextRequest) {
 
     const basePriceFromVariant =
       normalizedVariants.length > 0 ? normalizedVariants[0].price : null;
+    const baseCostFromVariant =
+      normalizedVariants.length > 0 ? normalizedVariants[0].cost_price : null;
 
     const { data, error } = await supabase
       .from("products")
@@ -568,7 +588,7 @@ export async function POST(request: NextRequest) {
           finalDiscountPercent > 0 ? normalizedDiscountStartAt : null,
         discount_end_at:
           finalDiscountPercent > 0 ? normalizedDiscountEndAt : null,
-        cost_price: normalizedCostPrice,
+        cost_price: baseCostFromVariant ?? effectiveCreateCost,
         stock_quantity: 0,
         category: normalizedCategoryNames[0],
         image_url: null,
@@ -703,6 +723,7 @@ export async function PATCH(request: NextRequest) {
 
     if (variants !== undefined && normalizedVariants.length > 0) {
       updates.price = normalizedVariants[0].price;
+      updates.cost_price = normalizedVariants[0].cost_price;
     }
 
     if (discount_percent !== undefined) {
@@ -784,6 +805,9 @@ export async function PATCH(request: NextRequest) {
           ? normalizedPrice
           : currentPrice;
     const finalCost =
+      variants !== undefined && normalizedVariants.length > 0
+        ? normalizedVariants[0].cost_price
+        :
       cost_price !== undefined ? normalizedCostPrice : currentCostPrice;
 
     if (

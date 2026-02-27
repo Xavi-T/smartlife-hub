@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   variant_name TEXT NOT NULL,
+  cost_price DECIMAL(12, 2) NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
   price DECIMAL(12, 2) NOT NULL CHECK (price >= 0),
   image_url TEXT,
   sort_order INTEGER NOT NULL DEFAULT 1,
@@ -13,6 +14,9 @@ CREATE TABLE IF NOT EXISTS product_variants (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE product_variants
+  ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12, 2) NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_product_variants_product_id
   ON product_variants(product_id);

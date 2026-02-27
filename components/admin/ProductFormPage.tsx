@@ -30,13 +30,15 @@ const { RangePicker } = DatePicker;
 interface ProductFormValues {
   name: string;
   description?: string;
-  price: number;
+  price?: number;
   discount_percent?: number;
   discount_period?: [Dayjs, Dayjs];
-  cost_price: number;
+  cost_price?: number;
   categories: string[];
+  has_variants?: boolean;
   variants?: Array<{
     variant_name: string;
+    cost_price: number;
     price: number;
     image_url?: string;
     sort_order?: number;
@@ -81,6 +83,18 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
   const [variantImagePickerIndex, setVariantImagePickerIndex] = useState<
     number | null
   >(null);
+
+  const variantsValue = Form.useWatch("variants", form) || [];
+  const hasVariants = Boolean(Form.useWatch("has_variants", form));
+  const discountPercent = Number(Form.useWatch("discount_percent", form) || 0);
+  const hasDiscount = discountPercent > 0;
+  const isEditMode = mode === "edit";
+
+  const pageTitle = useMemo(
+    () => (isEditMode ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"),
+    [isEditMode],
+  );
+
   const mediaImageOptions = useMemo(
     () =>
       editorMediaImages.map((item, index) => ({
@@ -90,15 +104,6 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
         value: item.url,
       })),
     [editorMediaImages],
-  );
-  const discountPercent = Number(Form.useWatch("discount_percent", form) || 0);
-  const hasDiscount = discountPercent > 0;
-
-  const isEditMode = mode === "edit";
-
-  const pageTitle = useMemo(
-    () => (isEditMode ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"),
-    [isEditMode],
   );
 
   useEffect(() => {
@@ -115,7 +120,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
           })),
         );
       } catch {
-        // Ignore and keep manual tag mode
+        // keep manual tags
       }
     };
 
@@ -128,9 +133,13 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
       setEditorMediaImages([]);
       form.setFieldsValue({
         is_active: true,
+        has_variants: false,
         discount_percent: 0,
         discount_period: undefined,
+        price: 0,
+        cost_price: 0,
         categories: [],
+        variants: [],
       });
       setIsLoadingProduct(false);
       return;
@@ -168,8 +177,10 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
             product.categories && product.categories.length > 0
               ? product.categories.map((item) => item.name)
               : [product.category],
+          has_variants: (product.variants || []).length > 0,
           variants: (product.variants || []).map((variant, index) => ({
             variant_name: variant.variant_name,
+            cost_price: Number(variant.cost_price || 0),
             price: Number(variant.price || 0),
             image_url: variant.image_url || undefined,
             sort_order: variant.sort_order || index + 1,
@@ -215,16 +226,50 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     setIsSubmitting(true);
 
     try {
-      const url = "/api/products";
-      const method = isEditMode ? "PATCH" : "POST";
       const normalizedCategories = Array.from(
         new Set(
           (values.categories || []).map((item) => item.trim()).filter(Boolean),
         ),
       );
 
+      const normalizedVariants = (values.variants || [])
+        .map((item, index) => ({
+          variant_name: String(item.variant_name || "").trim(),
+          cost_price: Number(item.cost_price || 0),
+          price: Number(item.price || 0),
+          image_url: String(item.image_url || "").trim() || null,
+          sort_order: Number(item.sort_order || index + 1),
+          is_active: item.is_active !== false,
+        }))
+        .filter(
+          (item) =>
+            item.variant_name &&
+            Number.isFinite(item.cost_price) &&
+            Number.isFinite(item.price) &&
+            item.cost_price >= 0 &&
+            item.price >= item.cost_price,
+        );
+
+      const useVariants = values.has_variants === true;
+      if (useVariants && normalizedVariants.length === 0) {
+        throw new Error("Vui lòng thêm ít nhất 1 phân loại sản phẩm");
+      }
+
+      const baseCost = useVariants
+        ? normalizedVariants[0].cost_price
+        : Number(values.cost_price || 0);
+      const basePrice = useVariants
+        ? normalizedVariants[0].price
+        : Number(values.price || 0);
+
+      if (baseCost < 0 || basePrice < 0 || basePrice < baseCost) {
+        throw new Error("Giá bán phải lớn hơn hoặc bằng giá vốn");
+      }
+
       const payload = {
         ...values,
+        cost_price: baseCost,
+        price: basePrice,
         discount_percent:
           values.discount_percent === undefined ||
           values.discount_percent === null
@@ -242,25 +287,18 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
             : null,
         categories: normalizedCategories,
         category: normalizedCategories[0] || null,
-        variants: (values.variants || []).map((item, index) => ({
-          variant_name: item.variant_name?.trim(),
-          price: Number(item.price || 0),
-          image_url: item.image_url?.trim() || null,
-          sort_order: Number(item.sort_order || index + 1),
-          is_active: item.is_active !== false,
-        })),
+        variants: useVariants ? normalizedVariants : [],
       };
 
-      const body = isEditMode ? { ...payload, id: productId } : payload;
-
-      const response = await fetch(url, {
-        method,
+      const response = await fetch("/api/products", {
+        method: isEditMode ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(
+          isEditMode ? { ...payload, id: productId } : payload,
+        ),
       });
 
       const result = await response.json();
-
       if (!response.ok) {
         throw new Error(result.error || "Không thể lưu sản phẩm");
       }
@@ -275,9 +313,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
         router.push("/admin/products");
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Đã xảy ra lỗi";
-      messageApi.error(errorMessage);
+      messageApi.error(
+        error instanceof Error ? error.message : "Đã xảy ra lỗi",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -287,37 +325,47 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     <div style={{ background: "#f5f5f5", minHeight: "100vh", padding: 24 }}>
       {contextHolder}
 
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-          <Space style={{ justifyContent: "space-between", width: "100%" }}>
-            <Space orientation="vertical" size={0}>
-              <Typography.Title level={2} style={{ margin: 0 }}>
-                {pageTitle}
-              </Typography.Title>
-              <Typography.Text type="secondary">
-                {isEditMode
-                  ? "Cập nhật thông tin sản phẩm và trạng thái hiển thị"
-                  : "Tạo sản phẩm mới trước khi nhập kho"}
-              </Typography.Text>
-            </Space>
+          <Card size="small">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <Space orientation="vertical" size={2}>
+                <Typography.Title level={3} style={{ margin: 0 }}>
+                  {pageTitle}
+                </Typography.Title>
+                <Typography.Text type="secondary">
+                  {isEditMode
+                    ? "Cập nhật thông tin sản phẩm và phân loại"
+                    : "Tạo sản phẩm trước khi nhập kho"}
+                </Typography.Text>
+              </Space>
 
-            <Space>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => router.push("/admin/products")}
-              >
-                Quay lại
-              </Button>
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                onClick={() => form.submit()}
-                loading={isSubmitting}
-              >
-                {isEditMode ? "Lưu thay đổi" : "Tạo sản phẩm"}
-              </Button>
-            </Space>
-          </Space>
+              <Space>
+                <Button
+                  icon={<ArrowLeftOutlined />}
+                  onClick={() => router.push("/admin/products")}
+                >
+                  Quay lại
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={() => form.submit()}
+                  loading={isSubmitting}
+                >
+                  {isEditMode ? "Lưu thay đổi" : "Tạo sản phẩm"}
+                </Button>
+              </Space>
+            </div>
+          </Card>
 
           {isLoadingProduct ? (
             <Card>
@@ -333,6 +381,8 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                 onFinish={handleSubmit}
                 disabled={isSubmitting}
               >
+                <Typography.Title level={5}>Thông tin cơ bản</Typography.Title>
+
                 <Form.Item
                   label="Tên sản phẩm"
                   name="name"
@@ -351,7 +401,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                 <Form.Item
                   label="Nội dung chi tiết sản phẩm"
                   name="description"
-                  tooltip="Dùng như editor để viết thông tin nổi bật, thông số, hướng dẫn sử dụng..."
+                  tooltip="Dùng editor để viết thông tin nổi bật, thông số, hướng dẫn sử dụng..."
                 >
                   <RichTextEditor
                     placeholder="Ví dụ: tiêu đề, thông số, hướng dẫn sử dụng, hình ảnh minh họa..."
@@ -362,69 +412,80 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                     gap: 16,
                   }}
                 >
-                  <Form.Item
-                    label="Giá vốn (VNĐ)"
-                    name="cost_price"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập giá vốn" },
-                      {
-                        type: "number",
-                        min: 0,
-                        message: "Giá vốn phải lớn hơn hoặc bằng 0",
-                      },
-                    ]}
-                  >
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      placeholder="0"
-                      formatter={(value) =>
-                        `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                      }
-                      parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label="Giá bán (VNĐ)"
-                    name="price"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập giá bán" },
-                      {
-                        type: "number",
-                        min: 0,
-                        message: "Giá bán phải lớn hơn hoặc bằng 0",
-                      },
-                      ({ getFieldValue }) => ({
-                        validator(_, value) {
-                          const costPrice = getFieldValue("cost_price");
-                          if (!value || !costPrice || value >= costPrice) {
-                            return Promise.resolve();
+                  {!hasVariants && (
+                    <>
+                      <Form.Item
+                        label="Giá vốn (VNĐ)"
+                        name="cost_price"
+                        rules={[
+                          { required: true, message: "Vui lòng nhập giá vốn" },
+                          {
+                            type: "number",
+                            min: 0,
+                            message: "Giá vốn phải >= 0",
+                          },
+                        ]}
+                      >
+                        <InputNumber
+                          style={{ width: "100%" }}
+                          placeholder="0"
+                          formatter={(value) =>
+                            `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                           }
-                          return Promise.reject(
-                            new Error("Giá bán phải lớn hơn hoặc bằng giá vốn"),
-                          );
-                        },
-                      }),
-                    ]}
-                  >
-                    <InputNumber
-                      style={{ width: "100%" }}
-                      placeholder="0"
-                      formatter={(value) =>
-                        `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                      }
-                      parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
-                    />
-                  </Form.Item>
+                          parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        label="Giá bán (VNĐ)"
+                        name="price"
+                        rules={[
+                          { required: true, message: "Vui lòng nhập giá bán" },
+                          {
+                            type: "number",
+                            min: 0,
+                            message: "Giá bán phải >= 0",
+                          },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              const costPrice = getFieldValue("cost_price");
+                              if (
+                                value === undefined ||
+                                value === null ||
+                                costPrice === undefined ||
+                                costPrice === null ||
+                                value >= costPrice
+                              ) {
+                                return Promise.resolve();
+                              }
+                              return Promise.reject(
+                                new Error(
+                                  "Giá bán phải lớn hơn hoặc bằng giá vốn",
+                                ),
+                              );
+                            },
+                          }),
+                        ]}
+                      >
+                        <InputNumber
+                          style={{ width: "100%" }}
+                          placeholder="0"
+                          formatter={(value) =>
+                            `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                          }
+                          parser={(value) => value!.replace(/\$\s?|(,*)/g, "")}
+                        />
+                      </Form.Item>
+                    </>
+                  )}
 
                   <Form.Item
                     label="Giảm giá (%)"
                     name="discount_percent"
-                    tooltip="Nhập từ 0 đến 100. Giá hiển thị cho khách sẽ tự tính sau giảm giá."
                     rules={[
                       {
                         transform: (value) =>
@@ -438,7 +499,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                         type: "number",
                         min: 0,
                         max: 100,
-                        message: "Giảm giá phải trong khoảng 0-100%",
+                        message: "Trong khoảng 0-100%",
                       },
                     ]}
                   >
@@ -456,7 +517,6 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                     label="Thời gian hiệu lực giảm giá"
                     name="discount_period"
                     dependencies={["discount_percent"]}
-                    tooltip="Áp dụng khi giảm giá > 0%. Hệ thống sẽ tự tắt giảm giá khi hết thời gian."
                     rules={[
                       ({ getFieldValue }) => ({
                         validator(_, value) {
@@ -519,135 +579,257 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   />
                 </Form.Item>
 
+                <Card
+                  size="small"
+                  style={{ marginBottom: 16, background: "#fafafa" }}
+                >
+                  <Space
+                    style={{
+                      width: "100%",
+                      justifyContent: "space-between",
+                    }}
+                    align="center"
+                  >
+                    <Space orientation="vertical" size={2}>
+                      <Typography.Text strong>
+                        Sản phẩm có nhiều phân loại
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        Mặc định dùng 1 loại sản phẩm. Bật công tắc để thêm
+                        nhiều phân loại, mỗi loại có giá vốn và giá bán riêng.
+                      </Typography.Text>
+                    </Space>
+                    <Form.Item name="has_variants" valuePropName="checked" noStyle>
+                      <Switch
+                        checkedChildren="Bật"
+                        unCheckedChildren="Tắt"
+                        onChange={(checked) => {
+                          if (checked) {
+                            const currentVariants = form.getFieldValue("variants") || [];
+                            if (currentVariants.length === 0) {
+                              form.setFieldValue("variants", [
+                                {
+                                  variant_name: "Loại mặc định",
+                                  cost_price: Number(form.getFieldValue("cost_price") || 0),
+                                  price: Number(form.getFieldValue("price") || 0),
+                                  image_url: "",
+                                  sort_order: 1,
+                                  is_active: true,
+                                },
+                              ]);
+                            }
+                            return;
+                          }
+                          form.setFieldValue("variants", []);
+                        }}
+                      />
+                    </Form.Item>
+                  </Space>
+                </Card>
+
                 <Divider style={{ marginTop: 8, marginBottom: 16 }}>
-                  Phân loại sản phẩm (tuỳ chọn)
+                  Phân loại sản phẩm
                 </Divider>
 
-                <Typography.Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
-                  Mỗi loại có thể có giá bán và ảnh khác nhau. Ảnh loại được chọn từ media đã upload của sản phẩm.
-                  Nếu có loại, giá của loại đầu tiên sẽ là giá mặc định hiển thị.
+                <Typography.Text
+                  type="secondary"
+                  style={{ display: "block", marginBottom: 12 }}
+                >
+                  Giá vốn/giá bán theo loại chỉ áp dụng khi bật phân loại. Giảm
+                  giá và thời gian hiệu lực dùng chung cho toàn bộ sản phẩm.
                 </Typography.Text>
 
-                <Form.List name="variants">
+                {hasVariants && <Form.List name="variants">
                   {(fields, { add, remove }) => (
                     <Space
                       orientation="vertical"
                       size={12}
                       style={{ width: "100%", marginBottom: 16 }}
                     >
-                      {fields.map(({ key, name, ...restField }, index) => (
-                        <Card
-                          key={key}
-                          size="small"
-                          title={`Loại #${index + 1}`}
-                          extra={
-                            <Button danger type="link" onClick={() => remove(name)}>
-                              Xóa
-                            </Button>
-                          }
-                        >
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "1.5fr 1fr 1fr",
-                              gap: 12,
-                            }}
+                      {fields.map(({ key, name, ...restField }, index) => {
+                        const currentImage = variantsValue?.[name]?.image_url;
+                        return (
+                          <Card
+                            key={key}
+                            size="small"
+                            title={`Loại #${index + 1}`}
+                            extra={
+                              <Button
+                                danger
+                                type="link"
+                                onClick={() => remove(name)}
+                              >
+                                Xóa
+                              </Button>
+                            }
                           >
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "repeat(auto-fit, minmax(160px, 1fr))",
+                                gap: 12,
+                              }}
+                            >
+                              <Form.Item
+                                {...restField}
+                                name={[name, "variant_name"]}
+                                label="Tên loại"
+                                rules={[
+                                  { required: true, message: "Nhập tên loại" },
+                                ]}
+                              >
+                                <Input placeholder="Ví dụ: Màu trắng / 1.8L" />
+                              </Form.Item>
+
+                              <Form.Item
+                                {...restField}
+                                name={[name, "cost_price"]}
+                                label="Giá vốn"
+                                rules={[
+                                  { required: true, message: "Nhập giá vốn" },
+                                  {
+                                    type: "number",
+                                    min: 0,
+                                    message: "Giá vốn không được âm",
+                                  },
+                                ]}
+                              >
+                                <InputNumber
+                                  style={{ width: "100%" }}
+                                  placeholder="0"
+                                  formatter={(value) =>
+                                    `${value}`.replace(
+                                      /\B(?=(\d{3})+(?!\d))/g,
+                                      ",",
+                                    )
+                                  }
+                                  parser={(value) =>
+                                    value!.replace(/\$\s?|(,*)/g, "")
+                                  }
+                                />
+                              </Form.Item>
+
+                              <Form.Item
+                                {...restField}
+                                name={[name, "price"]}
+                                label="Giá bán"
+                                rules={[
+                                  { required: true, message: "Nhập giá bán" },
+                                  {
+                                    type: "number",
+                                    min: 0,
+                                    message: "Giá không được âm",
+                                  },
+                                  {
+                                    validator(_, value) {
+                                      const variantCostPrice = Number(
+                                        form.getFieldValue([
+                                          "variants",
+                                          name,
+                                          "cost_price",
+                                        ]) || 0,
+                                      );
+                                      if (
+                                        value === undefined ||
+                                        value === null ||
+                                        value >= variantCostPrice
+                                      ) {
+                                        return Promise.resolve();
+                                      }
+                                      return Promise.reject(
+                                        new Error(
+                                          "Giá bán phải lớn hơn hoặc bằng giá vốn",
+                                        ),
+                                      );
+                                    },
+                                  },
+                                ]}
+                              >
+                                <InputNumber
+                                  style={{ width: "100%" }}
+                                  placeholder="0"
+                                  formatter={(value) =>
+                                    `${value}`.replace(
+                                      /\B(?=(\d{3})+(?!\d))/g,
+                                      ",",
+                                    )
+                                  }
+                                  parser={(value) =>
+                                    value!.replace(/\$\s?|(,*)/g, "")
+                                  }
+                                />
+                              </Form.Item>
+
+                              <Form.Item
+                                {...restField}
+                                name={[name, "sort_order"]}
+                                label="Thứ tự"
+                              >
+                                <InputNumber
+                                  style={{ width: "100%" }}
+                                  min={1}
+                                  placeholder={`${index + 1}`}
+                                />
+                              </Form.Item>
+                            </div>
+
                             <Form.Item
                               {...restField}
-                              name={[name, "variant_name"]}
-                              label="Tên loại"
-                              rules={[
-                                { required: true, message: "Nhập tên loại" },
-                              ]}
+                              name={[name, "image_url"]}
+                              hidden
                             >
-                              <Input placeholder="Ví dụ: Màu trắng / 1.8L" />
+                              <Input />
                             </Form.Item>
-                            <Form.Item
-                              {...restField}
-                              name={[name, "price"]}
-                              label="Giá bán"
-                              rules={[
-                                { required: true, message: "Nhập giá bán" },
-                                { type: "number", min: 0, message: "Giá không được âm" },
-                              ]}
+
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                flexWrap: "wrap",
+                              }}
                             >
-                              <InputNumber
-                                style={{ width: "100%" }}
-                                placeholder="0"
-                                formatter={(value) =>
-                                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                              <Button
+                                onClick={() => setVariantImagePickerIndex(name)}
+                                disabled={mediaImageOptions.length === 0}
+                              >
+                                Chọn ảnh từ media
+                              </Button>
+
+                              <Button
+                                type="link"
+                                danger
+                                onClick={() =>
+                                  form.setFieldValue(
+                                    ["variants", name, "image_url"],
+                                    null,
+                                  )
                                 }
-                                parser={(value) =>
-                                  value!.replace(/\$\s?|(,*)/g, "")
-                                }
-                              />
-                            </Form.Item>
-                            <Form.Item
-                              {...restField}
-                              name={[name, "sort_order"]}
-                              label="Thứ tự"
-                            >
-                              <InputNumber
-                                style={{ width: "100%" }}
-                                min={1}
-                                placeholder={String(index + 1)}
-                              />
-                            </Form.Item>
-                          </div>
-                          <Form.Item
-                            {...restField}
-                            name={[name, "image_url"]}
-                            label="Ảnh loại"
-                          >
-                            <Input type="hidden" />
-                          </Form.Item>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              marginTop: -6,
-                            }}
-                          >
-                            <Button
-                              onClick={() => setVariantImagePickerIndex(name)}
-                              disabled={mediaImageOptions.length === 0}
-                            >
-                              Chọn ảnh từ media
-                            </Button>
-                            <Button
-                              type="link"
-                              danger
-                              onClick={() =>
-                                form.setFieldValue(
-                                  ["variants", name, "image_url"],
-                                  null,
-                                )
-                              }
-                            >
-                              Xóa ảnh
-                            </Button>
-                            {form.getFieldValue(["variants", name, "image_url"]) ? (
-                              <Image
-                                src={form.getFieldValue([
-                                  "variants",
-                                  name,
-                                  "image_url",
-                                ])}
-                                alt="variant"
-                                width={44}
-                                height={44}
-                                style={{ objectFit: "cover", borderRadius: 8 }}
-                              />
-                            ) : (
-                              <Typography.Text type="secondary">
-                                Chưa chọn ảnh
-                              </Typography.Text>
-                            )}
-                          </div>
-                        </Card>
-                      ))}
+                              >
+                                Xóa ảnh
+                              </Button>
+
+                              {currentImage ? (
+                                <Image
+                                  src={currentImage}
+                                  alt="variant"
+                                  width={44}
+                                  height={44}
+                                  style={{
+                                    objectFit: "cover",
+                                    borderRadius: 8,
+                                  }}
+                                />
+                              ) : (
+                                <Typography.Text type="secondary">
+                                  Chưa chọn ảnh
+                                </Typography.Text>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      })}
 
                       <Button
                         type="dashed"
@@ -655,6 +837,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                         onClick={() =>
                           add({
                             variant_name: "",
+                            cost_price: 0,
                             price: 0,
                             image_url: "",
                             sort_order: fields.length + 1,
@@ -666,7 +849,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                       </Button>
                     </Space>
                   )}
-                </Form.List>
+                </Form.List>}
 
                 {!isEditMode && (
                   <Alert
@@ -674,7 +857,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                     showIcon
                     style={{ marginBottom: 16 }}
                     title="Tồn kho ban đầu"
-                    description="Tồn kho ban đầu mặc định bằng 0. Sau khi tạo sản phẩm, dùng chức năng Nhập kho để thêm hàng vào kho."
+                    description="Sản phẩm mới mặc định tồn kho = 0. Sau khi tạo sản phẩm, dùng chức năng Nhập kho để thêm hàng."
                   />
                 )}
 
@@ -683,7 +866,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   showIcon
                   style={{ marginBottom: 16 }}
                   title="Ảnh sản phẩm"
-                  description="Sản phẩm mới mặc định chưa có ảnh đại diện. Sau khi tạo, vào phần media của sản phẩm để upload và đặt ảnh cover."
+                  description="Sản phẩm mới chưa có ảnh đại diện. Hãy vào trang media của sản phẩm để upload ảnh và đặt cover."
                 />
 
                 <Form.Item

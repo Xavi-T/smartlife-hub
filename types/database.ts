@@ -26,6 +26,7 @@ export interface ProductVariant {
   id: string;
   product_id: string;
   variant_name: string;
+  cost_price: number;
   price: number;
   image_url: string | null;
   sort_order: number;
