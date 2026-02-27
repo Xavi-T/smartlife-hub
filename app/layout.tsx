@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = "https://smartlifehub.vn";
+const siteUrl = APP_CONFIG.shopWebsite;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -37,10 +37,10 @@ export const metadata: Metadata = {
     description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
     images: [
       {
-        url: "/banners/banner-1.svg",
-        width: 1600,
-        height: 520,
-        alt: "SmartLife Hub - Ưu đãi gia dụng thông minh",
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: `${APP_CONFIG.shopName} - ${APP_CONFIG.shopTagline}`,
       },
     ],
   },
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
     description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
-    images: ["/banners/banner-1.svg"],
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,
