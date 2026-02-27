@@ -55,6 +55,14 @@ export default function CheckoutPage() {
 
   const checkoutMethod = Form.useWatch("checkoutMethod", form) || "cod";
 
+  const splitProductAndVariant = (cartProductId: string) => {
+    const [productId, variantId] = String(cartProductId || "").split("::");
+    return {
+      productId,
+      variantId: variantId || undefined,
+    };
+  };
+
   useEffect(() => {
     if (!isLoaded || cart.length === 0 || hasTrackedBeginCheckout.current) {
       return;
@@ -126,7 +134,8 @@ export default function CheckoutPage() {
     try {
       const stockCheck = await checkStockAvailability(
         cart.map((item) => ({
-          product_id: item.product.id,
+          product_id: splitProductAndVariant(item.product.id).productId,
+          variant_id: splitProductAndVariant(item.product.id).variantId,
           quantity: item.quantity,
         })),
       );
@@ -147,7 +156,8 @@ export default function CheckoutPage() {
         paymentMethod:
           values.checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod",
         items: cart.map((item) => ({
-          product_id: item.product.id,
+          product_id: splitProductAndVariant(item.product.id).productId,
+          variant_id: splitProductAndVariant(item.product.id).variantId,
           quantity: item.quantity,
         })),
       });

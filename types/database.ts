@@ -19,6 +19,19 @@ export interface ProductRow {
 
 export interface Product extends ProductRow {
   categories?: Category[];
+  variants?: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  variant_name: string;
+  price: number;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Category {
@@ -141,6 +154,11 @@ export interface Database {
         Row: ProductCategory;
         Insert: Omit<ProductCategory, "id" | "created_at">;
         Update: Partial<Omit<ProductCategory, "id" | "created_at">>;
+      };
+      product_variants: {
+        Row: ProductVariant;
+        Insert: Omit<ProductVariant, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<ProductVariant, "id" | "created_at" | "updated_at">>;
       };
       customer_segment_settings: {
         Row: CustomerSegmentSetting;

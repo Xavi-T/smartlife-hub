@@ -7,9 +7,12 @@ import {
   Button,
   Card,
   DatePicker,
+  Divider,
   Form,
+  Image,
   Input,
   InputNumber,
+  Modal,
   Select,
   Space,
   Spin,
@@ -32,6 +35,13 @@ interface ProductFormValues {
   discount_period?: [Dayjs, Dayjs];
   cost_price: number;
   categories: string[];
+  variants?: Array<{
+    variant_name: string;
+    price: number;
+    image_url?: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }>;
   is_active?: boolean;
 }
 
@@ -68,6 +78,19 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
   const [editorMediaImages, setEditorMediaImages] = useState<
     EditorMediaImage[]
   >([]);
+  const [variantImagePickerIndex, setVariantImagePickerIndex] = useState<
+    number | null
+  >(null);
+  const mediaImageOptions = useMemo(
+    () =>
+      editorMediaImages.map((item, index) => ({
+        label: item.isCover
+          ? `Ảnh cover #${index + 1}`
+          : `Ảnh media #${index + 1}`,
+        value: item.url,
+      })),
+    [editorMediaImages],
+  );
   const discountPercent = Number(Form.useWatch("discount_percent", form) || 0);
   const hasDiscount = discountPercent > 0;
 
@@ -145,6 +168,13 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
             product.categories && product.categories.length > 0
               ? product.categories.map((item) => item.name)
               : [product.category],
+          variants: (product.variants || []).map((variant, index) => ({
+            variant_name: variant.variant_name,
+            price: Number(variant.price || 0),
+            image_url: variant.image_url || undefined,
+            sort_order: variant.sort_order || index + 1,
+            is_active: variant.is_active !== false,
+          })),
           is_active: product.is_active,
         });
 
@@ -212,6 +242,13 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
             : null,
         categories: normalizedCategories,
         category: normalizedCategories[0] || null,
+        variants: (values.variants || []).map((item, index) => ({
+          variant_name: item.variant_name?.trim(),
+          price: Number(item.price || 0),
+          image_url: item.image_url?.trim() || null,
+          sort_order: Number(item.sort_order || index + 1),
+          is_active: item.is_active !== false,
+        })),
       };
 
       const body = isEditMode ? { ...payload, id: productId } : payload;
@@ -234,7 +271,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
           : "Tạo sản phẩm mới thành công",
       );
 
-      router.push("/admin/products");
+      if (!isEditMode) {
+        router.push("/admin/products");
+      }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Đã xảy ra lỗi";
@@ -455,6 +494,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                       showTime
                       format="DD/MM/YYYY HH:mm"
                       disabled={!hasDiscount}
+                      allowEmpty={[true, true]}
                       placeholder={["Bắt đầu", "Kết thúc"]}
                     />
                   </Form.Item>
@@ -478,6 +518,155 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                     options={categoryOptions}
                   />
                 </Form.Item>
+
+                <Divider style={{ marginTop: 8, marginBottom: 16 }}>
+                  Phân loại sản phẩm (tuỳ chọn)
+                </Divider>
+
+                <Typography.Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+                  Mỗi loại có thể có giá bán và ảnh khác nhau. Ảnh loại được chọn từ media đã upload của sản phẩm.
+                  Nếu có loại, giá của loại đầu tiên sẽ là giá mặc định hiển thị.
+                </Typography.Text>
+
+                <Form.List name="variants">
+                  {(fields, { add, remove }) => (
+                    <Space
+                      orientation="vertical"
+                      size={12}
+                      style={{ width: "100%", marginBottom: 16 }}
+                    >
+                      {fields.map(({ key, name, ...restField }, index) => (
+                        <Card
+                          key={key}
+                          size="small"
+                          title={`Loại #${index + 1}`}
+                          extra={
+                            <Button danger type="link" onClick={() => remove(name)}>
+                              Xóa
+                            </Button>
+                          }
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1.5fr 1fr 1fr",
+                              gap: 12,
+                            }}
+                          >
+                            <Form.Item
+                              {...restField}
+                              name={[name, "variant_name"]}
+                              label="Tên loại"
+                              rules={[
+                                { required: true, message: "Nhập tên loại" },
+                              ]}
+                            >
+                              <Input placeholder="Ví dụ: Màu trắng / 1.8L" />
+                            </Form.Item>
+                            <Form.Item
+                              {...restField}
+                              name={[name, "price"]}
+                              label="Giá bán"
+                              rules={[
+                                { required: true, message: "Nhập giá bán" },
+                                { type: "number", min: 0, message: "Giá không được âm" },
+                              ]}
+                            >
+                              <InputNumber
+                                style={{ width: "100%" }}
+                                placeholder="0"
+                                formatter={(value) =>
+                                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                                }
+                                parser={(value) =>
+                                  value!.replace(/\$\s?|(,*)/g, "")
+                                }
+                              />
+                            </Form.Item>
+                            <Form.Item
+                              {...restField}
+                              name={[name, "sort_order"]}
+                              label="Thứ tự"
+                            >
+                              <InputNumber
+                                style={{ width: "100%" }}
+                                min={1}
+                                placeholder={String(index + 1)}
+                              />
+                            </Form.Item>
+                          </div>
+                          <Form.Item
+                            {...restField}
+                            name={[name, "image_url"]}
+                            label="Ảnh loại"
+                          >
+                            <Input type="hidden" />
+                          </Form.Item>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              marginTop: -6,
+                            }}
+                          >
+                            <Button
+                              onClick={() => setVariantImagePickerIndex(name)}
+                              disabled={mediaImageOptions.length === 0}
+                            >
+                              Chọn ảnh từ media
+                            </Button>
+                            <Button
+                              type="link"
+                              danger
+                              onClick={() =>
+                                form.setFieldValue(
+                                  ["variants", name, "image_url"],
+                                  null,
+                                )
+                              }
+                            >
+                              Xóa ảnh
+                            </Button>
+                            {form.getFieldValue(["variants", name, "image_url"]) ? (
+                              <Image
+                                src={form.getFieldValue([
+                                  "variants",
+                                  name,
+                                  "image_url",
+                                ])}
+                                alt="variant"
+                                width={44}
+                                height={44}
+                                style={{ objectFit: "cover", borderRadius: 8 }}
+                              />
+                            ) : (
+                              <Typography.Text type="secondary">
+                                Chưa chọn ảnh
+                              </Typography.Text>
+                            )}
+                          </div>
+                        </Card>
+                      ))}
+
+                      <Button
+                        type="dashed"
+                        block
+                        onClick={() =>
+                          add({
+                            variant_name: "",
+                            price: 0,
+                            image_url: "",
+                            sort_order: fields.length + 1,
+                            is_active: true,
+                          })
+                        }
+                      >
+                        Thêm loại sản phẩm
+                      </Button>
+                    </Space>
+                  )}
+                </Form.List>
 
                 {!isEditMode && (
                   <Alert
@@ -509,6 +698,77 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
           )}
         </Space>
       </div>
+
+      <Modal
+        open={variantImagePickerIndex !== null}
+        title="Chọn ảnh loại sản phẩm"
+        onCancel={() => setVariantImagePickerIndex(null)}
+        footer={null}
+        width={760}
+        destroyOnHidden
+      >
+        {mediaImageOptions.length === 0 ? (
+          <Alert
+            type="info"
+            showIcon
+            message="Chưa có ảnh media cho sản phẩm này"
+            description="Vui lòng upload ảnh ở trang media sản phẩm trước, sau đó quay lại chọn ảnh cho loại."
+          />
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {mediaImageOptions.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => {
+                  if (variantImagePickerIndex === null) return;
+                  form.setFieldValue(
+                    ["variants", variantImagePickerIndex, "image_url"],
+                    item.value,
+                  );
+                  setVariantImagePickerIndex(null);
+                }}
+                style={{
+                  border: "1px solid #d9d9d9",
+                  borderRadius: 10,
+                  padding: 6,
+                  textAlign: "left",
+                  background: "#fff",
+                }}
+              >
+                <img
+                  src={item.value}
+                  alt={item.label}
+                  width={96}
+                  height={96}
+                  style={{
+                    width: "100%",
+                    height: 96,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
+                />
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 12,
+                    color: "#595959",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {item.label}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

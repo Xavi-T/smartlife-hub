@@ -26,6 +26,18 @@ interface ProductImageRelation {
   created_at: string;
 }
 
+interface ProductVariantRow {
+  id: string;
+  product_id: string;
+  variant_name: string;
+  price: number;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 type ProductWithRelations = Database["public"]["Tables"]["products"]["Row"] & {
   product_categories?: ProductCategoryRelation[];
   product_images?: ProductImageRelation[];
@@ -135,11 +147,10 @@ function createServiceRoleSupabaseClient() {
 async function clearExpiredProductDiscounts() {
   const serviceRoleClient = createServiceRoleSupabaseClient();
   if (!serviceRoleClient) return;
-  const sb = serviceRoleClient as any;
 
   const nowIso = new Date().toISOString();
 
-  const { error } = await sb
+  const { error } = await serviceRoleClient
     .from("products")
     .update({
       discount_percent: 0,
@@ -245,6 +256,83 @@ async function syncProductCategoriesByName(
   if (insertError) throw insertError;
 }
 
+function normalizeVariantItems(input: unknown): Array<{
+  variant_name: string;
+  price: number;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+}> {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((item, index) => {
+      const source = item as Record<string, unknown>;
+      const variantName = String(source.variant_name || source.name || "").trim();
+      const normalizedPrice = toOptionalNumber(source.price);
+      const imageUrlRaw = String(source.image_url || source.imageUrl || "").trim();
+      const sortOrderRaw = toOptionalNumber(source.sort_order);
+
+      if (!variantName || normalizedPrice === null || normalizedPrice < 0) {
+        return null;
+      }
+
+      return {
+        variant_name: variantName,
+        price: normalizedPrice,
+        image_url: imageUrlRaw || null,
+        sort_order:
+          sortOrderRaw !== null && sortOrderRaw > 0
+            ? Math.trunc(sortOrderRaw)
+            : index + 1,
+        is_active: source.is_active !== false,
+      };
+    })
+    .filter(
+      (item): item is {
+        variant_name: string;
+        price: number;
+        image_url: string | null;
+        sort_order: number;
+        is_active: boolean;
+      } => Boolean(item),
+    );
+}
+
+async function syncProductVariants(
+  supabase: SupabaseClient,
+  productId: string,
+  variants: Array<{
+    variant_name: string;
+    price: number;
+    image_url: string | null;
+    sort_order: number;
+    is_active: boolean;
+  }>,
+): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from("product_variants")
+    .delete()
+    .eq("product_id", productId);
+  if (deleteError) throw deleteError;
+
+  if (variants.length === 0) return;
+
+  const payload = variants.map((item) => ({
+    product_id: productId,
+    variant_name: item.variant_name,
+    price: item.price,
+    image_url: item.image_url,
+    sort_order: item.sort_order,
+    is_active: item.is_active,
+  }));
+
+  const { error: insertError } = await supabase
+    .from("product_variants")
+    .insert(payload);
+  if (insertError) throw insertError;
+}
+
 // GET: Lấy danh sách sản phẩm
 export async function GET(request: NextRequest) {
   try {
@@ -283,7 +371,30 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const mappedProducts = ((products || []) as ProductWithRelations[]).map(
+    const productList = (products || []) as ProductWithRelations[];
+    const productIds = productList.map((item) => item.id);
+    let variantRows: ProductVariantRow[] = [];
+
+    if (productIds.length > 0) {
+      const { data: variantsData } = await supabase
+        .from("product_variants")
+        .select(
+          "id, product_id, variant_name, price, image_url, sort_order, is_active, created_at, updated_at",
+        )
+        .in("product_id", productIds)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      variantRows = (variantsData || []) as ProductVariantRow[];
+    }
+
+    const variantMap = new Map<string, ProductVariantRow[]>();
+    variantRows.forEach((item) => {
+      const current = variantMap.get(item.product_id) || [];
+      current.push(item);
+      variantMap.set(item.product_id, current);
+    });
+
+    const mappedProducts = productList.map(
       (product) => {
         const categories = (product.product_categories || [])
           .map((relation) => relation.categories)
@@ -293,6 +404,9 @@ export async function GET(request: NextRequest) {
           ...product,
           image_url: resolveProductImageUrl(product),
           categories,
+          variants: (variantMap.get(product.id) || []).filter(
+            (variant) => variant.is_active,
+          ),
         };
       },
     );
@@ -334,6 +448,7 @@ export async function POST(request: NextRequest) {
       stock_quantity,
       category,
       categories,
+      variants,
       is_active,
     } = body;
 
@@ -341,6 +456,7 @@ export async function POST(request: NextRequest) {
       categories,
       category,
     );
+    const normalizedVariants = normalizeVariantItems(variants);
     const normalizedPrice = toOptionalNumber(price);
     const normalizedCostPrice = toOptionalNumber(cost_price);
     const normalizedStockQuantity = toOptionalNumber(stock_quantity);
@@ -353,9 +469,12 @@ export async function POST(request: NextRequest) {
       parseOptionalTimestamp(discount_end_at);
 
     // Validation
+    const effectiveCreatePrice =
+      normalizedVariants.length > 0 ? normalizedVariants[0].price : normalizedPrice;
+
     if (
       !name ||
-      normalizedPrice === null ||
+      effectiveCreatePrice === null ||
       normalizedCostPrice === null ||
       normalizedCategoryNames.length === 0
     ) {
@@ -365,7 +484,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (normalizedPrice < 0 || normalizedCostPrice < 0) {
+    if (effectiveCreatePrice < 0 || normalizedCostPrice < 0) {
       return NextResponse.json({ error: "Giá không được âm" }, { status: 400 });
     }
 
@@ -411,7 +530,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (normalizedPrice < normalizedCostPrice) {
+    if (effectiveCreatePrice < normalizedCostPrice) {
       return NextResponse.json(
         { error: "Giá bán phải lớn hơn hoặc bằng giá vốn" },
         { status: 400 },
@@ -435,12 +554,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const basePriceFromVariant =
+      normalizedVariants.length > 0 ? normalizedVariants[0].price : null;
+
     const { data, error } = await supabase
       .from("products")
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
-        price: normalizedPrice,
+        price: basePriceFromVariant ?? effectiveCreatePrice,
         discount_percent: finalDiscountPercent,
         discount_start_at:
           finalDiscountPercent > 0 ? normalizedDiscountStartAt : null,
@@ -470,6 +592,7 @@ export async function POST(request: NextRequest) {
       data.id,
       normalizedCategoryNames,
     );
+    await syncProductVariants(supabase, data.id, normalizedVariants);
 
     // Log audit
     await AuditLogger.createProduct(data.id, data.name);
@@ -516,6 +639,7 @@ export async function PATCH(request: NextRequest) {
       stock_quantity,
       category,
       categories,
+      variants,
       is_active,
     } = body;
 
@@ -523,6 +647,7 @@ export async function PATCH(request: NextRequest) {
       categories,
       category,
     );
+    const normalizedVariants = normalizeVariantItems(variants);
     const normalizedPrice = toOptionalNumber(price);
     const normalizedCostPrice = toOptionalNumber(cost_price);
     const normalizedStockQuantity = toOptionalNumber(stock_quantity);
@@ -574,6 +699,10 @@ export async function PATCH(request: NextRequest) {
         );
       }
       updates.price = normalizedPrice;
+    }
+
+    if (variants !== undefined && normalizedVariants.length > 0) {
+      updates.price = normalizedVariants[0].price;
     }
 
     if (discount_percent !== undefined) {
@@ -648,7 +777,12 @@ export async function PATCH(request: NextRequest) {
       currentDiscountEndAt = currentProduct.discount_end_at || null;
     }
 
-    const finalPrice = price !== undefined ? normalizedPrice : currentPrice;
+    const finalPrice =
+      variants !== undefined && normalizedVariants.length > 0
+        ? normalizedVariants[0].price
+        : price !== undefined
+          ? normalizedPrice
+          : currentPrice;
     const finalCost =
       cost_price !== undefined ? normalizedCostPrice : currentCostPrice;
 
@@ -753,6 +887,9 @@ export async function PATCH(request: NextRequest) {
 
     if (category !== undefined || categories !== undefined) {
       await syncProductCategoriesByName(supabase, id, normalizedCategoryNames);
+    }
+    if (variants !== undefined) {
+      await syncProductVariants(supabase, id, normalizedVariants);
     }
 
     // Log audit

@@ -1,10 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
-import { Button, Card, InputNumber, Space, Tag, message } from "antd";
-import { ArrowLeftOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Card,
+  Carousel,
+  InputNumber,
+  Modal,
+  Space,
+  Tag,
+  message,
+} from "antd";
+import {
+  ArrowLeftOutlined,
+  SafetyCertificateOutlined,
+  LeftOutlined,
+  RightOutlined,
+  ShoppingCartOutlined,
+} from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
 import { useCart } from "@/hooks/useCart";
@@ -31,6 +46,15 @@ interface ProductMedia {
   media_type: "image" | "video";
 }
 
+interface ProductVariant {
+  id: string;
+  variant_name: string;
+  price: number;
+  image_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -39,10 +63,18 @@ export default function ProductDetailPage() {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [mediaItems, setMediaItems] = useState<ProductMedia[]>([]);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
+    null,
+  );
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const carouselRef = useRef<{
+    goTo: (slide: number, dontAnimate?: boolean) => void;
+  } | null>(null);
 
   const {
     cart,
@@ -83,8 +115,16 @@ export default function ProductDetailPage() {
             .slice(0, 4);
           setRelatedProducts(related);
           setQuantity(1);
+          const variants = Array.isArray(foundProduct.variants)
+            ? (foundProduct.variants as ProductVariant[])
+            : [];
+          const activeVariants = variants.filter(
+            (item) => item.is_active !== false,
+          );
+          setSelectedVariantId(activeVariants[0]?.id || null);
         } else {
           setRelatedProducts([]);
+          setSelectedVariantId(null);
         }
 
         if (mediaRes.ok) {
@@ -145,7 +185,21 @@ export default function ProductDetailPage() {
     if (!product) return;
     const maxAllowed = Math.max(1, product.stock_quantity);
     const safeQuantity = Math.min(Math.max(1, quantity), maxAllowed);
-    addToCart(product, safeQuantity);
+    const selectedVariant = activeVariants.find(
+      (item) => item.id === selectedVariantId,
+    );
+    const productForCart =
+      selectedVariant && selectedVariant.price >= 0
+        ? {
+            ...product,
+            id: `${product.id}::${selectedVariant.id}`,
+            name: `${product.name} - ${selectedVariant.variant_name}`,
+            price: Number(selectedVariant.price || product.price),
+            image_url: selectedVariant.image_url || product.image_url,
+          }
+        : product;
+
+    addToCart(productForCart, safeQuantity);
     messageApi.success(`Đã thêm ${safeQuantity} sản phẩm vào giỏ hàng`);
   };
 
@@ -154,6 +208,97 @@ export default function ProductDetailPage() {
     setIsCartOpen(false);
     router.push("/checkout");
   };
+
+  const handleBuyNow = () => {
+    if (!product) return;
+    const maxAllowed = Math.max(1, product.stock_quantity);
+    const safeQuantity = Math.min(Math.max(1, quantity), maxAllowed);
+    const selectedVariant = activeVariants.find(
+      (item) => item.id === selectedVariantId,
+    );
+    const productForCart =
+      selectedVariant && selectedVariant.price >= 0
+        ? {
+            ...product,
+            id: `${product.id}::${selectedVariant.id}`,
+            name: `${product.name} - ${selectedVariant.variant_name}`,
+            price: Number(selectedVariant.price || product.price),
+            image_url: selectedVariant.image_url || product.image_url,
+          }
+        : product;
+
+    addToCart(productForCart, safeQuantity);
+    router.push("/checkout");
+  };
+
+  const activeVariants = useMemo(
+    () =>
+      Array.isArray(product?.variants)
+        ? (product.variants as ProductVariant[]).filter(
+            (item) => item.is_active !== false,
+          )
+        : [],
+    [product?.variants],
+  );
+  const selectedVariant = useMemo(
+    () => activeVariants.find((item) => item.id === selectedVariantId),
+    [activeVariants, selectedVariantId],
+  );
+  const displayMediaItems = useMemo(() => {
+    const existing = [...mediaItems];
+    const variantImage = selectedVariant?.image_url?.trim() || "";
+    if (
+      variantImage &&
+      !existing.some((item) => item.image_url === variantImage)
+    ) {
+      return [
+        {
+          id: `variant-${selectedVariant?.id || "image"}`,
+          image_url: variantImage,
+          display_order: 0,
+          is_cover: true,
+          width: null,
+          height: null,
+          media_type: "image" as const,
+        },
+        ...existing,
+      ];
+    }
+    return existing;
+  }, [mediaItems, selectedVariant?.id, selectedVariant?.image_url]);
+  const activeMedia = displayMediaItems[activeMediaIndex];
+  const visibleThumbCount = 5;
+  const visibleThumbItems = displayMediaItems.slice(
+    thumbnailStartIndex,
+    thumbnailStartIndex + visibleThumbCount,
+  );
+  const canShowPrevThumb = activeMediaIndex > 0;
+  const canShowNextThumb = activeMediaIndex < displayMediaItems.length - 1;
+
+  useEffect(() => {
+    const variantImage = selectedVariant?.image_url?.trim() || "";
+    const variantImageIndex = variantImage
+      ? displayMediaItems.findIndex((item) => item.image_url === variantImage)
+      : -1;
+    const nextIndex = variantImageIndex >= 0 ? variantImageIndex : 0;
+
+    setActiveMediaIndex(nextIndex);
+    setThumbnailStartIndex(0);
+    carouselRef.current?.goTo?.(nextIndex, false);
+  }, [selectedVariantId, selectedVariant?.image_url, displayMediaItems]);
+
+  useEffect(() => {
+    if (activeMediaIndex < thumbnailStartIndex) {
+      setThumbnailStartIndex(activeMediaIndex);
+      return;
+    }
+
+    if (activeMediaIndex >= thumbnailStartIndex + visibleThumbCount) {
+      setThumbnailStartIndex(
+        Math.max(0, activeMediaIndex - visibleThumbCount + 1),
+      );
+    }
+  }, [activeMediaIndex, thumbnailStartIndex]);
 
   if (isLoading || !isLoaded) {
     return (
@@ -191,8 +336,8 @@ export default function ProductDetailPage() {
   }
 
   const isOutOfStock = product.stock_quantity <= 0;
-  const activeMedia = mediaItems[activeMediaIndex];
-  const fallbackMediaUrl = product.image_url || null;
+  const fallbackMediaUrl =
+    selectedVariant?.image_url || product.image_url || null;
   const discountPercent = getEffectiveDiscountPercent({
     discountPercent: product.discount_percent,
     discountStartAt: product.discount_start_at,
@@ -200,8 +345,9 @@ export default function ProductDetailPage() {
     nowMs,
   });
   const hasDiscount = discountPercent > 0;
-  const finalPrice = calculateDiscountedPrice(product.price, discountPercent);
-  const savingAmount = product.price - finalPrice;
+  const basePrice = Number(selectedVariant?.price || product.price);
+  const finalPrice = calculateDiscountedPrice(basePrice, discountPercent);
+  const savingAmount = basePrice - finalPrice;
   const discountEndMs = product.discount_end_at
     ? Date.parse(product.discount_end_at)
     : NaN;
@@ -209,12 +355,16 @@ export default function ProductDetailPage() {
   const remainingDiscountMs = hasValidDiscountEnd
     ? Math.max(0, discountEndMs - nowMs)
     : 0;
+  const openImagePreview = (imageUrl: string | null | undefined) => {
+    if (!imageUrl) return;
+    setPreviewImageUrl(imageUrl);
+  };
   const sanitizedDescription = DOMPurify.sanitize(product.description || "", {
     USE_PROFILES: { html: true },
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {contextHolder}
 
       <Header
@@ -222,16 +372,51 @@ export default function ProductDetailPage() {
         onCartClick={() => setIsCartOpen(true)}
       />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/")}>
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 overflow-x-hidden">
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => router.push("/")}
+          className="w-full sm:w-auto"
+        >
           Quay lại
         </Button>
 
         <Card>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+            <div className="space-y-2 sm:space-y-3">
               <div className="bg-gray-100 rounded-lg overflow-hidden aspect-square">
-                {activeMedia ? (
+                {displayMediaItems.length > 1 ? (
+                  <Carousel
+                    ref={carouselRef}
+                    dots
+                    autoplay={displayMediaItems.length > 1}
+                    autoplaySpeed={3200}
+                    infinite
+                    afterChange={(index) => setActiveMediaIndex(index)}
+                    className="w-full h-full"
+                  >
+                    {displayMediaItems.map((media) => (
+                      <div key={media.id}>
+                        {media.media_type === "video" ? (
+                          <video
+                            src={media.image_url}
+                            className="w-full h-full object-cover"
+                            controls
+                          />
+                        ) : (
+                          <img
+                            src={media.image_url}
+                            alt={product.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                            onClick={() => openImagePreview(media.image_url)}
+                            style={{ cursor: "zoom-in" }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </Carousel>
+                ) : activeMedia ? (
                   activeMedia.media_type === "video" ? (
                     <video
                       src={activeMedia.image_url}
@@ -244,6 +429,8 @@ export default function ProductDetailPage() {
                       alt={product.name}
                       loading="lazy"
                       className="w-full h-full object-cover"
+                      onClick={() => openImagePreview(activeMedia.image_url)}
+                      style={{ cursor: "zoom-in" }}
                     />
                   )
                 ) : fallbackMediaUrl ? (
@@ -252,6 +439,8 @@ export default function ProductDetailPage() {
                     alt={product.name}
                     loading="lazy"
                     className="w-full h-full object-cover"
+                    onClick={() => openImagePreview(fallbackMediaUrl)}
+                    style={{ cursor: "zoom-in" }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-5xl text-gray-400">
@@ -260,40 +449,76 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {mediaItems.length > 0 && (
-                <div className="grid grid-cols-5 gap-2">
-                  {mediaItems.map((media, index) => (
-                    <button
-                      key={media.id}
-                      onClick={() => setActiveMediaIndex(index)}
-                      className={`relative rounded-lg overflow-hidden border-2 aspect-square ${
-                        index === activeMediaIndex
-                          ? "border-blue-600"
-                          : "border-transparent"
-                      }`}
-                    >
-                      {media.media_type === "video" ? (
-                        <video
-                          src={media.image_url}
-                          className="w-full h-full object-cover"
-                          muted
-                        />
-                      ) : (
-                        <img
-                          src={media.image_url}
-                          alt={`${product.name}-${index + 1}`}
-                          loading="lazy"
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                    </button>
-                  ))}
+              {displayMediaItems.length > 0 && (
+                <div className="flex items-center gap-2 w-full max-w-full">
+                  <Button
+                    shape="circle"
+                    icon={<LeftOutlined />}
+                    size="small"
+                    className="shrink-0"
+                    onClick={() => {
+                      const nextIndex = Math.max(0, activeMediaIndex - 1);
+                      setActiveMediaIndex(nextIndex);
+                      carouselRef.current?.goTo?.(nextIndex, false);
+                    }}
+                    disabled={!canShowPrevThumb}
+                    aria-label="Ảnh trước"
+                  />
+                  <div className="flex-1 min-w-0 max-w-full flex items-center gap-1.5 sm:gap-2 overflow-hidden">
+                    {visibleThumbItems.map((media, index) => {
+                      const absoluteIndex = thumbnailStartIndex + index;
+                      const isActive = absoluteIndex === activeMediaIndex;
+                      return (
+                        <button
+                          key={`${media.id}-${absoluteIndex}`}
+                          onClick={() => {
+                            setActiveMediaIndex(absoluteIndex);
+                            carouselRef.current?.goTo?.(absoluteIndex, false);
+                          }}
+                          className={`relative rounded-lg overflow-hidden border-2 aspect-square shrink-0 w-[56px] sm:w-[64px] md:w-[84px] ${
+                            isActive ? "border-blue-600" : "border-transparent"
+                          }`}
+                        >
+                          {media.media_type === "video" ? (
+                            <video
+                              src={media.image_url}
+                              className="w-full h-full object-cover"
+                              muted
+                            />
+                          ) : (
+                            <img
+                              src={media.image_url}
+                              alt={`${product.name}-${absoluteIndex + 1}`}
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    shape="circle"
+                    icon={<RightOutlined />}
+                    size="small"
+                    className="shrink-0"
+                    onClick={() => {
+                      const nextIndex = Math.min(
+                        displayMediaItems.length - 1,
+                        activeMediaIndex + 1,
+                      );
+                      setActiveMediaIndex(nextIndex);
+                      carouselRef.current?.goTo?.(nextIndex, false);
+                    }}
+                    disabled={!canShowNextThumb}
+                    aria-label="Ảnh tiếp theo"
+                  />
                 </div>
               )}
             </div>
 
-            <div className="space-y-5">
-              <div className="space-y-2">
+            <div className="space-y-4 sm:space-y-5">
+              <div className="space-y-2 sm:space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {categoryNames.map((category) => (
                     <Tag key={category} color="blue">
@@ -302,23 +527,72 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
 
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-snug">
                   {product.name}
                 </h1>
 
                 <div className="space-y-2">
-                  <div className="text-2xl md:text-4xl font-extrabold text-red-600 leading-none">
+                  <div className="text-[26px] sm:text-3xl md:text-4xl font-extrabold text-red-600 leading-none">
                     {formatCurrency(finalPrice)}
                   </div>
+                  {activeVariants.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold text-gray-700 tracking-wide">
+                        PHÂN LOẠI
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {activeVariants.map((variant) => {
+                          const isSelected = selectedVariantId === variant.id;
+                          return (
+                            <button
+                              key={variant.id}
+                              type="button"
+                              onClick={() => setSelectedVariantId(variant.id)}
+                              className={`w-full rounded-lg border px-2.5 py-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-blue-500 bg-blue-50 shadow-sm"
+                                  : "border-gray-200 bg-white hover:border-blue-300"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-9 h-9 rounded overflow-hidden bg-gray-100 shrink-0">
+                                  {variant.image_url ? (
+                                    <img
+                                      src={variant.image_url}
+                                      alt={variant.variant_name}
+                                      loading="lazy"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full grid place-items-center text-gray-400 text-xs">
+                                      Ảnh
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-gray-800 text-sm sm:text-base leading-tight line-clamp-2">
+                                    {variant.variant_name}
+                                  </div>
+                                  <div className="text-[12px] text-gray-500">
+                                    {formatCurrency(variant.price)}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   {hasDiscount && (
                     <div className="flex items-center flex-wrap gap-2">
-                      <span className="text-lg text-gray-500 line-through">
-                        {formatCurrency(product.price)}
+                      <span className="text-base sm:text-lg text-gray-500 line-through">
+                        {formatCurrency(basePrice)}
                       </span>
                       <Tag color="red" style={{ marginInlineStart: 0 }}>
                         Giảm {discountPercent}%
                       </Tag>
-                      <span className="text-sm font-semibold text-red-500">
+                      <span className="text-xs sm:text-sm font-semibold text-red-500">
                         Tiết kiệm {formatCurrency(savingAmount)}
                       </span>
                     </div>
@@ -327,7 +601,7 @@ export default function ProductDetailPage() {
                   {hasDiscount &&
                     hasValidDiscountEnd &&
                     remainingDiscountMs > 0 && (
-                      <div className="text-sm font-medium text-orange-600">
+                      <div className="text-xs sm:text-sm font-medium text-orange-600">
                         Kết thúc giảm giá sau:{" "}
                         {formatRemainingTime(remainingDiscountMs)}
                       </div>
@@ -335,33 +609,60 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              <div className="text-sm text-gray-600">
+              <div className="text-xs sm:text-sm text-gray-600">
                 Tồn kho:{" "}
                 <strong>
                   {isOutOfStock ? "Hết hàng" : product.stock_quantity}
                 </strong>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-700">Số lượng:</span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <span className="text-sm text-gray-700 min-w-[68px]">Số lượng:</span>
                 <InputNumber
                   min={1}
                   max={Math.max(1, product.stock_quantity)}
                   value={quantity}
                   onChange={(value) => setQuantity(Number(value || 1))}
                   disabled={isOutOfStock}
+                  style={{ width: 120 }}
                 />
               </div>
 
-              <Button
-                type="primary"
-                size="large"
-                icon={<ShoppingCartOutlined />}
-                disabled={isOutOfStock}
-                onClick={handleAddToCart}
+              <Tag
+                color="green"
+                icon={<SafetyCertificateOutlined />}
+                style={{
+                  marginInlineStart: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  paddingInline: 10,
+                  paddingBlock: 5,
+                  borderRadius: 8,
+                }}
               >
-                Thêm vào giỏ hàng
-              </Button>
+                Bảo hành miễn phí 15 ngày đổi trả sản phẩm
+              </Tag>
+
+              <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<ShoppingCartOutlined />}
+                  disabled={isOutOfStock}
+                  onClick={handleAddToCart}
+                  className="w-full sm:w-auto"
+                >
+                  Thêm vào giỏ hàng
+                </Button>
+                <Button
+                  size="large"
+                  disabled={isOutOfStock}
+                  onClick={handleBuyNow}
+                  className="w-full sm:w-auto"
+                >
+                  Mua ngay
+                </Button>
+              </div>
             </div>
           </div>
         </Card>
@@ -440,6 +741,28 @@ export default function ProductDetailPage() {
         onCheckout={handleCheckout}
         totalPrice={getTotalPrice()}
       />
+
+      <Modal
+        open={Boolean(previewImageUrl)}
+        footer={null}
+        onCancel={() => setPreviewImageUrl(null)}
+        width="min(92vw, 960px)"
+        centered
+        destroyOnHidden
+      >
+        {previewImageUrl && (
+          <img
+            src={previewImageUrl}
+            alt={product.name}
+            style={{
+              width: "100%",
+              maxHeight: "80vh",
+              objectFit: "contain",
+              borderRadius: 8,
+            }}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

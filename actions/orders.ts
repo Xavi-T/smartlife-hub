@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
@@ -12,6 +13,8 @@ import type {
   PaymentMethod,
 } from "@/types/order";
 
+type SupabaseAdminClient = ReturnType<typeof createClient<Database>>;
+
 interface ProductForOrder {
   id: string;
   name: string;
@@ -19,6 +22,14 @@ interface ProductForOrder {
   discount_percent: number | null;
   category: string;
   stock_quantity: number;
+  is_active: boolean;
+}
+
+interface ProductVariantForOrder {
+  id: string;
+  product_id: string;
+  variant_name: string;
+  price: number;
   is_active: boolean;
 }
 
@@ -39,7 +50,7 @@ function createOrderWriteClient() {
       persistSession: false,
       autoRefreshToken: false,
     },
-  }) as any;
+  });
 }
 
 function calculateEffectivePrice(
@@ -51,7 +62,7 @@ function calculateEffectivePrice(
 }
 
 async function createOrderDirectly(params: {
-  db: any;
+  db: SupabaseAdminClient;
   customerName: string;
   customerPhone: string;
   customerAddress: string;
@@ -109,6 +120,25 @@ async function createOrderDirectly(params: {
     productRows.map((product: ProductForOrder) => [product.id, product]),
   );
 
+  const variantIds = Array.from(
+    new Set(
+      items
+        .map((item) => item.variant_id)
+        .filter((item): item is string => Boolean(item)),
+    ),
+  );
+  let variantMap = new Map<string, ProductVariantForOrder>();
+
+  if (variantIds.length > 0) {
+    const { data: variantsData } = await db
+      .from("product_variants")
+      .select("id, product_id, variant_name, price, is_active")
+      .in("id", variantIds);
+
+    const variantRows = (variantsData || []) as ProductVariantForOrder[];
+    variantMap = new Map(variantRows.map((variant) => [variant.id, variant]));
+  }
+
   for (const item of items) {
     const product = productMap.get(item.product_id);
     if (!product) {
@@ -125,6 +155,20 @@ async function createOrderDirectly(params: {
         success: false,
         message: `Sản phẩm \"${product.name}\" chỉ còn ${product.stock_quantity} sản phẩm`,
       };
+    }
+
+    if (item.variant_id) {
+      const variant = variantMap.get(item.variant_id);
+      if (
+        !variant ||
+        !variant.is_active ||
+        variant.product_id !== item.product_id
+      ) {
+        return {
+          success: false,
+          message: `Loại sản phẩm không hợp lệ cho \"${product.name}\"`,
+        };
+      }
     }
   }
 
@@ -194,8 +238,12 @@ async function createOrderDirectly(params: {
 
   const orderItemsPayload = items.map((item) => {
     const product = productMap.get(item.product_id)!;
+    const selectedVariant = item.variant_id
+      ? variantMap.get(item.variant_id)
+      : null;
+    const baseSourcePrice = Number(selectedVariant?.price || product.price);
     const baseUnitPrice = calculateEffectivePrice(
-      product.price,
+      baseSourcePrice,
       product.discount_percent,
     );
     const safeCustomerDiscount = Math.min(
@@ -274,7 +322,7 @@ export async function createOrder(
   request: CreateOrderRequest,
 ): Promise<CreateOrderResponse> {
   try {
-    const orderWriteClient = createOrderWriteClient() as any;
+    const orderWriteClient = createOrderWriteClient();
     if (!orderWriteClient) {
       return {
         success: false,

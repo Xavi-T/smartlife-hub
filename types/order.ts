@@ -1,6 +1,7 @@
 export interface CartItem {
   product_id: string;
   quantity: number;
+  variant_id?: string;
 }
 
 export interface CustomerInfo {
