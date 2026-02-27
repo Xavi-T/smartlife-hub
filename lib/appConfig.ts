@@ -9,7 +9,7 @@ export const APP_CONFIG = {
   bank: {
     name: "Vietcombank",
     accountNumber: "0123456789",
-    accountName: "CONG TY SMARTLIFE HUB",
+    accountName: "Cửa hàng SmartLife Hub",
   },
   socials: {
     zalo: "https://zalo.me/0838709126",
