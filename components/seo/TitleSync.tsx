@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { APP_CONFIG } from "@/lib/appConfig";
 
 const TITLE_MAP: Record<string, string> = {
-  "/": `${APP_CONFIG.shopName} – Đồ gia dụng thông minh`,
+  "/": `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
   "/checkout": "Thanh toán đơn hàng",
   "/orders/track": "Tra cứu đơn hàng",
   "/priority-customers": "Danh sách khách hàng ưu tiên",
@@ -32,9 +32,8 @@ export function TitleSync() {
       return;
     }
 
-    document.title = `${baseName} – Đồ gia dụng thông minh`;
+    document.title = `${baseName} – ${APP_CONFIG.shopTagline}`;
   }, [pathname]);
 
   return null;
 }
-

@@ -32,9 +32,7 @@ export default function AboutPage() {
             Về chúng tôi
           </Typography.Title>
           <Typography.Paragraph style={{ fontSize: "clamp(14px, 2.2vw, 17px)" }}>
-            {APP_CONFIG.shopName} là cửa hàng đồ gia dụng thông minh, tập trung
-            vào các sản phẩm giúp tối ưu thời gian, không gian sống và trải nghiệm
-            sử dụng hằng ngày.
+            Triết lý của {APP_CONFIG.shopName}: {APP_CONFIG.shopTagline}.
           </Typography.Paragraph>
 
           <Row gutter={[16, 16]}>

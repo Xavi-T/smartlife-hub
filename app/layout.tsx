@@ -24,19 +24,17 @@ const siteUrl = "https://smartlifehub.vn";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: `${APP_CONFIG.shopName} – Đồ gia dụng thông minh`,
+    default: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
     template: `%s | ${APP_CONFIG.shopName}`,
   },
-  description:
-    "SmartLife Hub - Cửa hàng đồ gia dụng thông minh, chính hãng, hỗ trợ theo dõi đơn hàng và ưu đãi dành cho khách hàng thân thiết.",
+  description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
   openGraph: {
     type: "website",
     locale: "vi_VN",
     url: siteUrl,
     siteName: APP_CONFIG.shopName,
-    title: `${APP_CONFIG.shopName} – Đồ gia dụng thông minh`,
-    description:
-      "Khám phá đồ gia dụng thông minh, tối ưu không gian sống với SmartLife Hub.",
+    title: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
+    description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
     images: [
       {
         url: "/banners/banner-1.svg",
@@ -48,9 +46,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${APP_CONFIG.shopName} – Đồ gia dụng thông minh`,
-    description:
-      "Cửa hàng đồ gia dụng thông minh, chính hãng, nhiều ưu đãi cho khách hàng thân thiết.",
+    title: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
+    description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
     images: ["/banners/banner-1.svg"],
   },
   robots: {
