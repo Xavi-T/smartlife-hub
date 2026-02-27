@@ -12,6 +12,7 @@ import {
   Card,
   Carousel,
   Empty,
+  Checkbox,
   Radio,
   Select,
   Space,
@@ -72,6 +73,11 @@ function HomeContent() {
   const [priceSort, setPriceSort] = useState<"asc" | "desc" | undefined>(
     undefined,
   );
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
+    undefined,
+  );
+  const [onlyDiscounted, setOnlyDiscounted] = useState(false);
+  const [hideOutOfStock, setHideOutOfStock] = useState(true);
   const [carouselItems, setCarouselItems] = useState(DEFAULT_CAROUSEL_ITEMS);
 
   const {
@@ -166,11 +172,43 @@ function HomeContent() {
     router.push(`/products/${product.id}`);
   };
 
-  const sortedProducts = useMemo(() => {
+  const categoryOptions = useMemo(() => {
+    const grouped = new Map<string, number>();
+    products.forEach((item) => {
+      grouped.set(item.category, (grouped.get(item.category) || 0) + 1);
+    });
+
+    return Array.from(grouped.entries())
+      .sort((first, second) => first[0].localeCompare(second[0], "vi"))
+      .map(([category, count]) => ({
+        label: `${category} (${count})`,
+        value: category,
+      }));
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((item) => {
+      if (selectedCategory && item.category !== selectedCategory) {
+        return false;
+      }
+
+      if (hideOutOfStock && item.stock_quantity <= 0) {
+        return false;
+      }
+
+      if (onlyDiscounted && Number(item.discount_percent || 0) <= 0) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [hideOutOfStock, onlyDiscounted, products, selectedCategory]);
+
+  const visibleProducts = useMemo(() => {
     const getFinalPrice = (item: Product) =>
       item.price * (1 - (item.discount_percent || 0) / 100);
 
-    const cloned = [...products];
+    const cloned = [...filteredProducts];
 
     if (priceSort) {
       return cloned.sort((a, b) => {
@@ -199,7 +237,7 @@ function HomeContent() {
       (a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
-  }, [products, priceSort, sortType]);
+  }, [filteredProducts, priceSort, sortType]);
 
   if (isLoading || !isLoaded) {
     return (
@@ -301,25 +339,54 @@ function HomeContent() {
                 { label: "Giá: Cao đến thấp", value: "desc" },
               ]}
             />
+            <Select
+              allowClear
+              placeholder="Danh mục"
+              value={selectedCategory}
+              onChange={(value) => setSelectedCategory(value)}
+              style={{ minWidth: 220 }}
+              options={categoryOptions}
+            />
+            <Checkbox
+              checked={onlyDiscounted}
+              onChange={(event) => setOnlyDiscounted(event.target.checked)}
+            >
+              Đang giảm giá
+            </Checkbox>
+            <Checkbox
+              checked={hideOutOfStock}
+              onChange={(event) => setHideOutOfStock(event.target.checked)}
+            >
+              Ẩn sản phẩm hết hàng
+            </Checkbox>
           </Space>
         </Card>
 
         {/* Product Grid */}
         <ProductGrid
-          products={sortedProducts}
+          products={visibleProducts}
           onAddToCart={handleAddToCart}
           onViewDetail={handleViewDetail}
         />
 
         {/* Empty State */}
-        {products.length === 0 && (
+        {visibleProducts.length === 0 && (
           <Card style={{ marginTop: 16 }}>
             <Empty
-              description="Chưa có sản phẩm nào"
+              description="Không có sản phẩm phù hợp bộ lọc"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
-              <Button type="primary" onClick={fetchProducts}>
-                Tải lại
+              <Button
+                type="primary"
+                onClick={() => {
+                  setSelectedCategory(undefined);
+                  setOnlyDiscounted(false);
+                  setHideOutOfStock(true);
+                  setPriceSort(undefined);
+                  setSortType("popular");
+                }}
+              >
+                Xóa bộ lọc
               </Button>
             </Empty>
           </Card>
