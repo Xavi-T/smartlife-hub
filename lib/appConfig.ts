@@ -7,9 +7,9 @@ export const APP_CONFIG = {
   shopEmail: "smartlifehub.work@gmail.com",
   shopWebsite: "https://smartlife-hub.shop",
   bank: {
-    name: "Vietcombank",
-    accountNumber: "0123456789",
-    accountName: "Cửa hàng SmartLife Hub",
+    name: "VPBANK",
+    accountNumber: "14220968",
+    accountName: "TRAN VAN SON",
   },
   socials: {
     zalo: "https://zalo.me/0838709126",

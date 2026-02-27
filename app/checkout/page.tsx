@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CopyOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
@@ -54,6 +55,8 @@ export default function CheckoutPage() {
   );
 
   const checkoutMethod = Form.useWatch("checkoutMethod", form) || "cod";
+  const customerName = Form.useWatch("name", form) || "";
+  const customerPhone = Form.useWatch("phone", form) || "";
 
   const splitProductAndVariant = (cartProductId: string) => {
     const [productId, variantId] = String(cartProductId || "").split("::");
@@ -61,6 +64,28 @@ export default function CheckoutPage() {
       productId,
       variantId: variantId || undefined,
     };
+  };
+
+  const transferContent = useMemo(() => {
+    const cleanName = String(customerName || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    const cleanPhone = String(customerPhone || "").trim();
+    const result = `${cleanName}-${cleanPhone}`.trim();
+    return result || "Ten KH + SDT";
+  }, [customerName, customerPhone]);
+
+  const handleCopy = async (value: string, label: string) => {
+    try {
+      if (!value) {
+        messageApi.warning(`Chưa có ${label.toLowerCase()} để copy`);
+        return;
+      }
+      await navigator.clipboard.writeText(value);
+      messageApi.success(`Đã copy ${label.toLowerCase()}`);
+    } catch {
+      messageApi.error("Không thể copy, vui lòng thử lại");
+    }
   };
 
   useEffect(() => {
@@ -84,7 +109,9 @@ export default function CheckoutPage() {
         if (!response.ok) return;
 
         const result = await response.json();
-        const firstQrCode = Array.isArray(result.media) ? result.media[0] : null;
+        const firstQrCode = Array.isArray(result.media)
+          ? result.media[0]
+          : null;
 
         if (active && firstQrCode?.image_url) {
           setBankQrSrc(firstQrCode.image_url);
@@ -361,11 +388,79 @@ export default function CheckoutPage() {
                           }}
                         >
                           <div style={{ flex: 1, minWidth: 220 }}>
-                            <div>Ngân hàng: {APP_CONFIG.bank.name}</div>
-                            <div>Số tài khoản: {APP_CONFIG.bank.accountNumber}</div>
-                            <div>Chủ tài khoản: {APP_CONFIG.bank.accountName}</div>
-                            <div style={{ marginTop: 6 }}>
-                              Nội dung CK: <strong>SDT của bạn</strong>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span>Ngân hàng: {APP_CONFIG.bank.name}</span>
+                              <Button
+                                size="small"
+                                icon={<CopyOutlined />}
+                                onClick={() =>
+                                  handleCopy(
+                                    APP_CONFIG.bank.name,
+                                    "Tên ngân hàng",
+                                  )
+                                }
+                              >
+                                Copy
+                              </Button>
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span>
+                                Số tài khoản: {APP_CONFIG.bank.accountNumber}
+                              </span>
+                              <Button
+                                size="small"
+                                icon={<CopyOutlined />}
+                                onClick={() =>
+                                  handleCopy(
+                                    APP_CONFIG.bank.accountNumber,
+                                    "Số tài khoản",
+                                  )
+                                }
+                              >
+                                Copy
+                              </Button>
+                            </div>
+                            <div>
+                              Chủ tài khoản: {APP_CONFIG.bank.accountName}
+                            </div>
+                            <div
+                              style={{
+                                marginTop: 6,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span>
+                                Nội dung CK: <strong>{transferContent}</strong>
+                              </span>
+                              <Button
+                                size="small"
+                                icon={<CopyOutlined />}
+                                onClick={() =>
+                                  handleCopy(
+                                    transferContent,
+                                    "Nội dung chuyển khoản",
+                                  )
+                                }
+                              >
+                                Copy
+                              </Button>
                             </div>
                           </div>
                           <div>
