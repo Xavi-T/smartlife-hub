@@ -77,7 +77,6 @@ function HomeContent() {
     undefined,
   );
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
-  const [hideOutOfStock, setHideOutOfStock] = useState(true);
   const [carouselItems, setCarouselItems] = useState(DEFAULT_CAROUSEL_ITEMS);
 
   const {
@@ -192,17 +191,13 @@ function HomeContent() {
         return false;
       }
 
-      if (hideOutOfStock && item.stock_quantity <= 0) {
-        return false;
-      }
-
       if (onlyDiscounted && Number(item.discount_percent || 0) <= 0) {
         return false;
       }
 
       return true;
     });
-  }, [hideOutOfStock, onlyDiscounted, products, selectedCategory]);
+  }, [onlyDiscounted, products, selectedCategory]);
 
   const visibleProducts = useMemo(() => {
     const getFinalPrice = (item: Product) =>
@@ -353,12 +348,6 @@ function HomeContent() {
             >
               Đang giảm giá
             </Checkbox>
-            <Checkbox
-              checked={hideOutOfStock}
-              onChange={(event) => setHideOutOfStock(event.target.checked)}
-            >
-              Ẩn sản phẩm hết hàng
-            </Checkbox>
           </Space>
         </Card>
 
@@ -381,7 +370,6 @@ function HomeContent() {
                 onClick={() => {
                   setSelectedCategory(undefined);
                   setOnlyDiscounted(false);
-                  setHideOutOfStock(true);
                   setPriceSort(undefined);
                   setSortType("popular");
                 }}
