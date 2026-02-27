@@ -19,6 +19,7 @@ import {
   LeftOutlined,
   RightOutlined,
   ShoppingCartOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
@@ -617,7 +618,9 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <span className="text-sm text-gray-700 min-w-[68px]">Số lượng:</span>
+                <span className="text-sm text-gray-700 min-w-[68px]">
+                  Số lượng:
+                </span>
                 <InputNumber
                   min={1}
                   max={Math.max(1, product.stock_quantity)}
@@ -641,6 +644,22 @@ export default function ProductDetailPage() {
                 }}
               >
                 Bảo hành miễn phí 15 ngày đổi trả sản phẩm
+              </Tag>
+
+              <Tag
+                color="blue"
+                icon={<TruckOutlined />}
+                style={{
+                  marginInlineStart: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  paddingInline: 10,
+                  paddingBlock: 5,
+                  borderRadius: 8,
+                  marginTop: 10,
+                }}
+              >
+                Miễn phí vận chuyển toàn quốc
               </Tag>
 
               <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">

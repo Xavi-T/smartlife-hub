@@ -9,6 +9,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Modal,
   Select,
   Space,
   Switch,
@@ -31,7 +32,7 @@ import {
   formatCurrency,
   getEffectiveDiscountPercent,
 } from "@/lib/utils";
-import { APP_CONFIG } from "@/lib/appConfig";
+import { buildInvoiceHtml, printInvoiceHtml } from "@/lib/invoice";
 import type { Product } from "@/types/database";
 
 const { TextArea } = Input;
@@ -72,139 +73,6 @@ interface RecentOrder {
   notes: string | null;
   created_at: string;
   order_items: RecentOrderItem[];
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function printInvoice(
-  order: RecentOrder,
-  messageApi: ReturnType<typeof message.useMessage>[0],
-) {
-  const orderDate = new Date(order.created_at).toLocaleString("vi-VN");
-  const rowsHtml = order.order_items
-    .map((item, index) => {
-      const productName = escapeHtml(item.products?.name || "Sản phẩm");
-      return `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${productName}</td>
-          <td style="text-align:right;">${item.quantity}</td>
-          <td style="text-align:right;">${formatCurrency(item.unit_price)}</td>
-          <td style="text-align:right;">${formatCurrency(item.subtotal)}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  const notes = escapeHtml(order.notes || "");
-  const customerName = escapeHtml(order.customer_name);
-  const customerPhone = escapeHtml(order.customer_phone);
-  const customerAddress = escapeHtml(order.customer_address || "");
-  const shopName = escapeHtml(APP_CONFIG.shopName);
-  const shopAddress = escapeHtml(APP_CONFIG.shopAddress);
-  const shopPhone = escapeHtml(APP_CONFIG.shopPhone);
-  const taxCode = escapeHtml(APP_CONFIG.taxCode);
-  const shopEmail = escapeHtml(APP_CONFIG.shopEmail);
-  const shopWebsite = escapeHtml(APP_CONFIG.shopWebsite);
-
-  const html = `
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Hóa đơn #${order.id.slice(0, 8).toUpperCase()}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-          h1 { margin: 0 0 4px; font-size: 24px; }
-          .muted { color: #666; font-size: 12px; }
-          .section { margin-top: 16px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
-          th { background: #f5f5f5; text-align: left; }
-          .total { text-align: right; margin-top: 12px; font-size: 18px; font-weight: 700; }
-        </style>
-      </head>
-      <body>
-        <h1>HÓA ĐƠN BÁN HÀNG - ${shopName}</h1>
-        <div class="muted">Địa chỉ: ${shopAddress}</div>
-        <div class="muted">SĐT: ${shopPhone}</div>
-        <div class="muted">MST: ${taxCode}</div>
-        <div class="muted">Email: ${shopEmail} • Website: ${shopWebsite}</div>
-        <div class="muted">Mã đơn: #${order.id.slice(0, 8).toUpperCase()} • Ngày: ${orderDate}</div>
-
-        <div class="section">
-          <div><strong>Khách hàng:</strong> ${customerName}</div>
-          <div><strong>SĐT:</strong> ${customerPhone}</div>
-          <div><strong>Địa chỉ:</strong> ${customerAddress || "-"}</div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="width:50px;">STT</th>
-              <th>Sản phẩm</th>
-              <th style="width:80px; text-align:right;">SL</th>
-              <th style="width:140px; text-align:right;">Đơn giá</th>
-              <th style="width:160px; text-align:right;">Thành tiền</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="total">Tổng cộng: ${formatCurrency(order.total_amount)}</div>
-        ${notes ? `<div class="section"><strong>Ghi chú:</strong> ${notes}</div>` : ""}
-      </body>
-    </html>
-  `;
-
-  const printFrame = document.createElement("iframe");
-  printFrame.style.position = "fixed";
-  printFrame.style.right = "0";
-  printFrame.style.bottom = "0";
-  printFrame.style.width = "0";
-  printFrame.style.height = "0";
-  printFrame.style.border = "0";
-  document.body.appendChild(printFrame);
-
-  const frameDoc =
-    printFrame.contentDocument || printFrame.contentWindow?.document;
-  if (!frameDoc) {
-    document.body.removeChild(printFrame);
-    messageApi.error("Không thể xuất hóa đơn");
-    return;
-  }
-
-  frameDoc.open();
-  frameDoc.write(html);
-  frameDoc.close();
-
-  const cleanup = () => {
-    window.setTimeout(() => {
-      if (document.body.contains(printFrame)) {
-        document.body.removeChild(printFrame);
-      }
-    }, 300);
-  };
-
-  printFrame.onload = () => {
-    const frameWindow = printFrame.contentWindow;
-    if (!frameWindow) {
-      cleanup();
-      return;
-    }
-    frameWindow.focus();
-    frameWindow.print();
-    cleanup();
-  };
 }
 
 export default function QuickSalesPage() {
@@ -476,6 +344,58 @@ export default function QuickSalesPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handlePrintRecentOrder = (order: RecentOrder) => {
+    let vatPercent = 0;
+
+    Modal.confirm({
+      title: "Xuất hoá đơn",
+      okText: "In hoá đơn",
+      cancelText: "Hủy",
+      content: (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ marginBottom: 8, color: "#595959" }}>
+            Nhập % khấu trừ VAT áp dụng cho hóa đơn này.
+          </div>
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            defaultValue={0}
+            suffix="%"
+            onChange={(event) => {
+              vatPercent = Number(event.target.value || 0);
+            }}
+          />
+        </div>
+      ),
+      onOk: () => {
+        const html = buildInvoiceHtml(
+          {
+            orderId: order.id,
+            orderDate: new Date(order.created_at).toLocaleString("vi-VN"),
+            customerName: order.customer_name,
+            customerPhone: order.customer_phone,
+            customerAddress: order.customer_address,
+            notes: order.notes,
+            totalAmount: order.total_amount,
+            items: order.order_items.map((item) => ({
+              name: item.products?.name || "Sản phẩm",
+              quantity: item.quantity,
+              unitPrice: item.unit_price,
+              subtotal: item.subtotal,
+            })),
+          },
+          { vatPercent },
+        );
+
+        const ok = printInvoiceHtml(html);
+        if (!ok) {
+          messageApi.error("Không thể xuất hóa đơn");
+        }
+      },
+    });
   };
 
   return (
@@ -946,7 +866,7 @@ export default function QuickSalesPage() {
                     <Button
                       type="link"
                       icon={<PrinterOutlined />}
-                      onClick={() => printInvoice(order, messageApi)}
+                      onClick={() => handlePrintRecentOrder(order)}
                     >
                       Xuất hoá đơn
                     </Button>
