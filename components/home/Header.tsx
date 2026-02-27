@@ -34,8 +34,8 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
         if (active && firstLogo?.image_url) {
           setLogoSrc(
             getOptimizedImageUrl(firstLogo.image_url, {
-              width: 96,
-              quality: 80,
+              width: 180,
+              quality: 92,
               format: "webp",
             }),
           );
@@ -90,14 +90,16 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 borderRadius: 12,
                 display: "grid",
                 placeItems: "center",
+                overflow: "hidden",
+                background: "#fff",
               }}
             >
               <Image
                 src={logoSrc}
                 alt={`${APP_CONFIG.shopName} Logo`}
-                width={40}
-                height={40}
-                className="w-10 h-10 object-contain"
+                width={48}
+                height={48}
+                className="w-12 h-12 object-contain"
                 priority
               />
             </div>
