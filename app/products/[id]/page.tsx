@@ -13,6 +13,7 @@ import {
   Tag,
   message,
 } from "antd";
+import type { CarouselRef } from "antd/es/carousel";
 import {
   ArrowLeftOutlined,
   SafetyCertificateOutlined,
@@ -73,9 +74,7 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const carouselRef = useRef<{
-    goTo: (slide: number, dontAnimate?: boolean) => void;
-  } | null>(null);
+  const carouselRef = useRef<CarouselRef | null>(null);
 
   const {
     cart,

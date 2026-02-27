@@ -45,7 +45,7 @@ function createOrderWriteClient() {
     return null;
   }
 
-  return createClient(supabaseUrl, serviceRoleKey, {
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -197,8 +197,9 @@ async function createOrderDirectly(params: {
   let orderId: string | null = null;
   let orderInsertError: { code?: string; message?: string } | null = null;
 
-  const { data: createdWithPayment, error: createWithPaymentError } = await db
-    .from("orders")
+  const { data: createdWithPayment, error: createWithPaymentError } = await (
+    db.from("orders") as any
+  )
     .insert(orderInsertWithPayment)
     .select("id")
     .single();
@@ -211,8 +212,9 @@ async function createOrderDirectly(params: {
       message?: string;
     };
 
-    const { data: createdBase, error: createBaseError } = await db
-      .from("orders")
+    const { data: createdBase, error: createBaseError } = await (
+      db.from("orders") as any
+    )
       .insert(baseOrderInsert)
       .select("id")
       .single();
@@ -275,20 +277,21 @@ async function createOrderDirectly(params: {
     };
   });
 
-  const { error: orderItemsError } = await db
-    .from("order_items")
-    .insert(orderItemsPayload);
+  const { error: orderItemsError } = await (db.from("order_items") as any).insert(
+    orderItemsPayload,
+  );
 
   if (orderItemsError) {
-    await db.from("orders").delete().eq("id", orderId);
+    await (db.from("orders") as any).delete().eq("id", orderId);
     return {
       success: false,
       message: `Không thể tạo chi tiết đơn hàng: ${orderItemsError.message}`,
     };
   }
 
-  const { data: finalOrder, error: finalOrderError } = await db
-    .from("orders")
+  const { data: finalOrder, error: finalOrderError } = await (
+    db.from("orders") as any
+  )
     .select("id, total_amount")
     .eq("id", orderId)
     .single();

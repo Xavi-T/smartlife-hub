@@ -135,31 +135,37 @@ export interface Database {
         Row: ProductRow;
         Insert: Omit<ProductRow, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<ProductRow, "id" | "created_at" | "updated_at">>;
+        Relationships: [];
       };
       orders: {
         Row: Order;
         Insert: Omit<Order, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Order, "id" | "created_at" | "updated_at">>;
+        Relationships: [];
       };
       order_items: {
         Row: OrderItem;
         Insert: Omit<OrderItem, "id" | "created_at">;
         Update: Partial<Omit<OrderItem, "id" | "created_at">>;
+        Relationships: [];
       };
       categories: {
         Row: Category;
         Insert: Omit<Category, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Category, "id" | "created_at" | "updated_at">>;
+        Relationships: [];
       };
       product_categories: {
         Row: ProductCategory;
         Insert: Omit<ProductCategory, "id" | "created_at">;
         Update: Partial<Omit<ProductCategory, "id" | "created_at">>;
+        Relationships: [];
       };
       product_variants: {
         Row: ProductVariant;
         Insert: Omit<ProductVariant, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<ProductVariant, "id" | "created_at" | "updated_at">>;
+        Relationships: [];
       };
       customer_segment_settings: {
         Row: CustomerSegmentSetting;
@@ -170,6 +176,7 @@ export interface Database {
         Update: Partial<
           Omit<CustomerSegmentSetting, "id" | "created_at" | "updated_at">
         >;
+        Relationships: [];
       };
       priority_customers: {
         Row: PriorityCustomer;
@@ -177,12 +184,17 @@ export interface Database {
         Update: Partial<
           Omit<PriorityCustomer, "id" | "created_at" | "updated_at">
         >;
+        Relationships: [];
       };
     };
     Views: {
       product_sales_summary: {
         Row: ProductSalesSummary;
+        Relationships: [];
       };
     };
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 }

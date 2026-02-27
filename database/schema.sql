@@ -289,7 +289,8 @@ INSERT INTO products (name, description, price, cost_price, stock_quantity, cate
 -- ===========================================
 
 -- View thống kê doanh thu theo sản phẩm
-CREATE VIEW product_sales_summary AS
+CREATE VIEW product_sales_summary
+WITH (security_invoker = true) AS
 SELECT 
   p.id,
   p.name,
@@ -307,7 +308,8 @@ LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'cancelled'
 GROUP BY p.id, p.name, p.category, p.price, p.cost_price;
 
 -- View thống kê đơn hàng
-CREATE VIEW order_summary AS
+CREATE VIEW order_summary
+WITH (security_invoker = true) AS
 SELECT 
   DATE(o.created_at) as order_date,
   COUNT(DISTINCT o.id) as total_orders,

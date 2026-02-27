@@ -151,8 +151,7 @@ async function clearExpiredProductDiscounts() {
 
   const nowIso = new Date().toISOString();
 
-  const { error } = await serviceRoleClient
-    .from("products")
+  const { error } = await (serviceRoleClient.from("products") as any)
     .update({
       discount_percent: 0,
       discount_start_at: null,
