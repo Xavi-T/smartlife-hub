@@ -6,9 +6,7 @@ import {
   Form,
   Input,
   Button,
-  List,
   Card,
-  InputNumber,
   Space,
   Typography,
   Divider,
@@ -44,6 +42,13 @@ interface CartItem {
 interface QuickOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface QuickOrderFormValues {
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  notes?: string;
 }
 
 export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
@@ -123,7 +128,7 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
     0,
   );
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: QuickOrderFormValues) => {
     if (cart.length === 0) {
       messageApi.error("Vui lòng thêm sản phẩm vào đơn hàng");
       return;
@@ -220,26 +225,39 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
                 padding: 8,
               }}
             >
-              <List
-                dataSource={filteredProducts}
-                renderItem={(product) => (
-                  <List.Item
-                    style={{ cursor: "pointer", padding: "8px 12px" }}
-                    onClick={() => addToCart(product)}
-                  >
-                    <List.Item.Meta
-                      title={<Text strong>{product.name}</Text>}
-                      description={
-                        <Text type="secondary">
-                          {formatCurrency(product.price)} • Còn{" "}
-                          {product.stock_quantity}
-                        </Text>
-                      }
-                    />
-                    <PlusOutlined style={{ color: "#1890ff" }} />
-                  </List.Item>
-                )}
-              />
+              {filteredProducts.length === 0 ? (
+                <Text type="secondary">Không có sản phẩm phù hợp</Text>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {filteredProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      style={{
+                        cursor: "pointer",
+                        padding: "8px 12px",
+                        border: "1px solid #f0f0f0",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                      onClick={() => addToCart(product)}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <Text strong>{product.name}</Text>
+                        <div>
+                          <Text type="secondary">
+                            {formatCurrency(product.price)} • Còn{" "}
+                            {product.stock_quantity}
+                          </Text>
+                        </div>
+                      </div>
+                      <PlusOutlined style={{ color: "#1890ff" }} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Cart */}

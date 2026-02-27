@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, List, Space, Tag, Typography } from "antd";
+import { Button, Card, Input, Space, Tag, Typography } from "antd";
 import { Header } from "@/components/home/Header";
 import { useCart } from "@/hooks/useCart";
 import { APP_CONFIG } from "@/lib/appConfig";
@@ -77,33 +77,41 @@ export default function PriorityCustomersPublicPage() {
           </Card>
 
           <Card>
-            <List
-              loading={isLoading}
-              dataSource={filteredCustomers}
-              locale={{ emptyText: "Chưa có khách hàng ưu tiên" }}
-              renderItem={(customer) => (
-                <List.Item>
-                  <Space
-                    orientation="vertical"
-                    size={2}
-                    style={{ width: "100%" }}
+            {isLoading ? (
+              <Typography.Text type="secondary">Đang tải...</Typography.Text>
+            ) : filteredCustomers.length === 0 ? (
+              <Typography.Text type="secondary">
+                Chưa có khách hàng ưu tiên
+              </Typography.Text>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {filteredCustomers.map((customer) => (
+                  <div
+                    key={customer.id}
+                    style={{
+                      border: "1px solid #f0f0f0",
+                      borderRadius: 8,
+                      padding: 12,
+                    }}
                   >
-                    <Space>
-                      <Typography.Text strong>
-                        {customer.customer_name}
+                    <Space orientation="vertical" size={2} style={{ width: "100%" }}>
+                      <Space wrap>
+                        <Typography.Text strong>
+                          {customer.customer_name}
+                        </Typography.Text>
+                        <Tag color="gold">{customer.customer_segment}</Tag>
+                        <Tag color="blue">
+                          -{Number(customer.discount_percent || 0)}%
+                        </Tag>
+                      </Space>
+                      <Typography.Text type="secondary">
+                        {customer.customer_phone_masked}
                       </Typography.Text>
-                      <Tag color="gold">{customer.customer_segment}</Tag>
-                      <Tag color="blue">
-                        -{Number(customer.discount_percent || 0)}%
-                      </Tag>
                     </Space>
-                    <Typography.Text type="secondary">
-                      {customer.customer_phone_masked}
-                    </Typography.Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           <div>
