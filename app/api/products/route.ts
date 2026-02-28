@@ -953,10 +953,10 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Xóa sản phẩm (soft delete)
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createApiSupabaseClient();
+    const authClient = await createApiSupabaseClient();
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await authClient.auth.getUser();
 
     if (!user) {
       return NextResponse.json(
@@ -975,17 +975,37 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Get product name first
-    const { data: product } = await supabase
+    const mutationClient = createServiceRoleSupabaseClient() || authClient;
+
+    const { data: product, error: productError } = await mutationClient
       .from("products")
-      .select("name")
+      .select("id, name, is_active")
       .eq("id", id)
       .single();
 
-    // Soft delete: set is_active = false
-    const { error } = await supabase
+    if (productError) {
+      if ((productError as { code?: string }).code === "PGRST116") {
+        return NextResponse.json(
+          { error: "Không tìm thấy sản phẩm" },
+          { status: 404 },
+        );
+      }
+      throw productError;
+    }
+
+    if (!product.is_active) {
+      return NextResponse.json({
+        success: true,
+        message: "Sản phẩm đã được ẩn trước đó",
+      });
+    }
+
+    const { error } = await mutationClient
       .from("products")
-      .update({ is_active: false })
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id);
 
     if (error) {
@@ -999,9 +1019,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Log audit
-    if (product) {
-      await AuditLogger.deleteProduct(id, product.name);
-    }
+    await AuditLogger.deleteProduct(id, product.name);
 
     return NextResponse.json({
       success: true,

@@ -54,12 +54,14 @@ export default function ProductsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
     try {
-      const res = await fetch("/api/products");
+      const res = await fetch(`/api/products?activeOnly=false&t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Failed to fetch products");
       const data = await res.json();
       setProducts(data);
