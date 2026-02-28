@@ -43,6 +43,10 @@ type ProductWithRelations = Database["public"]["Tables"]["products"]["Row"] & {
   product_categories?: ProductCategoryRelation[];
   product_images?: ProductImageRelation[];
 };
+interface ProductImageStorageRow {
+  id: string;
+  storage_path: string | null;
+}
 
 function isVideoUrl(url: string): boolean {
   return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
@@ -975,7 +979,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const mutationClient = createServiceRoleSupabaseClient() || authClient;
+    const serviceRoleClient = createServiceRoleSupabaseClient();
+    const mutationClient = serviceRoleClient || authClient;
 
     const { data: product, error: productError } = await mutationClient
       .from("products")
@@ -1000,10 +1005,52 @@ export async function DELETE(request: NextRequest) {
       });
     }
 
+    const { data: mediaRows, error: mediaRowsError } = await mutationClient
+      .from("product_images")
+      .select("id, storage_path")
+      .eq("product_id", id);
+
+    if (mediaRowsError) {
+      throw mediaRowsError;
+    }
+
+    const mediaList = Array.isArray(mediaRows)
+      ? (mediaRows as ProductImageStorageRow[])
+      : [];
+    const storagePaths = mediaList
+      .map((item) => item.storage_path)
+      .filter(
+        (path): path is string =>
+          Boolean(path) && String(path).startsWith("products/"),
+      );
+
+    if (storagePaths.length > 0 && serviceRoleClient) {
+      const { error: removeStorageError } = await serviceRoleClient.storage
+        .from("product-images")
+        .remove(storagePaths);
+
+      if (removeStorageError) {
+        console.error(
+          "Error removing product media from storage during product delete:",
+          removeStorageError,
+        );
+      }
+    }
+
+    const { error: deleteMediaError } = await mutationClient
+      .from("product_images")
+      .delete()
+      .eq("product_id", id);
+
+    if (deleteMediaError) {
+      throw deleteMediaError;
+    }
+
     const { error } = await mutationClient
       .from("products")
       .update({
         is_active: false,
+        image_url: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
