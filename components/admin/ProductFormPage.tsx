@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -24,6 +24,8 @@ import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import type { Product } from "@/types/database";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
+import { ImageUpload } from "@/components/admin/ImageUpload";
+import { ImageGallery } from "@/components/admin/ImageGallery";
 
 const { RangePicker } = DatePicker;
 
@@ -52,11 +54,15 @@ interface CategoryOption {
   value: string;
 }
 
-interface ProductMediaItem {
+interface ProductGalleryItem {
   id: string;
   image_url: string;
+  display_order: number;
   is_cover: boolean;
-  media_type: "image" | "video";
+  file_size: number | null;
+  width: number | null;
+  height: number | null;
+  media_type?: "image" | "video";
 }
 
 interface EditorMediaImage {
@@ -80,6 +86,10 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
   const [editorMediaImages, setEditorMediaImages] = useState<
     EditorMediaImage[]
   >([]);
+  const [productMediaItems, setProductMediaItems] = useState<ProductGalleryItem[]>(
+    [],
+  );
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   const [variantImagePickerIndex, setVariantImagePickerIndex] = useState<
     number | null
   >(null);
@@ -106,6 +116,48 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     [editorMediaImages],
   );
 
+  const fetchProductMedia = useCallback(async () => {
+    if (!isEditMode || !productId) {
+      setProductMediaItems([]);
+      setEditorMediaImages([]);
+      return;
+    }
+
+    setIsLoadingMedia(true);
+    try {
+      const mediaRes = await fetch(
+        `/api/admin/product-images?productId=${productId}&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
+
+      if (!mediaRes.ok) {
+        setProductMediaItems([]);
+        setEditorMediaImages([]);
+        return;
+      }
+
+      const mediaList = (await mediaRes.json()) as ProductGalleryItem[];
+      const sorted = [...mediaList].sort(
+        (a, b) => Number(a.display_order || 0) - Number(b.display_order || 0),
+      );
+      setProductMediaItems(sorted);
+      setEditorMediaImages(
+        sorted
+          .filter((item) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(item.image_url))
+          .map((item) => ({
+            id: item.id,
+            url: item.image_url,
+            isCover: item.is_cover,
+          })),
+      );
+    } catch {
+      setProductMediaItems([]);
+      setEditorMediaImages([]);
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  }, [isEditMode, productId]);
+
   useEffect(() => {
     const fetchCategoryOptions = async () => {
       try {
@@ -131,6 +183,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     if (!isEditMode || !productId) {
       form.resetFields();
       setEditorMediaImages([]);
+      setProductMediaItems([]);
       form.setFieldsValue({
         is_active: true,
         has_variants: false,
@@ -189,21 +242,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
           is_active: product.is_active,
         });
 
-        const mediaRes = await fetch(`/api/products/${productId}/media`);
-        if (mediaRes.ok) {
-          const mediaList = (await mediaRes.json()) as ProductMediaItem[];
-          setEditorMediaImages(
-            mediaList
-              .filter((item) => item.media_type === "image" && item.image_url)
-              .map((item) => ({
-                id: item.id,
-                url: item.image_url,
-                isCover: item.is_cover,
-              })),
-          );
-        } else {
-          setEditorMediaImages([]);
-        }
+        await fetchProductMedia();
       } catch (error) {
         console.error("Error fetching product:", error);
         messageApi.error("Không thể tải thông tin sản phẩm");
@@ -214,7 +253,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     };
 
     fetchProduct();
-  }, [form, isEditMode, messageApi, productId, router]);
+  }, [fetchProductMedia, form, isEditMode, messageApi, productId, router]);
 
   useEffect(() => {
     if (!hasDiscount) {
@@ -310,7 +349,13 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
       );
 
       if (!isEditMode) {
-        router.push("/admin/products");
+        const createdProductId =
+          typeof result?.product?.id === "string" ? result.product.id : null;
+        if (createdProductId) {
+          router.push(`/admin/products/${createdProductId}/edit`);
+        } else {
+          router.push("/admin/products");
+        }
       }
     } catch (error: unknown) {
       messageApi.error(
@@ -861,13 +906,39 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   />
                 )}
 
-                <Alert
-                  type="info"
-                  showIcon
-                  style={{ marginBottom: 16 }}
-                  title="Ảnh sản phẩm"
-                  description="Sản phẩm mới chưa có ảnh đại diện. Hãy vào trang media của sản phẩm để upload ảnh và đặt cover."
-                />
+                {!isEditMode ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    title="Media sản phẩm"
+                    description="Tạo sản phẩm trước, sau đó hệ thống sẽ chuyển sang trang chỉnh sửa để upload và sắp xếp media ngay tại đây."
+                  />
+                ) : (
+                  <Card
+                    title="Media sản phẩm"
+                    style={{ marginBottom: 16 }}
+                    styles={{ body: { paddingTop: 12 } }}
+                  >
+                    <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                      <ImageUpload
+                        productId={productId || ""}
+                        onUploadSuccess={fetchProductMedia}
+                        maxFiles={10}
+                      />
+                      {isLoadingMedia ? (
+                        <div style={{ textAlign: "center", padding: 20 }}>
+                          <Spin />
+                        </div>
+                      ) : (
+                        <ImageGallery
+                          images={productMediaItems}
+                          onImagesChange={fetchProductMedia}
+                        />
+                      )}
+                    </Space>
+                  </Card>
+                )}
 
                 <Form.Item
                   label="Trạng thái"

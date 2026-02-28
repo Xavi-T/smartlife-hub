@@ -322,14 +322,6 @@ export default function ProductsPage() {
           <Button
             type="link"
             size="small"
-            icon={<PictureOutlined />}
-            onClick={() => router.push(`/admin/products/${record.id}/media`)}
-          >
-            Media
-          </Button>
-          <Button
-            type="link"
-            size="small"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           />
