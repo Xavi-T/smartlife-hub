@@ -338,7 +338,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         }}
       >
         <img
-          src="/logo.png"
+          src="/logoSH.png"
           alt="SmartLife Logo"
           style={{
             height: 40,

@@ -6,6 +6,7 @@ export const APP_CONFIG = {
   taxCode: "0108390511",
   shopEmail: "smartlifehub.work@gmail.com",
   shopWebsite: "https://smartlife-hub.shop",
+  defaultLogo: "/logoSH.png",
   bank: {
     name: "VPBANK",
     accountNumber: "14220968",

@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
-  const [logoSrc, setLogoSrc] = useState("/logo.png");
+  const [logoSrc, setLogoSrc] = useState(APP_CONFIG.defaultLogo);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
