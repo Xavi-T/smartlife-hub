@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="650" viewBox="0 0 1600 650" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0D4A93" />
+      <stop offset="0.52" stop-color="#1B7FFF" />
+      <stop offset="1" stop-color="#37B85A" />
+    </linearGradient>
+    <radialGradient id="g1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1280 170) rotate(145) scale(380 220)">
+      <stop stop-color="#8CFFAE" stop-opacity="0.45" />
+      <stop offset="1" stop-color="#8CFFAE" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="g2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(240 520) rotate(-20) scale(460 200)">
+      <stop stop-color="#CDE0FF" stop-opacity="0.4" />
+      <stop offset="1" stop-color="#CDE0FF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="650" fill="url(#bg)" />
+  <rect width="1600" height="650" fill="url(#g1)" />
+  <rect width="1600" height="650" fill="url(#g2)" />
+
+  <rect x="96" y="92" width="860" height="466" rx="36" fill="white" fill-opacity="0.1" stroke="white" stroke-opacity="0.24" />
+
+  <text x="152" y="252" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="88" font-weight="800">
+    Rẻ Hơn Shoppe,
+  </text>
+  <text x="152" y="358" fill="#E9FFF2" font-family="Arial, Helvetica, sans-serif" font-size="88" font-weight="800">
+    Ngon Hơn Shopee
+  </text>
+  <text x="156" y="438" fill="white" fill-opacity="0.92" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="600">
+    SmartLife Hub • Mang sự tiện lợi đến với mọi gia đình Việt
+  </text>
+</svg>

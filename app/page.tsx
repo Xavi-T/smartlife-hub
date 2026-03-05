@@ -36,29 +36,14 @@ type HomeBanner = {
   display_order?: number | null;
 };
 
+const DEFAULT_LEAD_BANNER = {
+  image: "/banners/banner-default-smartlife.svg",
+  alt: "Rẻ Hơn Shoppe, Ngon Hơn Shopee",
+  type: "image" as const,
+};
+
 const DEFAULT_CAROUSEL_ITEMS = [
-  { image: "/banners/banner-1.svg", alt: "Ưu đãi gia dụng", type: "image" },
-  {
-    image: "/banners/banner-2.svg",
-    alt: "Mua sắm nhanh chóng",
-    type: "image",
-  },
-  {
-    image: "/banners/banner-3.svg",
-    alt: "Chính hãng giá tốt",
-    type: "image",
-  },
-  { image: "/banners/banner-1.svg", alt: "Ưu đãi gia dụng", type: "image" },
-  {
-    image: "/banners/banner-2.svg",
-    alt: "Mua sắm nhanh chóng",
-    type: "image",
-  },
-  {
-    image: "/banners/banner-3.svg",
-    alt: "Chính hãng giá tốt",
-    type: "image",
-  },
+  DEFAULT_LEAD_BANNER,
 ];
 
 function HomeContent() {
@@ -148,7 +133,10 @@ function HomeContent() {
         }));
 
       if (mapped.length > 0) {
-        setCarouselItems(mapped);
+        setCarouselItems([
+          DEFAULT_LEAD_BANNER,
+          ...mapped.filter((item) => item.image !== DEFAULT_LEAD_BANNER.image),
+        ]);
       }
     } catch {
       // Keep fallback carousel items

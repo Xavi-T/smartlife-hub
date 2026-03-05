@@ -608,14 +608,12 @@ export default function ProductDetailPage() {
                     )}
                 </div>
               </div>
-
               <div className="text-xs sm:text-sm text-gray-600">
                 Tồn kho:{" "}
                 <strong>
                   {isOutOfStock ? "Hết hàng" : product.stock_quantity}
                 </strong>
               </div>
-
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span className="text-sm text-gray-700 min-w-[68px]">
                   Số lượng:
@@ -629,7 +627,6 @@ export default function ProductDetailPage() {
                   style={{ width: 120 }}
                 />
               </div>
-
               <Tag
                 color="green"
                 icon={<SafetyCertificateOutlined />}
@@ -642,9 +639,24 @@ export default function ProductDetailPage() {
                   borderRadius: 8,
                 }}
               >
-                Bảo hành miễn phí 15 ngày đổi trả sản phẩm
+                Miễn phí 15 ngày đổi trả sản phẩm
               </Tag>
-
+              <Tag
+                color="geekblue"
+                icon={<SafetyCertificateOutlined />}
+                style={{
+                  marginInlineStart: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  paddingInline: 10,
+                  paddingBlock: 5,
+                  borderRadius: 8,
+                  marginTop: 10,
+                }}
+              >
+                Bảo hành sản phẩm 3 tháng
+              </Tag>{" "}
+              <br />
               <Tag
                 color="blue"
                 icon={<TruckOutlined />}
@@ -660,7 +672,6 @@ export default function ProductDetailPage() {
               >
                 Miễn phí vận chuyển toàn quốc
               </Tag>
-
               <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <Button
                   type="primary"
