@@ -7,7 +7,7 @@ interface ProductMetadataLayoutProps {
 }
 
 interface ProductMetadataParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 interface ProductMetadataRow {
@@ -99,7 +99,7 @@ async function getProductMetadata(id: string) {
 export async function generateMetadata({
   params,
 }: ProductMetadataParams): Promise<Metadata> {
-  const { id } = params;
+  const { id } = await params;
   const siteUrl = APP_CONFIG.shopWebsite;
   const fallbackTitle = `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`;
   const fallbackDescription = `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`;

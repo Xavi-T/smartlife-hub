@@ -36,15 +36,19 @@ type HomeBanner = {
   display_order?: number | null;
 };
 
-const DEFAULT_LEAD_BANNER = {
-  image: "/banners/banner-default-smartlife.svg",
-  alt: "Rẻ Hơn Shoppe, Ngon Hơn Shopee",
-  type: "image" as const,
+type CarouselItem = {
+  image: string;
+  alt: string;
+  type: "image" | "video";
 };
 
-const DEFAULT_CAROUSEL_ITEMS = [
-  DEFAULT_LEAD_BANNER,
-];
+const DEFAULT_LEAD_BANNER: CarouselItem = {
+  image: "/banners/banner-default-smartlife.svg",
+  alt: "Rẻ Hơn Shoppe, Ngon Hơn Shopee",
+  type: "image",
+};
+
+const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [DEFAULT_LEAD_BANNER];
 
 function HomeContent() {
   const router = useRouter();
@@ -62,7 +66,9 @@ function HomeContent() {
     undefined,
   );
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
-  const [carouselItems, setCarouselItems] = useState(DEFAULT_CAROUSEL_ITEMS);
+  const [carouselItems, setCarouselItems] = useState<CarouselItem[]>(
+    DEFAULT_CAROUSEL_ITEMS,
+  );
 
   const {
     cart,
@@ -109,7 +115,7 @@ function HomeContent() {
 
       if (banners.length === 0) return;
 
-      const mapped = banners
+      const mapped: CarouselItem[] = banners
         .filter((item) => item.image_url)
         .sort((a, b) => {
           const orderA =

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { FaviconSync } from "@/components/home/FaviconSync";
@@ -8,16 +7,6 @@ import { PublicSiteWidgets } from "@/components/home/PublicSiteWidgets";
 import { APP_CONFIG } from "@/lib/appConfig";
 import { TitleSync } from "@/components/seo/TitleSync";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const siteUrl = APP_CONFIG.shopWebsite;
 
@@ -72,9 +61,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <AntdRegistry>
           {children}
           <PublicSiteWidgets />

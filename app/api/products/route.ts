@@ -982,7 +982,7 @@ export async function DELETE(request: NextRequest) {
     const serviceRoleClient = createServiceRoleSupabaseClient();
     const mutationClient = serviceRoleClient || authClient;
 
-    const { data: product, error: productError } = await mutationClient
+    const { data: productData, error: productError } = await mutationClient
       .from("products")
       .select("id, name, is_active")
       .eq("id", id)
@@ -996,6 +996,17 @@ export async function DELETE(request: NextRequest) {
         );
       }
       throw productError;
+    }
+
+    const product = productData as
+      | { id: string; name: string; is_active: boolean }
+      | null;
+
+    if (!product) {
+      return NextResponse.json(
+        { error: "Không tìm thấy sản phẩm" },
+        { status: 404 },
+      );
     }
 
     if (!product.is_active) {
@@ -1046,12 +1057,16 @@ export async function DELETE(request: NextRequest) {
       throw deleteMediaError;
     }
 
-    const { error } = await mutationClient
-      .from("products")
+    const productsMutationApi = mutationClient.from("products") as unknown as {
+      update: (values: ProductUpdate) => {
+        eq: (column: string, value: string) => Promise<{ error: { code?: string } | null }>;
+      };
+    };
+
+    const { error } = await productsMutationApi
       .update({
         is_active: false,
         image_url: null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", id);
 
