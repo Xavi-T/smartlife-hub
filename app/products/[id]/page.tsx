@@ -608,12 +608,6 @@ export default function ProductDetailPage() {
                     )}
                 </div>
               </div>
-              <div className="text-xs sm:text-sm text-gray-600">
-                Tồn kho:{" "}
-                <strong>
-                  {isOutOfStock ? "Hết hàng" : product.stock_quantity}
-                </strong>
-              </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span className="text-sm text-gray-700 min-w-[68px]">
                   Số lượng:

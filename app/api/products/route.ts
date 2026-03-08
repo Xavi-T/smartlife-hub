@@ -157,7 +157,11 @@ async function clearExpiredProductDiscounts() {
 
   type ProductsUpdateQuery = {
     gt: (column: string, value: number) => ProductsUpdateQuery;
-    not: (column: string, operator: string, value: string | null) => ProductsUpdateQuery;
+    not: (
+      column: string,
+      operator: string,
+      value: string | null,
+    ) => ProductsUpdateQuery;
     lte: (column: string, value: string) => Promise<{ error: unknown }>;
   };
 
@@ -210,7 +214,18 @@ function normalizeCategoryNames(
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter((item) => item.length > 0);
 
-  return Array.from(new Set(normalized));
+  const slugToName = new Map<string, string>();
+
+  normalized.forEach((name) => {
+    const slug = slugify(name);
+    if (!slug) return;
+
+    if (!slugToName.has(slug)) {
+      slugToName.set(slug, name);
+    }
+  });
+
+  return Array.from(slugToName.values());
 }
 
 async function ensureCategoryIdsByNames(
@@ -219,11 +234,24 @@ async function ensureCategoryIdsByNames(
 ): Promise<string[]> {
   if (categoryNames.length === 0) return [];
 
-  const upsertPayload = categoryNames.map((name) => ({
-    name,
-    slug: slugify(name),
-    is_active: true,
-  }));
+  const slugToName = new Map<string, string>();
+  categoryNames.forEach((name) => {
+    const slug = slugify(name);
+    if (!slug) return;
+    if (!slugToName.has(slug)) {
+      slugToName.set(slug, name);
+    }
+  });
+
+  const upsertPayload = Array.from(slugToName.entries()).map(
+    ([slug, name]) => ({
+      name,
+      slug,
+      is_active: true,
+    }),
+  );
+
+  if (upsertPayload.length === 0) return [];
 
   const { error: upsertError } = await supabase
     .from("categories")
@@ -242,9 +270,11 @@ async function ensureCategoryIdsByNames(
   const idMap = new Map(
     (rows || []).map((row: { slug: string; id: string }) => [row.slug, row.id]),
   );
-  return slugs
+  const ids = slugs
     .map((slug) => idMap.get(slug))
     .filter((id): id is string => Boolean(id));
+
+  return Array.from(new Set(ids));
 }
 
 async function syncProductCategoriesByName(
@@ -287,10 +317,14 @@ function normalizeVariantItems(input: unknown): Array<{
   return input
     .map((item, index) => {
       const source = item as Record<string, unknown>;
-      const variantName = String(source.variant_name || source.name || "").trim();
+      const variantName = String(
+        source.variant_name || source.name || "",
+      ).trim();
       const normalizedCostPrice = toOptionalNumber(source.cost_price);
       const normalizedPrice = toOptionalNumber(source.price);
-      const imageUrlRaw = String(source.image_url || source.imageUrl || "").trim();
+      const imageUrlRaw = String(
+        source.image_url || source.imageUrl || "",
+      ).trim();
       const sortOrderRaw = toOptionalNumber(source.sort_order);
 
       if (
@@ -317,7 +351,9 @@ function normalizeVariantItems(input: unknown): Array<{
       };
     })
     .filter(
-      (item): item is {
+      (
+        item,
+      ): item is {
         variant_name: string;
         cost_price: number;
         price: number;
@@ -425,22 +461,24 @@ export async function GET(request: NextRequest) {
       variantMap.set(item.product_id, current);
     });
 
-    const mappedProducts = productList.map(
-      (product) => {
-        const categories = (product.product_categories || [])
-          .map((relation) => relation.categories)
-          .filter((category): category is CategoryRow => Boolean(category));
+    const mappedProducts = productList.map((product) => {
+      const categories = (product.product_categories || [])
+        .map((relation) => relation.categories)
+        .filter((category): category is CategoryRow => Boolean(category))
+        .filter(
+          (category, index, list) =>
+            list.findIndex((item) => item.id === category.id) === index,
+        );
 
-        return {
-          ...product,
-          image_url: resolveProductImageUrl(product),
-          categories,
-          variants: (variantMap.get(product.id) || []).filter(
-            (variant) => variant.is_active,
-          ),
-        };
-      },
-    );
+      return {
+        ...product,
+        image_url: resolveProductImageUrl(product),
+        categories,
+        variants: (variantMap.get(product.id) || []).filter(
+          (variant) => variant.is_active,
+        ),
+      };
+    });
 
     return NextResponse.json(mappedProducts, {
       headers: {
@@ -505,7 +543,9 @@ export async function POST(request: NextRequest) {
 
     // Validation
     const effectiveCreatePrice =
-      normalizedVariants.length > 0 ? normalizedVariants[0].price : normalizedPrice;
+      normalizedVariants.length > 0
+        ? normalizedVariants[0].price
+        : normalizedPrice;
     const effectiveCreateCost =
       normalizedVariants.length > 0
         ? normalizedVariants[0].cost_price
@@ -828,8 +868,9 @@ export async function PATCH(request: NextRequest) {
     const finalCost =
       variants !== undefined && normalizedVariants.length > 0
         ? normalizedVariants[0].cost_price
-        :
-      cost_price !== undefined ? normalizedCostPrice : currentCostPrice;
+        : cost_price !== undefined
+          ? normalizedCostPrice
+          : currentCostPrice;
 
     if (
       finalPrice !== null &&
@@ -998,9 +1039,11 @@ export async function DELETE(request: NextRequest) {
       throw productError;
     }
 
-    const product = productData as
-      | { id: string; name: string; is_active: boolean }
-      | null;
+    const product = productData as {
+      id: string;
+      name: string;
+      is_active: boolean;
+    } | null;
 
     if (!product) {
       return NextResponse.json(
@@ -1059,7 +1102,10 @@ export async function DELETE(request: NextRequest) {
 
     const productsMutationApi = mutationClient.from("products") as unknown as {
       update: (values: ProductUpdate) => {
-        eq: (column: string, value: string) => Promise<{ error: { code?: string } | null }>;
+        eq: (
+          column: string,
+          value: string,
+        ) => Promise<{ error: { code?: string } | null }>;
       };
     };
 

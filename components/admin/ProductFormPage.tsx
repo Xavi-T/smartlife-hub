@@ -86,9 +86,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
   const [editorMediaImages, setEditorMediaImages] = useState<
     EditorMediaImage[]
   >([]);
-  const [productMediaItems, setProductMediaItems] = useState<ProductGalleryItem[]>(
-    [],
-  );
+  const [productMediaItems, setProductMediaItems] = useState<
+    ProductGalleryItem[]
+  >([]);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   const [variantImagePickerIndex, setVariantImagePickerIndex] = useState<
     number | null
@@ -143,7 +143,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
       setProductMediaItems(sorted);
       setEditorMediaImages(
         sorted
-          .filter((item) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(item.image_url))
+          .filter(
+            (item) => !/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(item.image_url),
+          )
           .map((item) => ({
             id: item.id,
             url: item.image_url,
@@ -226,10 +228,16 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                 ]
               : undefined,
           cost_price: product.cost_price,
-          categories:
-            product.categories && product.categories.length > 0
-              ? product.categories.map((item) => item.name)
-              : [product.category],
+          categories: Array.from(
+            new Set(
+              (product.categories && product.categories.length > 0
+                ? product.categories.map((item) => item.name)
+                : [product.category]
+              )
+                .map((item) => String(item || "").trim())
+                .filter(Boolean),
+            ),
+          ),
           has_variants: (product.variants || []).length > 0,
           variants: (product.variants || []).map((variant, index) => ({
             variant_name: variant.variant_name,
@@ -644,19 +652,28 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                         nhiều phân loại, mỗi loại có giá vốn và giá bán riêng.
                       </Typography.Text>
                     </Space>
-                    <Form.Item name="has_variants" valuePropName="checked" noStyle>
+                    <Form.Item
+                      name="has_variants"
+                      valuePropName="checked"
+                      noStyle
+                    >
                       <Switch
                         checkedChildren="Bật"
                         unCheckedChildren="Tắt"
                         onChange={(checked) => {
                           if (checked) {
-                            const currentVariants = form.getFieldValue("variants") || [];
+                            const currentVariants =
+                              form.getFieldValue("variants") || [];
                             if (currentVariants.length === 0) {
                               form.setFieldValue("variants", [
                                 {
                                   variant_name: "Loại mặc định",
-                                  cost_price: Number(form.getFieldValue("cost_price") || 0),
-                                  price: Number(form.getFieldValue("price") || 0),
+                                  cost_price: Number(
+                                    form.getFieldValue("cost_price") || 0,
+                                  ),
+                                  price: Number(
+                                    form.getFieldValue("price") || 0,
+                                  ),
                                   image_url: "",
                                   sort_order: 1,
                                   is_active: true,
@@ -684,217 +701,224 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   giá và thời gian hiệu lực dùng chung cho toàn bộ sản phẩm.
                 </Typography.Text>
 
-                {hasVariants && <Form.List name="variants">
-                  {(fields, { add, remove }) => (
-                    <Space
-                      orientation="vertical"
-                      size={12}
-                      style={{ width: "100%", marginBottom: 16 }}
-                    >
-                      {fields.map(({ key, name, ...restField }, index) => {
-                        const currentImage = variantsValue?.[name]?.image_url;
-                        return (
-                          <Card
-                            key={key}
-                            size="small"
-                            title={`Loại #${index + 1}`}
-                            extra={
-                              <Button
-                                danger
-                                type="link"
-                                onClick={() => remove(name)}
-                              >
-                                Xóa
-                              </Button>
-                            }
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  "repeat(auto-fit, minmax(160px, 1fr))",
-                                gap: 12,
-                              }}
-                            >
-                              <Form.Item
-                                {...restField}
-                                name={[name, "variant_name"]}
-                                label="Tên loại"
-                                rules={[
-                                  { required: true, message: "Nhập tên loại" },
-                                ]}
-                              >
-                                <Input placeholder="Ví dụ: Màu trắng / 1.8L" />
-                              </Form.Item>
-
-                              <Form.Item
-                                {...restField}
-                                name={[name, "cost_price"]}
-                                label="Giá vốn"
-                                rules={[
-                                  { required: true, message: "Nhập giá vốn" },
-                                  {
-                                    type: "number",
-                                    min: 0,
-                                    message: "Giá vốn không được âm",
-                                  },
-                                ]}
-                              >
-                                <InputNumber
-                                  style={{ width: "100%" }}
-                                  placeholder="0"
-                                  formatter={(value) =>
-                                    `${value}`.replace(
-                                      /\B(?=(\d{3})+(?!\d))/g,
-                                      ",",
-                                    )
-                                  }
-                                  parser={(value) =>
-                                    value!.replace(/\$\s?|(,*)/g, "")
-                                  }
-                                />
-                              </Form.Item>
-
-                              <Form.Item
-                                {...restField}
-                                name={[name, "price"]}
-                                label="Giá bán"
-                                rules={[
-                                  { required: true, message: "Nhập giá bán" },
-                                  {
-                                    type: "number",
-                                    min: 0,
-                                    message: "Giá không được âm",
-                                  },
-                                  {
-                                    validator(_, value) {
-                                      const variantCostPrice = Number(
-                                        form.getFieldValue([
-                                          "variants",
-                                          name,
-                                          "cost_price",
-                                        ]) || 0,
-                                      );
-                                      if (
-                                        value === undefined ||
-                                        value === null ||
-                                        value >= variantCostPrice
-                                      ) {
-                                        return Promise.resolve();
-                                      }
-                                      return Promise.reject(
-                                        new Error(
-                                          "Giá bán phải lớn hơn hoặc bằng giá vốn",
-                                        ),
-                                      );
-                                    },
-                                  },
-                                ]}
-                              >
-                                <InputNumber
-                                  style={{ width: "100%" }}
-                                  placeholder="0"
-                                  formatter={(value) =>
-                                    `${value}`.replace(
-                                      /\B(?=(\d{3})+(?!\d))/g,
-                                      ",",
-                                    )
-                                  }
-                                  parser={(value) =>
-                                    value!.replace(/\$\s?|(,*)/g, "")
-                                  }
-                                />
-                              </Form.Item>
-
-                              <Form.Item
-                                {...restField}
-                                name={[name, "sort_order"]}
-                                label="Thứ tự"
-                              >
-                                <InputNumber
-                                  style={{ width: "100%" }}
-                                  min={1}
-                                  placeholder={`${index + 1}`}
-                                />
-                              </Form.Item>
-                            </div>
-
-                            <Form.Item
-                              {...restField}
-                              name={[name, "image_url"]}
-                              hidden
-                            >
-                              <Input />
-                            </Form.Item>
-
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <Button
-                                onClick={() => setVariantImagePickerIndex(name)}
-                                disabled={mediaImageOptions.length === 0}
-                              >
-                                Chọn ảnh từ media
-                              </Button>
-
-                              <Button
-                                type="link"
-                                danger
-                                onClick={() =>
-                                  form.setFieldValue(
-                                    ["variants", name, "image_url"],
-                                    null,
-                                  )
-                                }
-                              >
-                                Xóa ảnh
-                              </Button>
-
-                              {currentImage ? (
-                                <Image
-                                  src={currentImage}
-                                  alt="variant"
-                                  width={44}
-                                  height={44}
-                                  style={{
-                                    objectFit: "cover",
-                                    borderRadius: 8,
-                                  }}
-                                />
-                              ) : (
-                                <Typography.Text type="secondary">
-                                  Chưa chọn ảnh
-                                </Typography.Text>
-                              )}
-                            </div>
-                          </Card>
-                        );
-                      })}
-
-                      <Button
-                        type="dashed"
-                        block
-                        onClick={() =>
-                          add({
-                            variant_name: "",
-                            cost_price: 0,
-                            price: 0,
-                            image_url: "",
-                            sort_order: fields.length + 1,
-                            is_active: true,
-                          })
-                        }
+                {hasVariants && (
+                  <Form.List name="variants">
+                    {(fields, { add, remove }) => (
+                      <Space
+                        orientation="vertical"
+                        size={12}
+                        style={{ width: "100%", marginBottom: 16 }}
                       >
-                        Thêm loại sản phẩm
-                      </Button>
-                    </Space>
-                  )}
-                </Form.List>}
+                        {fields.map(({ key, name, ...restField }, index) => {
+                          const currentImage = variantsValue?.[name]?.image_url;
+                          return (
+                            <Card
+                              key={key}
+                              size="small"
+                              title={`Loại #${index + 1}`}
+                              extra={
+                                <Button
+                                  danger
+                                  type="link"
+                                  onClick={() => remove(name)}
+                                >
+                                  Xóa
+                                </Button>
+                              }
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit, minmax(160px, 1fr))",
+                                  gap: 12,
+                                }}
+                              >
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, "variant_name"]}
+                                  label="Tên loại"
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Nhập tên loại",
+                                    },
+                                  ]}
+                                >
+                                  <Input placeholder="Ví dụ: Màu trắng / 1.8L" />
+                                </Form.Item>
+
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, "cost_price"]}
+                                  label="Giá vốn"
+                                  rules={[
+                                    { required: true, message: "Nhập giá vốn" },
+                                    {
+                                      type: "number",
+                                      min: 0,
+                                      message: "Giá vốn không được âm",
+                                    },
+                                  ]}
+                                >
+                                  <InputNumber
+                                    style={{ width: "100%" }}
+                                    placeholder="0"
+                                    formatter={(value) =>
+                                      `${value}`.replace(
+                                        /\B(?=(\d{3})+(?!\d))/g,
+                                        ",",
+                                      )
+                                    }
+                                    parser={(value) =>
+                                      value!.replace(/\$\s?|(,*)/g, "")
+                                    }
+                                  />
+                                </Form.Item>
+
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, "price"]}
+                                  label="Giá bán"
+                                  rules={[
+                                    { required: true, message: "Nhập giá bán" },
+                                    {
+                                      type: "number",
+                                      min: 0,
+                                      message: "Giá không được âm",
+                                    },
+                                    {
+                                      validator(_, value) {
+                                        const variantCostPrice = Number(
+                                          form.getFieldValue([
+                                            "variants",
+                                            name,
+                                            "cost_price",
+                                          ]) || 0,
+                                        );
+                                        if (
+                                          value === undefined ||
+                                          value === null ||
+                                          value >= variantCostPrice
+                                        ) {
+                                          return Promise.resolve();
+                                        }
+                                        return Promise.reject(
+                                          new Error(
+                                            "Giá bán phải lớn hơn hoặc bằng giá vốn",
+                                          ),
+                                        );
+                                      },
+                                    },
+                                  ]}
+                                >
+                                  <InputNumber
+                                    style={{ width: "100%" }}
+                                    placeholder="0"
+                                    formatter={(value) =>
+                                      `${value}`.replace(
+                                        /\B(?=(\d{3})+(?!\d))/g,
+                                        ",",
+                                      )
+                                    }
+                                    parser={(value) =>
+                                      value!.replace(/\$\s?|(,*)/g, "")
+                                    }
+                                  />
+                                </Form.Item>
+
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, "sort_order"]}
+                                  label="Thứ tự"
+                                >
+                                  <InputNumber
+                                    style={{ width: "100%" }}
+                                    min={1}
+                                    placeholder={`${index + 1}`}
+                                  />
+                                </Form.Item>
+                              </div>
+
+                              <Form.Item
+                                {...restField}
+                                name={[name, "image_url"]}
+                                hidden
+                              >
+                                <Input />
+                              </Form.Item>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <Button
+                                  onClick={() =>
+                                    setVariantImagePickerIndex(name)
+                                  }
+                                  disabled={mediaImageOptions.length === 0}
+                                >
+                                  Chọn ảnh từ media
+                                </Button>
+
+                                <Button
+                                  type="link"
+                                  danger
+                                  onClick={() =>
+                                    form.setFieldValue(
+                                      ["variants", name, "image_url"],
+                                      null,
+                                    )
+                                  }
+                                >
+                                  Xóa ảnh
+                                </Button>
+
+                                {currentImage ? (
+                                  <Image
+                                    src={currentImage}
+                                    alt="variant"
+                                    width={44}
+                                    height={44}
+                                    style={{
+                                      objectFit: "cover",
+                                      borderRadius: 8,
+                                    }}
+                                  />
+                                ) : (
+                                  <Typography.Text type="secondary">
+                                    Chưa chọn ảnh
+                                  </Typography.Text>
+                                )}
+                              </div>
+                            </Card>
+                          );
+                        })}
+
+                        <Button
+                          type="dashed"
+                          block
+                          onClick={() =>
+                            add({
+                              variant_name: "",
+                              cost_price: 0,
+                              price: 0,
+                              image_url: "",
+                              sort_order: fields.length + 1,
+                              is_active: true,
+                            })
+                          }
+                        >
+                          Thêm loại sản phẩm
+                        </Button>
+                      </Space>
+                    )}
+                  </Form.List>
+                )}
 
                 {!isEditMode && (
                   <Alert
@@ -920,7 +944,11 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                     style={{ marginBottom: 16 }}
                     styles={{ body: { paddingTop: 12 } }}
                   >
-                    <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+                    <Space
+                      orientation="vertical"
+                      size={16}
+                      style={{ width: "100%" }}
+                    >
                       <ImageUpload
                         productId={productId || ""}
                         onUploadSuccess={fetchProductMedia}

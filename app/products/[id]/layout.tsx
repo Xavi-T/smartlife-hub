@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { APP_CONFIG } from "@/lib/appConfig";
+import type { Database } from "@/types/database";
 
 interface ProductMetadataLayoutProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface ProductMetadataRow {
   name: string;
   description: string | null;
   image_url: string | null;
+  is_active: boolean;
 }
 
 interface ProductMediaRow {
@@ -22,34 +24,63 @@ interface ProductMediaRow {
 }
 
 function stripHtml(input: string) {
-  return input.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return input
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toAbsoluteUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  const base = APP_CONFIG.shopWebsite.replace(/\/$/, "");
+  const normalizedPath = pathOrUrl.startsWith("/")
+    ? pathOrUrl
+    : `/${pathOrUrl}`;
+  return `${base}${normalizedPath}`;
+}
+
+function truncateDescription(input: string, maxLength = 180): string {
+  if (input.length <= maxLength) return input;
+  return `${input.slice(0, maxLength - 3).trim()}...`;
 }
 
 async function getProductMetadata(id: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !supabaseKey) {
     return null;
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: productData } = await supabase
+  const { data: productData, error: productError } = await supabase
     .from("products")
-    .select("id, name, description, image_url")
+    .select("id, name, description, image_url, is_active")
     .eq("id", id)
-    .single();
+    .maybeSingle();
+
+  if (productError) {
+    return null;
+  }
 
   const product = productData as ProductMetadataRow | null;
-  if (!product) return null;
+  if (!product || !product.is_active) return null;
 
-  const { data: mediaRows } = await (supabase
-    .from("product_images") as unknown as {
+  const { data: mediaRows } = await (
+    supabase.from("product_images") as unknown as {
       select: (columns: string) => {
-        eq: (column: string, value: string) => {
+        eq: (
+          column: string,
+          value: string,
+        ) => {
           order: (
             column: string,
             options: { ascending: boolean },
@@ -71,7 +102,8 @@ async function getProductMetadata(id: string) {
           };
         };
       };
-    })
+    }
+  )
     .select("image_url, is_cover, display_order, created_at")
     .eq("product_id", id)
     .order("is_cover", { ascending: false })
@@ -84,15 +116,15 @@ async function getProductMetadata(id: string) {
     : null;
   const imageUrl = mediaImageUrl || product.image_url || "/opengraph-image";
   const descriptionText = stripHtml(product.description || "");
-  const description = descriptionText
-    ? descriptionText.slice(0, 180)
-    : `${APP_CONFIG.shopTagline}.`;
+  const description = truncateDescription(
+    descriptionText || `${product.name} - ${APP_CONFIG.shopTagline}.`,
+  );
 
   return {
     id: product.id,
     name: product.name,
     description,
-    imageUrl,
+    imageUrl: toAbsoluteUrl(imageUrl),
   };
 }
 
@@ -111,14 +143,20 @@ export async function generateMetadata({
       title: fallbackTitle,
       description: fallbackDescription,
       alternates: { canonical },
+      robots: {
+        index: false,
+        follow: false,
+      },
       openGraph: {
         type: "website",
+        locale: "vi_VN",
+        siteName: APP_CONFIG.shopName,
         url: canonical,
         title: fallbackTitle,
         description: fallbackDescription,
         images: [
           {
-            url: "/opengraph-image",
+            url: toAbsoluteUrl("/opengraph-image"),
             width: 1200,
             height: 630,
             alt: fallbackTitle,
@@ -129,7 +167,7 @@ export async function generateMetadata({
         card: "summary_large_image",
         title: fallbackTitle,
         description: fallbackDescription,
-        images: ["/opengraph-image"],
+        images: [toAbsoluteUrl("/opengraph-image")],
       },
     };
   }
@@ -142,6 +180,7 @@ export async function generateMetadata({
     alternates: { canonical },
     openGraph: {
       type: "website",
+      locale: "vi_VN",
       url: canonical,
       siteName: APP_CONFIG.shopName,
       title: pageTitle,
@@ -154,7 +193,7 @@ export async function generateMetadata({
           alt: productMeta.name,
         },
         {
-          url: "/opengraph-image",
+          url: toAbsoluteUrl("/opengraph-image"),
           width: 1200,
           height: 630,
           alt: `${APP_CONFIG.shopName} - ${APP_CONFIG.shopTagline}`,

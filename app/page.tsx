@@ -7,6 +7,7 @@ import { Header } from "@/components/home/Header";
 import { ProductGrid } from "@/components/home/ProductGrid";
 import { useCart } from "@/hooks/useCart";
 import type { Product } from "@/types/database";
+import { CloseOutlined, FilterOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
@@ -25,7 +26,8 @@ import { trackBeginCheckout, trackSelectItem } from "@/lib/analytics";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
 
 const CartModal = dynamic(
-  () => import("@/components/home/CartModal").then((module) => module.CartModal),
+  () =>
+    import("@/components/home/CartModal").then((module) => module.CartModal),
   { ssr: false },
 );
 
@@ -51,6 +53,7 @@ const DEFAULT_LEAD_BANNER: CarouselItem = {
 const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [DEFAULT_LEAD_BANNER];
 
 function HomeContent() {
+  const MOBILE_PRODUCTS_STEP = 8;
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
@@ -69,6 +72,10 @@ function HomeContent() {
   const [carouselItems, setCarouselItems] = useState<CarouselItem[]>(
     DEFAULT_CAROUSEL_ITEMS,
   );
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [mobileVisibleCount, setMobileVisibleCount] =
+    useState(MOBILE_PRODUCTS_STEP);
 
   const {
     cart,
@@ -84,6 +91,20 @@ function HomeContent() {
   useEffect(() => {
     fetchProducts();
     fetchHomepageBanners();
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateMobileState = () => {
+      setIsMobileView(mediaQuery.matches);
+    };
+
+    updateMobileState();
+    mediaQuery.addEventListener("change", updateMobileState);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateMobileState);
+    };
   }, []);
 
   const fetchProducts = async () => {
@@ -228,6 +249,31 @@ function HomeContent() {
     );
   }, [filteredProducts, priceSort, sortType]);
 
+  useEffect(() => {
+    setMobileVisibleCount(MOBILE_PRODUCTS_STEP);
+  }, [
+    MOBILE_PRODUCTS_STEP,
+    selectedCategory,
+    onlyDiscounted,
+    sortType,
+    priceSort,
+  ]);
+
+  const displayedProducts = useMemo(() => {
+    if (!isMobileView) return visibleProducts;
+    return visibleProducts.slice(0, mobileVisibleCount);
+  }, [isMobileView, mobileVisibleCount, visibleProducts]);
+
+  const hasMoreMobileProducts =
+    isMobileView && displayedProducts.length < visibleProducts.length;
+
+  const resetFilters = () => {
+    setSelectedCategory(undefined);
+    setOnlyDiscounted(false);
+    setPriceSort(undefined);
+    setSortType("popular");
+  };
+
   if (isLoading || !isLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 grid place-items-center">
@@ -254,6 +300,7 @@ function HomeContent() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Card
+          className="hidden md:block"
           style={{ marginBottom: 24, padding: 0 }}
           styles={{ body: { padding: 0 } }}
         >
@@ -303,7 +350,10 @@ function HomeContent() {
           </Carousel>
         </Card>
 
-        <Card style={{ marginBottom: 16, background: "#fafafa" }}>
+        <Card
+          className="hidden md:block"
+          style={{ marginBottom: 16, background: "#fafafa" }}
+        >
           <Space wrap size={12} style={{ width: "100%" }}>
             <Typography.Text type="secondary">Sắp xếp theo</Typography.Text>
             <Radio.Group
@@ -345,12 +395,93 @@ function HomeContent() {
           </Space>
         </Card>
 
+        <div className="md:hidden mb-3 flex justify-end">
+          <Button
+            type={isMobileFilterOpen ? "primary" : "default"}
+            icon={isMobileFilterOpen ? <CloseOutlined /> : <FilterOutlined />}
+            onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+          >
+            {isMobileFilterOpen ? "Đóng lọc" : "Bộ lọc"}
+          </Button>
+        </div>
+
+        {isMobileFilterOpen && (
+          <Card
+            className="md:hidden"
+            style={{ marginBottom: 12, background: "#fafafa" }}
+          >
+            <Space orientation="vertical" size={10} style={{ width: "100%" }}>
+              <Typography.Text type="secondary">
+                Bộ lọc sản phẩm
+              </Typography.Text>
+
+              <Select
+                value={sortType}
+                onChange={(value) => setSortType(value)}
+                style={{ width: "100%" }}
+                options={[
+                  { label: "Phổ Biến", value: "popular" },
+                  { label: "Mới Nhất", value: "newest" },
+                  { label: "Bán Chạy", value: "bestseller" },
+                ]}
+              />
+
+              <Select
+                allowClear
+                placeholder="Giá"
+                value={priceSort}
+                onChange={(value) => setPriceSort(value)}
+                style={{ width: "100%" }}
+                options={[
+                  { label: "Giá: Thấp đến cao", value: "asc" },
+                  { label: "Giá: Cao đến thấp", value: "desc" },
+                ]}
+              />
+
+              <Select
+                allowClear
+                placeholder="Danh mục"
+                value={selectedCategory}
+                onChange={(value) => setSelectedCategory(value)}
+                style={{ width: "100%" }}
+                options={categoryOptions}
+              />
+
+              <Space
+                size={8}
+                style={{ width: "100%", justifyContent: "space-between" }}
+              >
+                <Button onClick={resetFilters}>Xóa lọc</Button>
+                <Button
+                  type={onlyDiscounted ? "primary" : "default"}
+                  onClick={() => setOnlyDiscounted((prev) => !prev)}
+                >
+                  Đang giảm giá
+                </Button>
+              </Space>
+            </Space>
+          </Card>
+        )}
+
         {/* Product Grid */}
         <ProductGrid
-          products={visibleProducts}
+          products={displayedProducts}
           onAddToCart={handleAddToCart}
           onViewDetail={handleViewDetail}
         />
+
+        {hasMoreMobileProducts && (
+          <div className="md:hidden mt-4 flex justify-center">
+            <Button
+              type="primary"
+              onClick={() =>
+                setMobileVisibleCount((prev) => prev + MOBILE_PRODUCTS_STEP)
+              }
+            >
+              Hiển thị thêm
+            </Button>
+          </div>
+        )}
 
         {/* Empty State */}
         {visibleProducts.length === 0 && (
@@ -359,15 +490,7 @@ function HomeContent() {
               description="Không có sản phẩm phù hợp bộ lọc"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             >
-              <Button
-                type="primary"
-                onClick={() => {
-                  setSelectedCategory(undefined);
-                  setOnlyDiscounted(false);
-                  setPriceSort(undefined);
-                  setSortType("popular");
-                }}
-              >
+              <Button type="primary" onClick={resetFilters}>
                 Xóa bộ lọc
               </Button>
             </Empty>
