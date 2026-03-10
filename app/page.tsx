@@ -54,6 +54,7 @@ const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [DEFAULT_LEAD_BANNER];
 
 function HomeContent() {
   const MOBILE_PRODUCTS_STEP = 8;
+  const DESKTOP_PRODUCTS_STEP = 12;
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
@@ -74,8 +75,7 @@ function HomeContent() {
   );
   const [isMobileView, setIsMobileView] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [mobileVisibleCount, setMobileVisibleCount] =
-    useState(MOBILE_PRODUCTS_STEP);
+  const [visibleCount, setVisibleCount] = useState(DESKTOP_PRODUCTS_STEP);
 
   const {
     cart,
@@ -249,23 +249,19 @@ function HomeContent() {
     );
   }, [filteredProducts, priceSort, sortType]);
 
+  const productsStep = isMobileView
+    ? MOBILE_PRODUCTS_STEP
+    : DESKTOP_PRODUCTS_STEP;
+
+  const hasMoreProducts = visibleProducts.length > visibleCount;
+
   useEffect(() => {
-    setMobileVisibleCount(MOBILE_PRODUCTS_STEP);
-  }, [
-    MOBILE_PRODUCTS_STEP,
-    selectedCategory,
-    onlyDiscounted,
-    sortType,
-    priceSort,
-  ]);
+    setVisibleCount(productsStep);
+  }, [productsStep, selectedCategory, onlyDiscounted, sortType, priceSort]);
 
   const displayedProducts = useMemo(() => {
-    if (!isMobileView) return visibleProducts;
-    return visibleProducts.slice(0, mobileVisibleCount);
-  }, [isMobileView, mobileVisibleCount, visibleProducts]);
-
-  const hasMoreMobileProducts =
-    isMobileView && displayedProducts.length < visibleProducts.length;
+    return visibleProducts.slice(0, visibleCount);
+  }, [visibleCount, visibleProducts]);
 
   const resetFilters = () => {
     setSelectedCategory(undefined);
@@ -470,12 +466,14 @@ function HomeContent() {
           onViewDetail={handleViewDetail}
         />
 
-        {hasMoreMobileProducts && (
-          <div className="md:hidden mt-4 flex justify-center">
+        {hasMoreProducts && (
+          <div className="mt-4 flex justify-center py-2">
             <Button
               type="primary"
               onClick={() =>
-                setMobileVisibleCount((prev) => prev + MOBILE_PRODUCTS_STEP)
+                setVisibleCount((prev) =>
+                  Math.min(prev + productsStep, visibleProducts.length),
+                )
               }
             >
               Hiển thị thêm
