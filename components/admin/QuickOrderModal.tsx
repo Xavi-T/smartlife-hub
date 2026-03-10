@@ -67,7 +67,9 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch("/api/products");
+      const res = await fetch(`/api/products?noCache=1&t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (res.ok) {
         const data = await res.json();
         setProducts(data.filter((p: Product) => p.stock_quantity > 0));

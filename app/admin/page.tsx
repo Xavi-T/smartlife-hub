@@ -42,7 +42,9 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       const [productsRes, statsRes, chartRes] = await Promise.all([
-        fetch(`/api/products?t=${Date.now()}`, { cache: "no-store" }),
+        fetch(`/api/products?noCache=1&t=${Date.now()}`, {
+          cache: "no-store",
+        }),
         fetch("/api/admin/stats"),
         fetch("/api/admin/chart"),
       ]);

@@ -407,6 +407,9 @@ export async function GET(request: NextRequest) {
     await clearExpiredProductDiscounts();
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("activeOnly") === "true";
+    const noCache =
+      searchParams.get("noCache") === "1" ||
+      searchParams.get("noCache") === "true";
 
     let query = supabase.from("products").select(
       `
@@ -482,7 +485,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(mappedProducts, {
       headers: {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        "Cache-Control": noCache
+          ? "no-store"
+          : "public, max-age=60, stale-while-revalidate=300",
       },
     });
   } catch (error) {

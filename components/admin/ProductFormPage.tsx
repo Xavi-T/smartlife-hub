@@ -203,7 +203,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     const fetchProduct = async () => {
       setIsLoadingProduct(true);
       try {
-        const res = await fetch("/api/products");
+        const res = await fetch(`/api/products?noCache=1&t=${Date.now()}`, {
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error("Không thể tải dữ liệu sản phẩm");
 
         const products = (await res.json()) as Product[];

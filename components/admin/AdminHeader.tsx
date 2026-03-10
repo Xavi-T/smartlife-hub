@@ -52,7 +52,10 @@ export function AdminHeader({
         const results: SearchResult[] = [];
 
         // Search products
-        const productsRes = await fetch("/api/products");
+        const productsRes = await fetch(
+          `/api/products?noCache=1&t=${Date.now()}`,
+          { cache: "no-store" },
+        );
         if (productsRes.ok) {
           const products = await productsRes.json();
           const matchedProducts = products

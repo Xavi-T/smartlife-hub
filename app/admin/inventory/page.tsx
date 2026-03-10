@@ -41,7 +41,7 @@ export default function InventoryPage() {
   // Fetch products
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`/api/products?t=${Date.now()}`, {
+      const res = await fetch(`/api/products?noCache=1&t=${Date.now()}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("Failed to fetch products");

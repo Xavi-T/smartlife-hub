@@ -139,7 +139,10 @@ export default function QuickSalesPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch("/api/products?activeOnly=true");
+        const res = await fetch(
+          `/api/products?activeOnly=true&noCache=1&t=${Date.now()}`,
+          { cache: "no-store" },
+        );
         if (!res.ok) throw new Error("Không thể tải sản phẩm");
         const data = (await res.json()) as Product[];
         setProducts(data.filter((product) => product.stock_quantity > 0));
@@ -328,7 +331,10 @@ export default function QuickSalesPage() {
       setCart([]);
       setSearchQuery("");
 
-      const productsRes = await fetch("/api/products?activeOnly=true");
+      const productsRes = await fetch(
+        `/api/products?activeOnly=true&noCache=1&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
       if (productsRes.ok) {
         const latestProducts = (await productsRes.json()) as Product[];
         setProducts(
