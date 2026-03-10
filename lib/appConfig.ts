@@ -1,6 +1,6 @@
 export const APP_CONFIG = {
   shopName: "SmartLife Hub",
-  shopTagline: "Mang sự tiện lợi đến với mọi gia đình Việt",
+  shopTagline: "Đơn giản hơn - Tiện lợi hơn",
   shopAddress: "142 Đ. Tô Hiến Thành, P. Nguyễn, Đại Năng, TP. Hải Phòng",
   shopPhone: "0838 709 126",
   taxCode: "0108390511",
