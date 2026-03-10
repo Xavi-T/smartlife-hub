@@ -9,6 +9,7 @@ import {
   Card,
   Empty,
   Form,
+  Image,
   Input,
   Radio,
   Space,
@@ -464,10 +465,12 @@ export default function CheckoutPage() {
                             </div>
                           </div>
                           <div>
-                            <img
+                            <Image
                               src={bankQrSrc}
                               alt="Mã QR chuyển khoản"
-                              loading="lazy"
+                              preview={{
+                                mask: "Nhấn để xem ảnh lớn",
+                              }}
                               style={{
                                 width: "clamp(170px, 24vw, 220px)",
                                 height: "clamp(170px, 24vw, 220px)",

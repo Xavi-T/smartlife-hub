@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
+import { sendOrderNotificationEmail } from "@/lib/emailNotifications";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type {
@@ -277,9 +278,9 @@ async function createOrderDirectly(params: {
     };
   });
 
-  const { error: orderItemsError } = await (db.from("order_items") as any).insert(
-    orderItemsPayload,
-  );
+  const { error: orderItemsError } = await (
+    db.from("order_items") as any
+  ).insert(orderItemsPayload);
 
   if (orderItemsError) {
     await (db.from("orders") as any).delete().eq("id", orderId);
@@ -498,6 +499,21 @@ export async function createOrder(
       createResult.totalAmount || 0,
       request.items.length,
     );
+
+    try {
+      await sendOrderNotificationEmail({
+        orderId: createResult.orderId,
+        customerName: request.customer.name.trim(),
+        customerPhone: normalizedPhone,
+        customerAddress: resolvedAddress,
+        checkoutMethod,
+        paymentMethod,
+        totalAmount: Number(createResult.totalAmount || 0),
+        itemCount: request.items.length,
+      });
+    } catch (notifyError) {
+      console.warn("Order created but email notification failed:", notifyError);
+    }
 
     return createResult;
   } catch (error) {
