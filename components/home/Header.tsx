@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Badge, Button, Drawer, Space, Typography } from "antd";
-import { MenuOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { Badge, Button, Space, Typography } from "antd";
+import {
+  HomeOutlined,
+  InfoCircleOutlined,
+  SearchOutlined,
+  ShoppingCartOutlined,
+  StarOutlined,
+} from "@ant-design/icons";
 import { APP_CONFIG } from "@/lib/appConfig";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
+import { usePathname } from "next/navigation";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -14,8 +21,21 @@ interface HeaderProps {
 }
 
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
+  const pathname = usePathname();
   const [logoSrc, setLogoSrc] = useState(APP_CONFIG.defaultLogo);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileNavItems = useMemo(
+    () => [
+      { href: "/", label: "Trang chủ", icon: <HomeOutlined /> },
+      { href: "/about", label: "Về chúng tôi", icon: <InfoCircleOutlined /> },
+      {
+        href: "/priority-customers",
+        label: "KH ưu tiên",
+        icon: <StarOutlined />,
+      },
+      { href: "/orders/track", label: "Tra cứu đơn", icon: <SearchOutlined /> },
+    ],
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -140,52 +160,76 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           </div>
 
           <div className="block md:hidden">
-            <Space size="small">
-              <Badge
-                count={cartItemsCount > 9 ? "9+" : cartItemsCount}
-                size="small"
-              >
-                <Button
-                  type="text"
-                  shape="circle"
-                  icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
-                  onClick={onCartClick}
-                  aria-label="Giỏ hàng"
-                />
-              </Badge>
+            <Badge
+              count={cartItemsCount > 9 ? "9+" : cartItemsCount}
+              size="small"
+            >
               <Button
                 type="text"
                 shape="circle"
-                icon={<MenuOutlined style={{ fontSize: 20 }} />}
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Mở menu"
+                icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
+                onClick={onCartClick}
+                aria-label="Giỏ hàng"
               />
-            </Space>
+            </Badge>
           </div>
         </div>
       </div>
 
-      <Drawer
-        title="Menu"
-        placement="right"
-        open={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0"
+        style={{
+          zIndex: 60,
+          background: "#fff",
+          borderTop: "1px solid #f0f0f0",
+          boxShadow: "0 -1px 4px rgba(0,0,0,0.06)",
+        }}
+        aria-label="Điều hướng mobile"
       >
-        <Space orientation="vertical" size={8} style={{ width: "100%" }}>
-          <Link href="/about" onClick={() => setMobileMenuOpen(false)}>
-            <Button block>Về chúng tôi</Button>
-          </Link>
-          <Link
-            href="/priority-customers"
-            onClick={() => setMobileMenuOpen(false)}
+        <div className="grid grid-cols-5 px-1 py-1">
+          {mobileNavItems.map((item) => {
+            const isActive = pathname === item.href;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center justify-center py-1"
+                style={{
+                  color: isActive ? "#1677ff" : "rgba(0,0,0,0.65)",
+                  textDecoration: "none",
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
+                <span style={{ fontSize: 11, marginTop: 4 }}>{item.label}</span>
+              </Link>
+            );
+          })}
+
+          <button
+            type="button"
+            className="flex flex-col items-center justify-center py-1"
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "rgba(0,0,0,0.65)",
+            }}
+            onClick={onCartClick}
+            aria-label="Mở giỏ hàng"
           >
-            <Button block>Danh sách KH ưu tiên</Button>
-          </Link>
-          <Link href="/orders/track" onClick={() => setMobileMenuOpen(false)}>
-            <Button block>Tra cứu đơn</Button>
-          </Link>
-        </Space>
-      </Drawer>
+            <Badge
+              count={cartItemsCount > 9 ? "9+" : cartItemsCount}
+              size="small"
+              offset={[6, -2]}
+            >
+              <span style={{ fontSize: 18, lineHeight: 1 }}>
+                <ShoppingCartOutlined />
+              </span>
+            </Badge>
+            <span style={{ fontSize: 11, marginTop: 4 }}>Giỏ hàng</span>
+          </button>
+        </div>
+      </nav>
     </header>
   );
 }

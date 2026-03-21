@@ -14,6 +14,7 @@ import {
   Carousel,
   Empty,
   Checkbox,
+  Input,
   Radio,
   Select,
   Space,
@@ -69,6 +70,7 @@ function HomeContent() {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
     undefined,
   );
+  const [searchQuery, setSearchQuery] = useState("");
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [carouselItems, setCarouselItems] = useState<CarouselItem[]>(
     DEFAULT_CAROUSEL_ITEMS,
@@ -201,6 +203,17 @@ function HomeContent() {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
+    const normalizeText = (value: string | null | undefined) =>
+      (value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .trim();
+
+    const normalizedQuery = normalizeText(searchQuery);
+
     return products.filter((item) => {
       if (selectedCategory && item.category !== selectedCategory) {
         return false;
@@ -210,9 +223,19 @@ function HomeContent() {
         return false;
       }
 
+      if (normalizedQuery) {
+        const haystack = normalizeText(
+          `${item.name} ${item.category} ${item.description || ""}`,
+        );
+
+        if (!haystack.includes(normalizedQuery)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [onlyDiscounted, products, selectedCategory]);
+  }, [onlyDiscounted, products, searchQuery, selectedCategory]);
 
   const visibleProducts = useMemo(() => {
     const getFinalPrice = (item: Product) =>
@@ -257,7 +280,14 @@ function HomeContent() {
 
   useEffect(() => {
     setVisibleCount(productsStep);
-  }, [productsStep, selectedCategory, onlyDiscounted, sortType, priceSort]);
+  }, [
+    productsStep,
+    selectedCategory,
+    searchQuery,
+    onlyDiscounted,
+    sortType,
+    priceSort,
+  ]);
 
   const displayedProducts = useMemo(() => {
     return visibleProducts.slice(0, visibleCount);
@@ -265,6 +295,7 @@ function HomeContent() {
 
   const resetFilters = () => {
     setSelectedCategory(undefined);
+    setSearchQuery("");
     setOnlyDiscounted(false);
     setPriceSort(undefined);
     setSortType("popular");
@@ -294,7 +325,7 @@ function HomeContent() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8">
         <Card
           className="hidden md:block"
           style={{ marginBottom: 24, padding: 0 }}
@@ -351,6 +382,13 @@ function HomeContent() {
           style={{ marginBottom: 16, background: "#fafafa" }}
         >
           <Space wrap size={12} style={{ width: "100%" }}>
+            <Input.Search
+              allowClear
+              placeholder="Tìm sản phẩm theo tên, mô tả, danh mục"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              style={{ minWidth: 320 }}
+            />
             <Typography.Text type="secondary">Sắp xếp theo</Typography.Text>
             <Radio.Group
               optionType="button"
@@ -391,11 +429,21 @@ function HomeContent() {
           </Space>
         </Card>
 
+        <div className="md:hidden mb-3">
+          <Input.Search
+            allowClear
+            placeholder="Tìm theo tên, mô tả, danh mục"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </div>
+
         <div className="md:hidden mb-3 flex justify-end">
           <Button
             type={isMobileFilterOpen ? "primary" : "default"}
             icon={isMobileFilterOpen ? <CloseOutlined /> : <FilterOutlined />}
             onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+            size="middle"
           >
             {isMobileFilterOpen ? "Đóng lọc" : "Bộ lọc"}
           </Button>
@@ -467,7 +515,7 @@ function HomeContent() {
         />
 
         {hasMoreProducts && (
-          <div className="mt-4 flex justify-center py-2">
+          <div className="mt-4 flex justify-center py-1 md:py-2">
             <Button
               type="primary"
               onClick={() =>

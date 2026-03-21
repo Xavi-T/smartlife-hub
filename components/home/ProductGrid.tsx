@@ -24,7 +24,7 @@ export function ProductGrid({
   }
 
   return (
-    <Row gutter={[16, 16]} align="stretch">
+    <Row gutter={[12, 12]} align="stretch">
       {products.map((product) => (
         <Col
           key={product.id}

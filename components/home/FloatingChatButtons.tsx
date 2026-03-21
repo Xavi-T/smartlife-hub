@@ -29,9 +29,7 @@ const chatItems = [
 
 export function FloatingChatButtons() {
   return (
-    <div
-      className="fixed bottom-5 right-7 sm:right-4 z-[1000] flex flex-col gap-2.5"
-    >
+    <div className="fixed right-4 bottom-[calc(92px+env(safe-area-inset-bottom))] md:bottom-5 md:right-7 z-1000 flex flex-col gap-2 md:gap-2.5">
       {chatItems.map((item) => (
         <a
           key={item.key}
@@ -55,8 +53,8 @@ export function FloatingChatButtons() {
           <Image
             src={item.iconSrc}
             alt={item.ariaLabel}
-            width={44}
-            height={44}
+            width={40}
+            height={40}
             style={{ display: "block" }}
           />
         </a>
