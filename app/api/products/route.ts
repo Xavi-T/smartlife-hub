@@ -1105,30 +1105,31 @@ export async function DELETE(request: NextRequest) {
       throw deleteMediaError;
     }
 
-    const productsMutationApi = mutationClient.from("products") as unknown as {
-      update: (values: ProductUpdate) => {
-        eq: (
-          column: string,
-          value: string,
-        ) => Promise<{ error: { code?: string } | null }>;
-      };
-    };
-
-    const { error } = await productsMutationApi
+    const { data: updatedProduct, error: updateError } = await mutationClient
+      .from("products")
       .update({
         is_active: false,
         image_url: null,
-      })
-      .eq("id", id);
+      } satisfies ProductUpdate)
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
-      if (error.code === "42501") {
+    if (updateError) {
+      if ((updateError as { code?: string }).code === "42501") {
         return NextResponse.json(
           { error: "Bạn không có quyền xóa sản phẩm" },
           { status: 403 },
         );
       }
-      throw error;
+      throw updateError;
+    }
+
+    if (!updatedProduct) {
+      return NextResponse.json(
+        { error: "Không thể xóa sản phẩm do thiếu quyền cập nhật" },
+        { status: 403 },
+      );
     }
 
     // Log audit
