@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Space, Typography } from "antd";
 import { APP_CONFIG } from "@/lib/appConfig";
 
@@ -48,7 +49,9 @@ export function SiteFooter() {
             <Typography.Paragraph type="secondary" style={{ marginBottom: 6 }}>
               {APP_CONFIG.shopTagline}
             </Typography.Paragraph>
-            <Typography.Text type="secondary">{APP_CONFIG.shopAddress}</Typography.Text>
+            <Typography.Text type="secondary">
+              {APP_CONFIG.shopAddress}
+            </Typography.Text>
           </div>
 
           <div>
@@ -82,7 +85,7 @@ export function SiteFooter() {
                       textDecoration: "none",
                     }}
                   >
-                    <img
+                    <Image
                       src={item.iconSrc}
                       alt={item.label}
                       width={20}

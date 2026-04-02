@@ -20,6 +20,42 @@ interface HeaderProps {
   onCartClick: () => void;
 }
 
+let cachedLogoSrc: string | null = null;
+let logoRequestPromise: Promise<string | null> | null = null;
+
+async function fetchLogoSrc(): Promise<string | null> {
+  if (cachedLogoSrc) return cachedLogoSrc;
+
+  if (!logoRequestPromise) {
+    logoRequestPromise = fetch("/api/media?purpose=site_logo")
+      .then(async (response) => {
+        if (!response.ok) return null;
+
+        const result = await response.json();
+        const firstLogo = Array.isArray(result.media) ? result.media[0] : null;
+
+        if (!firstLogo?.image_url) {
+          return null;
+        }
+
+        const optimized = getOptimizedImageUrl(firstLogo.image_url, {
+          width: 180,
+          quality: 92,
+          format: "webp",
+        });
+
+        cachedLogoSrc = optimized;
+        return optimized;
+      })
+      .catch(() => null)
+      .finally(() => {
+        logoRequestPromise = null;
+      });
+  }
+
+  return logoRequestPromise;
+}
+
 export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   const pathname = usePathname();
   const [logoSrc, setLogoSrc] = useState(APP_CONFIG.defaultLogo);
@@ -41,27 +77,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
     let active = true;
 
     const loadSiteLogo = async () => {
-      try {
-        const response = await fetch("/api/media?purpose=site_logo", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) return;
-
-        const result = await response.json();
-        const firstLogo = Array.isArray(result.media) ? result.media[0] : null;
-
-        if (active && firstLogo?.image_url) {
-          setLogoSrc(
-            getOptimizedImageUrl(firstLogo.image_url, {
-              width: 180,
-              quality: 92,
-              format: "webp",
-            }),
-          );
-        }
-      } catch {
-        // Keep default logo fallback
+      const nextLogoSrc = await fetchLogoSrc();
+      if (active && nextLogoSrc) {
+        setLogoSrc(nextLogoSrc);
       }
     };
 

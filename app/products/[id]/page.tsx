@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
 import {
@@ -384,7 +385,7 @@ export default function ProductDetailPage() {
         <Card>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
             <div className="space-y-2 sm:space-y-3">
-              <div className="bg-gray-100 rounded-lg overflow-hidden aspect-square">
+              <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-square">
                 {displayMediaItems.length > 1 ? (
                   <Carousel
                     ref={carouselRef}
@@ -396,7 +397,10 @@ export default function ProductDetailPage() {
                     className="w-full h-full"
                   >
                     {displayMediaItems.map((media) => (
-                      <div key={media.id}>
+                      <div
+                        key={media.id}
+                        className="relative w-full aspect-square"
+                      >
                         {media.media_type === "video" ? (
                           <video
                             src={media.image_url}
@@ -404,10 +408,11 @@ export default function ProductDetailPage() {
                             controls
                           />
                         ) : (
-                          <img
+                          <Image
                             src={media.image_url}
                             alt={product.name}
-                            loading="lazy"
+                            fill
+                            sizes="(max-width: 1024px) 100vw, 50vw"
                             className="w-full h-full object-cover"
                             onClick={() => openImagePreview(media.image_url)}
                             style={{ cursor: "zoom-in" }}
@@ -424,20 +429,22 @@ export default function ProductDetailPage() {
                       controls
                     />
                   ) : (
-                    <img
+                    <Image
                       src={activeMedia.image_url}
                       alt={product.name}
-                      loading="lazy"
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
                       className="w-full h-full object-cover"
                       onClick={() => openImagePreview(activeMedia.image_url)}
                       style={{ cursor: "zoom-in" }}
                     />
                   )
                 ) : fallbackMediaUrl ? (
-                  <img
+                  <Image
                     src={fallbackMediaUrl}
                     alt={product.name}
-                    loading="lazy"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     className="w-full h-full object-cover"
                     onClick={() => openImagePreview(fallbackMediaUrl)}
                     style={{ cursor: "zoom-in" }}
@@ -475,7 +482,7 @@ export default function ProductDetailPage() {
                             setActiveMediaIndex(absoluteIndex);
                             carouselRef.current?.goTo?.(absoluteIndex, false);
                           }}
-                          className={`relative rounded-lg overflow-hidden border-2 aspect-square shrink-0 w-[56px] sm:w-[64px] md:w-[84px] ${
+                          className={`relative rounded-lg overflow-hidden border-2 aspect-square shrink-0 w-14 sm:w-16 md:w-21 ${
                             isActive ? "border-blue-600" : "border-transparent"
                           }`}
                         >
@@ -486,10 +493,11 @@ export default function ProductDetailPage() {
                               muted
                             />
                           ) : (
-                            <img
+                            <Image
                               src={media.image_url}
                               alt={`${product.name}-${absoluteIndex + 1}`}
-                              loading="lazy"
+                              fill
+                              sizes="84px"
                               className="w-full h-full object-cover"
                             />
                           )}
@@ -557,10 +565,11 @@ export default function ProductDetailPage() {
                               <div className="flex items-center gap-2">
                                 <div className="w-9 h-9 rounded overflow-hidden bg-gray-100 shrink-0">
                                   {variant.image_url ? (
-                                    <img
+                                    <Image
                                       src={variant.image_url}
                                       alt={variant.variant_name}
-                                      loading="lazy"
+                                      width={36}
+                                      height={36}
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
@@ -609,7 +618,7 @@ export default function ProductDetailPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <span className="text-sm text-gray-700 min-w-[68px]">
+                <span className="text-sm text-gray-700 min-w-17">
                   Số lượng:
                 </span>
                 <InputNumber
@@ -718,10 +727,11 @@ export default function ProductDetailPage() {
                 >
                   <div className="aspect-square bg-gray-100">
                     {item.image_url ? (
-                      <img
+                      <Image
                         src={item.image_url}
                         alt={item.name}
-                        loading="lazy"
+                        width={480}
+                        height={480}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -774,9 +784,11 @@ export default function ProductDetailPage() {
         destroyOnHidden
       >
         {previewImageUrl && (
-          <img
+          <Image
             src={previewImageUrl}
             alt={product.name}
+            width={1400}
+            height={1000}
             style={{
               width: "100%",
               maxHeight: "80vh",

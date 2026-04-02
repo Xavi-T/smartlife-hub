@@ -133,6 +133,19 @@ async function createApiSupabaseClient() {
   );
 }
 
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
+}
+
 function createServiceRoleSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -186,6 +199,32 @@ async function clearExpiredProductDiscounts() {
   if (error) {
     console.error("Error clearing expired product discounts:", error);
   }
+}
+
+const DISCOUNT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+let discountCleanupLastRunAt = 0;
+let discountCleanupInFlight: Promise<void> | null = null;
+
+function scheduleExpiredDiscountCleanup() {
+  const now = Date.now();
+
+  if (discountCleanupInFlight) {
+    return;
+  }
+
+  if (now - discountCleanupLastRunAt < DISCOUNT_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  discountCleanupLastRunAt = now;
+  discountCleanupInFlight = clearExpiredProductDiscounts()
+    .catch((error) => {
+      console.error("Error during scheduled discount cleanup:", error);
+      discountCleanupLastRunAt = 0;
+    })
+    .finally(() => {
+      discountCleanupInFlight = null;
+    });
 }
 
 function slugify(value: string): string {
@@ -403,8 +442,8 @@ async function syncProductVariants(
 // GET: Lấy danh sách sản phẩm
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createApiSupabaseClient();
-    await clearExpiredProductDiscounts();
+    const supabase = createPublicSupabaseClient();
+    scheduleExpiredDiscountCleanup();
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("activeOnly") === "true";
     const noCache =

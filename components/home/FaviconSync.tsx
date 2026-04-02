@@ -1,49 +1,43 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
 
 let cachedFaviconUrl: string | null = null;
+let faviconRequestPromise: Promise<string | null> | null = null;
 
-export function FaviconSync() {
-  const pathname = usePathname();
+function applyFavicon(href: string) {
+  const iconSelectors = [
+    'link[rel="icon"]',
+    'link[rel="shortcut icon"]',
+    'link[rel="apple-touch-icon"]',
+  ];
 
-  useEffect(() => {
-    let active = true;
+  iconSelectors.forEach((selector) => {
+    let link = document.querySelector<HTMLLinkElement>(selector);
 
-    const applyFavicon = (href: string) => {
-      const iconSelectors = [
-        'link[rel="icon"]',
-        'link[rel="shortcut icon"]',
-        'link[rel="apple-touch-icon"]',
-      ];
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = selector.includes("apple-touch-icon")
+        ? "apple-touch-icon"
+        : selector.includes("shortcut")
+          ? "shortcut icon"
+          : "icon";
+      document.head.appendChild(link);
+    }
 
-      iconSelectors.forEach((selector) => {
-        let link = document.querySelector<HTMLLinkElement>(selector);
+    link.href = href;
+  });
+}
 
-        if (!link) {
-          link = document.createElement("link");
-          link.rel = selector.includes("apple-touch-icon")
-            ? "apple-touch-icon"
-            : selector.includes("shortcut")
-              ? "shortcut icon"
-              : "icon";
-          document.head.appendChild(link);
-        }
+async function fetchFaviconUrl() {
+  if (cachedFaviconUrl) {
+    return cachedFaviconUrl;
+  }
 
-        link.href = href;
-      });
-    };
-
-    const loadFavicon = async () => {
-      if (cachedFaviconUrl) {
-        applyFavicon(cachedFaviconUrl);
-      }
-
-      try {
-        const response = await fetch("/api/media?purpose=site_favicon");
-
-        if (!response.ok) return;
+  if (!faviconRequestPromise) {
+    faviconRequestPromise = fetch("/api/media?purpose=site_favicon")
+      .then(async (response) => {
+        if (!response.ok) return null;
 
         const result = await response.json();
         const firstFavicon = Array.isArray(result.media)
@@ -54,17 +48,40 @@ export function FaviconSync() {
             ? firstFavicon.image_url
             : "";
 
-        if (active && faviconUrl) {
+        if (faviconUrl) {
           cachedFaviconUrl = faviconUrl;
-          applyFavicon(faviconUrl);
-          return;
+          return faviconUrl;
         }
 
-        if (active && !cachedFaviconUrl) {
-          applyFavicon("/favicon.ico");
-        }
-      } catch {
-        // Ignore and keep existing favicon
+        return null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        faviconRequestPromise = null;
+      });
+  }
+
+  return faviconRequestPromise;
+}
+
+export function FaviconSync() {
+  useEffect(() => {
+    let active = true;
+
+    const loadFavicon = async () => {
+      if (cachedFaviconUrl) {
+        applyFavicon(cachedFaviconUrl);
+      }
+
+      const faviconUrl = await fetchFaviconUrl();
+
+      if (active && faviconUrl) {
+        applyFavicon(faviconUrl);
+        return;
+      }
+
+      if (active && !cachedFaviconUrl) {
+        applyFavicon("/favicon.ico");
       }
     };
 
@@ -73,7 +90,7 @@ export function FaviconSync() {
     return () => {
       active = false;
     };
-  }, [pathname]);
+  }, []);
 
   return null;
 }

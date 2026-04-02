@@ -52,6 +52,21 @@ const DEFAULT_LEAD_BANNER: CarouselItem = {
 };
 
 const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [DEFAULT_LEAD_BANNER];
+const CLIENT_CACHE_TTL_MS = 2 * 60 * 1000;
+
+const normalizeText = (value: string | null | undefined) =>
+  (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+
+let cachedProducts: Product[] | null = null;
+let cachedProductsAt = 0;
+let cachedCarouselItems: CarouselItem[] | null = null;
+let cachedCarouselAt = 0;
 
 function HomeContent() {
   const MOBILE_PRODUCTS_STEP = 8;
@@ -110,12 +125,21 @@ function HomeContent() {
   }, []);
 
   const fetchProducts = async () => {
+    if (cachedProducts && Date.now() - cachedProductsAt < CLIENT_CACHE_TTL_MS) {
+      setProducts(cachedProducts);
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch("/api/products");
+      const res = await fetch("/api/products?activeOnly=true");
       if (!res.ok) throw new Error("Failed to fetch products");
       const data = await res.json();
       // Chỉ hiển thị sản phẩm đang hoạt động
-      setProducts(data.filter((p: Product) => p.is_active));
+      const activeProducts = data.filter((p: Product) => p.is_active);
+      cachedProducts = activeProducts;
+      cachedProductsAt = Date.now();
+      setProducts(activeProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -124,10 +148,16 @@ function HomeContent() {
   };
 
   const fetchHomepageBanners = async () => {
+    if (
+      cachedCarouselItems &&
+      Date.now() - cachedCarouselAt < CLIENT_CACHE_TTL_MS
+    ) {
+      setCarouselItems(cachedCarouselItems);
+      return;
+    }
+
     try {
-      const response = await fetch("/api/media?purpose=homepage_banner", {
-        cache: "no-store",
-      });
+      const response = await fetch("/api/media?purpose=homepage_banner");
 
       if (!response.ok) return;
 
@@ -162,10 +192,14 @@ function HomeContent() {
         }));
 
       if (mapped.length > 0) {
-        setCarouselItems([
+        const nextCarouselItems = [
           DEFAULT_LEAD_BANNER,
           ...mapped.filter((item) => item.image !== DEFAULT_LEAD_BANNER.image),
-        ]);
+        ];
+
+        cachedCarouselItems = nextCarouselItems;
+        cachedCarouselAt = Date.now();
+        setCarouselItems(nextCarouselItems);
       }
     } catch {
       // Keep fallback carousel items
@@ -202,40 +236,42 @@ function HomeContent() {
       }));
   }, [products]);
 
-  const filteredProducts = useMemo(() => {
-    const normalizeText = (value: string | null | undefined) =>
-      (value || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/đ/g, "d")
-        .replace(/Đ/g, "D")
-        .toLowerCase()
-        .trim();
+  const searchableProducts = useMemo(
+    () =>
+      products.map((item) => ({
+        product: item,
+        searchIndex: normalizeText(
+          `${item.name} ${item.category} ${item.description || ""}`,
+        ),
+      })),
+    [products],
+  );
 
+  const filteredProducts = useMemo(() => {
     const normalizedQuery = normalizeText(searchQuery);
 
-    return products.filter((item) => {
-      if (selectedCategory && item.category !== selectedCategory) {
-        return false;
-      }
+    return searchableProducts
+      .filter(({ product, searchIndex }) => {
+        const item = product;
 
-      if (onlyDiscounted && Number(item.discount_percent || 0) <= 0) {
-        return false;
-      }
-
-      if (normalizedQuery) {
-        const haystack = normalizeText(
-          `${item.name} ${item.category} ${item.description || ""}`,
-        );
-
-        if (!haystack.includes(normalizedQuery)) {
+        if (selectedCategory && item.category !== selectedCategory) {
           return false;
         }
-      }
 
-      return true;
-    });
-  }, [onlyDiscounted, products, searchQuery, selectedCategory]);
+        if (onlyDiscounted && Number(item.discount_percent || 0) <= 0) {
+          return false;
+        }
+
+        if (normalizedQuery) {
+          if (!searchIndex.includes(normalizedQuery)) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .map(({ product }) => product);
+  }, [onlyDiscounted, searchQuery, searchableProducts, selectedCategory]);
 
   const visibleProducts = useMemo(() => {
     const getFinalPrice = (item: Product) =>

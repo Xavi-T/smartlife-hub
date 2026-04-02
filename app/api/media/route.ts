@@ -1,14 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "Không thể tải media";
 }
 
+function createPublicSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createPublicSupabaseClient();
     const { searchParams } = new URL(request.url);
     const mediaKey = (searchParams.get("key") || "").trim();
     const purpose = (searchParams.get("purpose") || "").trim();
