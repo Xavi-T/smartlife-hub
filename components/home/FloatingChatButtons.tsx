@@ -29,7 +29,7 @@ const chatItems = [
 
 export function FloatingChatButtons() {
   return (
-    <div className="fixed right-4 bottom-[calc(92px+env(safe-area-inset-bottom))] md:bottom-5 md:right-7 z-1000 flex flex-col gap-2 md:gap-2.5">
+    <div className="fixed right-2 bottom-[calc(62px+env(safe-area-inset-bottom))] z-50 flex flex-col gap-1.5 md:right-7 md:bottom-5 md:z-[1000] md:gap-2.5">
       {chatItems.map((item) => (
         <a
           key={item.key}
@@ -37,9 +37,8 @@ export function FloatingChatButtons() {
           target={item.external ? "_blank" : undefined}
           rel={item.external ? "noopener noreferrer" : undefined}
           aria-label={item.ariaLabel}
+          className="h-10 w-10 md:h-12 md:w-12"
           style={{
-            width: 48,
-            height: 48,
             borderRadius: "999px",
             display: "grid",
             placeItems: "center",
@@ -55,6 +54,7 @@ export function FloatingChatButtons() {
             alt={item.ariaLabel}
             width={40}
             height={40}
+            className="h-8 w-8 md:h-10 md:w-10"
             style={{ display: "block" }}
           />
         </a>

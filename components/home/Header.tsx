@@ -98,16 +98,14 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
 
   return (
     <header
-      className="sl-public-header"
+      className="sl-public-header md:sticky md:top-0"
       style={{
-        position: "sticky",
-        top: 0,
         zIndex: 50,
       }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div
-          className="min-h-16 sm:min-h-[76px]"
+          className="min-h-14 sm:min-h-[76px]"
           style={{
             display: "flex",
             alignItems: "center",
@@ -125,7 +123,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             }}
           >
             <div
-              className="sl-logo-frame w-12 h-12 sm:w-14 sm:h-14"
+              className="sl-logo-frame w-10 h-10 sm:w-14 sm:h-14"
               style={{
                 border: "2px solid rgba(22, 139, 208, 0.9)",
                 borderRadius: 12,
@@ -140,11 +138,11 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 alt={`${APP_CONFIG.shopName} Logo`}
                 width={48}
                 height={48}
-                className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
+                className="w-8 h-8 sm:w-12 sm:h-12 object-contain"
                 priority
               />
             </div>
-            <div className="min-w-0">
+            <div className="hidden min-w-0 sm:block">
               <Typography.Title
                 level={4}
                 className="!mb-0 !text-lg sm:!text-xl"
@@ -227,7 +225,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
         }}
         aria-label="Điều hướng mobile"
       >
-        <div className="grid grid-cols-6 px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-6 px-1 py-0.5 pb-[calc(0.125rem+env(safe-area-inset-bottom))]">
           {mobileNavItems.map((item) => {
             const isActive = pathname === item.href;
 
@@ -236,16 +234,16 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className="sl-bottom-nav-item flex min-w-0 flex-col items-center justify-center px-0.5 py-1"
+                className="sl-bottom-nav-item flex min-w-0 flex-col items-center justify-center px-0.5 py-0.5"
                 style={{
                   color: isActive ? "#1677ff" : "rgba(0,0,0,0.65)",
                   textDecoration: "none",
                 }}
               >
-                <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
+                <span style={{ fontSize: 17, lineHeight: 1 }}>{item.icon}</span>
                 <span
                   className="max-w-full truncate"
-                  style={{ fontSize: 10, marginTop: 4 }}
+                  style={{ fontSize: 10, marginTop: 2 }}
                 >
                   {item.label}
                 </span>
@@ -255,7 +253,7 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
 
           <button
             type="button"
-            className="sl-bottom-nav-item flex min-w-0 flex-col items-center justify-center px-0.5 py-1"
+            className="sl-bottom-nav-item flex min-w-0 flex-col items-center justify-center px-0.5 py-0.5"
             style={{
               border: "none",
               background: "transparent",
@@ -269,13 +267,13 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
               size="small"
               offset={[6, -2]}
             >
-              <span style={{ fontSize: 18, lineHeight: 1 }}>
+              <span style={{ fontSize: 17, lineHeight: 1 }}>
                 <ShoppingCartOutlined />
               </span>
             </Badge>
             <span
               className="max-w-full truncate"
-              style={{ fontSize: 10, marginTop: 4 }}
+              style={{ fontSize: 10, marginTop: 2 }}
             >
               Giỏ hàng
             </span>

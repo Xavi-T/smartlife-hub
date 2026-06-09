@@ -384,7 +384,7 @@ function HomeContent() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 md:py-8 pb-36 md:pb-8">
         <section className="sl-hero sl-animate-in mb-5 rounded-2xl p-4 sm:p-6 xl:p-8">
           <div className="sl-hero-content grid grid-cols-1 items-center gap-5 xl:grid-cols-[minmax(360px,0.78fr)_minmax(680px,1.22fr)]">
             <div className="space-y-4">

@@ -164,16 +164,25 @@ export function ProductCard({
 
       <Space
         orientation="vertical"
-        size={10}
+        size={8}
         className="w-full flex-1"
       >
-        <div style={{ minHeight: 24 }}>
-          <Tag color="green" style={{ margin: 0 }}>
+        <div className="h-[38px] overflow-hidden sm:h-8">
+          <Tag
+            color="green"
+            style={{
+              margin: 0,
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {product.category}
           </Tag>
         </div>
 
-        <div style={{ minHeight: 44 }}>
+        <div className="h-[48px] overflow-hidden">
           <Typography.Text
             strong
             ellipsis={{ tooltip: product.name }}
@@ -182,7 +191,7 @@ export function ProductCard({
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              fontSize: 14,
+              fontSize: 15,
               lineHeight: 1.35,
             }}
           >
@@ -190,42 +199,46 @@ export function ProductCard({
           </Typography.Text>
         </div>
 
-        <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-auto flex flex-col gap-3">
           <div className="min-w-0">
-            <div className="text-[15px] font-semibold leading-tight text-red-500 whitespace-nowrap">
+            <div className="h-8 text-[18px] font-semibold leading-8 text-red-500 whitespace-nowrap sm:text-[20px]">
               {formatCurrency(finalPrice)}
             </div>
-            {hasDiscount && (
-              <Space orientation="vertical" size={0} style={{ marginTop: 2 }}>
-                <Typography.Text
-                  delete
-                  type="secondary"
-                  style={{ fontSize: 12 }}
-                >
-                  {formatCurrency(product.price)}
-                </Typography.Text>
-                <Typography.Text
-                  style={{ fontSize: 13, fontWeight: 700, color: "#ff4d4f" }}
-                >
-                  Tiết kiệm {formatCurrency(savingAmount)}
-                </Typography.Text>
-              </Space>
-            )}
+            <div className="h-[46px] overflow-hidden">
+              {hasDiscount && (
+                <Space orientation="vertical" size={0} style={{ marginTop: 2 }}>
+                  <Typography.Text
+                    delete
+                    type="secondary"
+                    style={{ fontSize: 13 }}
+                  >
+                    {formatCurrency(product.price)}
+                  </Typography.Text>
+                  <Typography.Text
+                    style={{ fontSize: 14, fontWeight: 700, color: "#ff4d4f" }}
+                  >
+                    Tiết kiệm {formatCurrency(savingAmount)}
+                  </Typography.Text>
+                </Space>
+              )}
+            </div>
           </div>
 
-          <Button
-            type="primary"
-            icon={<ShoppingCartOutlined />}
-            className="w-full sm:w-auto"
-            onClick={(event) => {
-              event.stopPropagation();
-              onAddToCart(product);
-            }}
-            disabled={isOutOfStock}
-            style={{ borderRadius: 10 }}
-          >
-            Thêm
-          </Button>
+          <div className="h-12">
+            <Button
+              type="primary"
+              icon={<ShoppingCartOutlined />}
+              className="h-11 w-full"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddToCart(product);
+              }}
+              disabled={isOutOfStock}
+              style={{ borderRadius: 12 }}
+            >
+              Thêm
+            </Button>
+          </div>
         </div>
       </Space>
     </Card>
