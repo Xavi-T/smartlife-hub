@@ -46,13 +46,28 @@ type CarouselItem = {
   type: "image" | "video";
 };
 
-const DEFAULT_LEAD_BANNER: CarouselItem = {
-  image: "/banners/banner-default-smartlife.svg",
-  alt: "Rẻ Hơn Shoppe, Ngon Hơn Shopee",
-  type: "image",
-};
-
-const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [DEFAULT_LEAD_BANNER];
+const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
+  {
+    image: "/banners/banner-nutrition-consulting.svg",
+    alt: "Tư vấn dinh dưỡng cá nhân tại SmartLife Hub",
+    type: "image",
+  },
+  {
+    image: "/banners/banner-family-health.svg",
+    alt: "Nâng tầm sức khỏe gia đình Việt",
+    type: "image",
+  },
+  {
+    image: "/banners/banner-mom-baby-milk.svg",
+    alt: "Sữa mẹ bầu và trẻ em",
+    type: "image",
+  },
+  {
+    image: "/banners/banner-healthy-products.svg",
+    alt: "Gian hàng dinh dưỡng lành mạnh",
+    type: "image",
+  },
+];
 const CLIENT_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const normalizeText = (value: string | null | undefined) =>
@@ -193,9 +208,16 @@ function HomeContent() {
         }));
 
       if (mapped.length > 0) {
+        const defaultBannerImages = new Set(
+          DEFAULT_CAROUSEL_ITEMS.map((item) => item.image),
+        );
         const nextCarouselItems = [
-          DEFAULT_LEAD_BANNER,
-          ...mapped.filter((item) => item.image !== DEFAULT_LEAD_BANNER.image),
+          ...DEFAULT_CAROUSEL_ITEMS,
+          ...mapped.filter(
+            (item) =>
+              !defaultBannerImages.has(item.image) &&
+              !item.image.includes("banner-default-smartlife.svg"),
+          ),
         ];
 
         cachedCarouselItems = nextCarouselItems;
@@ -363,8 +385,8 @@ function HomeContent() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8">
-        <section className="sl-hero sl-animate-in mb-5 rounded-2xl p-4 sm:p-6 lg:p-8">
-          <div className="sl-hero-content grid grid-cols-1 items-center gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
+        <section className="sl-hero sl-animate-in mb-5 rounded-2xl p-4 sm:p-6 xl:p-8">
+          <div className="sl-hero-content grid grid-cols-1 items-center gap-5 xl:grid-cols-[minmax(360px,0.78fr)_minmax(680px,1.22fr)]">
             <div className="space-y-4">
               <div className="sl-brand-pill px-3 py-2 text-sm font-semibold">
                 <Image
@@ -379,7 +401,7 @@ function HomeContent() {
               <div>
                 <Typography.Title
                   level={1}
-                  className="sl-section-title !mb-3 !text-[32px] sm:!text-[44px] lg:!text-[52px]"
+                  className="sl-section-title !mb-3 !text-[32px] sm:!text-[44px] xl:!text-[50px]"
                 >
                   Nâng tầm sức khỏe gia đình Việt
                 </Typography.Title>
@@ -430,8 +452,9 @@ function HomeContent() {
                       style={{
                         width: "100%",
                         overflow: "hidden",
-                        aspectRatio: "16 / 8",
-                        background: "#fff8e8",
+                        aspectRatio: "1600 / 650",
+                        background:
+                          "linear-gradient(135deg, #fffaf0, #f4fbf3)",
                         position: "relative",
                       }}
                     >
@@ -446,7 +469,7 @@ function HomeContent() {
                             width: "100%",
                             height: "100%",
                             display: "block",
-                            objectFit: "cover",
+                            objectFit: "contain",
                           }}
                         />
                       ) : (
@@ -455,10 +478,10 @@ function HomeContent() {
                           alt={item.alt}
                           fill
                           priority={item === carouselItems[0]}
-                          sizes="(max-width: 1024px) 100vw, 720px"
+                          sizes="(max-width: 1279px) 100vw, 760px"
                           style={{
                             display: "block",
-                            objectFit: "cover",
+                            objectFit: "contain",
                           }}
                         />
                       )}

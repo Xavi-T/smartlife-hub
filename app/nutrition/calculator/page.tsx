@@ -17,6 +17,7 @@ import {
 import {
   ArrowLeftOutlined,
   CalculatorOutlined,
+  InfoCircleOutlined,
   ReadOutlined,
 } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
@@ -42,6 +43,51 @@ interface PublicCalculatorFormValues {
   activityLevel: NutritionActivityLevel;
   goal: NutritionGoal;
 }
+
+const METRIC_EXPLANATIONS = [
+  {
+    title: "BMI",
+    subtitle: "Chỉ số khối cơ thể",
+    description:
+      "BMI giúp ước tính cân nặng hiện tại đang ở mức thiếu cân, bình thường, thừa cân hay béo phì so với chiều cao.",
+    note: "BMI chỉ là chỉ số sàng lọc nhanh, chưa phản ánh tỷ lệ mỡ, cơ bắp hoặc tình trạng bệnh lý.",
+  },
+  {
+    title: "BMR",
+    subtitle: "Năng lượng cơ bản",
+    description:
+      "BMR là lượng calo cơ thể cần để duy trì các hoạt động sống cơ bản khi nghỉ ngơi như thở, tuần hoàn và giữ thân nhiệt.",
+    note: "Không nên ăn thấp hơn BMR trong thời gian dài nếu không có chuyên gia theo dõi.",
+  },
+  {
+    title: "TDEE",
+    subtitle: "Tổng năng lượng tiêu hao",
+    description:
+      "TDEE là ước tính tổng calo bạn tiêu hao trong một ngày sau khi tính thêm mức vận động, đi lại, làm việc và tập luyện.",
+    note: "Muốn duy trì cân nặng, khẩu phần thường sẽ xoay quanh mức TDEE.",
+  },
+  {
+    title: "Calo mục tiêu",
+    subtitle: "Mức calo theo mục tiêu",
+    description:
+      "Calo mục tiêu được điều chỉnh từ TDEE theo mục tiêu giảm cân, duy trì, tăng cân hoặc cải thiện sức khỏe.",
+    note: "Giảm hoặc tăng cân nên đi từ từ để cơ thể dễ thích nghi và duy trì lâu dài.",
+  },
+  {
+    title: "Macro",
+    subtitle: "Đạm, chất béo, tinh bột",
+    description:
+      "Macro là gợi ý lượng protein, fat và carb mỗi ngày để bạn dễ chia khẩu phần ăn thành các bữa cụ thể.",
+    note: "Bạn không cần cân quá chính xác từng gram, hãy dùng như một mốc tham khảo để chọn thực phẩm.",
+  },
+  {
+    title: "Protein",
+    subtitle: "Chất đạm",
+    description:
+      "Protein hỗ trợ duy trì cơ, tạo cảm giác no và giúp bữa ăn cân bằng hơn, đặc biệt khi giảm cân hoặc tập luyện.",
+    note: "Có thể lấy từ thịt, cá, trứng, sữa, đậu phụ, các loại đậu hoặc sản phẩm bổ sung phù hợp.",
+  },
+];
 
 function getResultTone(result: NutritionCalculationResult) {
   if (result.bmi < 18.5) return "gold";
@@ -298,6 +344,43 @@ export default function PublicNutritionCalculatorPage() {
             )}
           </Card>
         </div>
+
+        <Card
+          className="sl-animate-in sl-animate-delay-3"
+          style={{ marginTop: 16 }}
+          styles={{ body: { padding: 16 } }}
+          title={
+            <Space>
+              <InfoCircleOutlined />
+              <span>Hiểu các chỉ số</span>
+            </Space>
+          }
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {METRIC_EXPLANATIONS.map((item) => (
+              <section
+                key={item.title}
+                className="rounded-lg border border-gray-200 bg-white p-3"
+              >
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <Tag color="blue" style={{ margin: 0 }}>
+                    {item.title}
+                  </Tag>
+                  <Typography.Text strong>{item.subtitle}</Typography.Text>
+                </div>
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ marginBottom: 8 }}
+                >
+                  {item.description}
+                </Typography.Paragraph>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                  {item.note}
+                </Typography.Text>
+              </section>
+            ))}
+          </div>
+        </Card>
       </main>
 
       <CartModal

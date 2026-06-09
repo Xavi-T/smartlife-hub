@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="650" viewBox="0 0 1600 650" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8E9"/>
+      <stop offset=".58" stop-color="#FDFCF8"/>
+      <stop offset="1" stop-color="#E8F6FF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#17365D" flood-opacity=".14"/>
+    </filter>
+    <style>
+      .title{font-family:Arial,Helvetica,sans-serif;font-size:74px;font-weight:800;fill:#17365D}
+      .accent{font-family:Arial,Helvetica,sans-serif;font-size:74px;font-weight:800;fill:#168BD0}
+      .sub{font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:600;fill:#536B80}
+      .shelf{font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:800;fill:#17365D}
+    </style>
+  </defs>
+  <rect width="1600" height="650" fill="url(#bg)"/>
+  <circle cx="1340" cy="520" r="300" fill="#5FBE42" opacity=".09"/>
+  <circle cx="220" cy="126" r="260" fill="#168BD0" opacity=".08"/>
+
+  <g filter="url(#shadow)">
+    <rect x="86" y="80" width="714" height="490" rx="38" fill="white" opacity=".9"/>
+    <image href="/logoSH.png" x="128" y="118" width="82" height="82" preserveAspectRatio="xMidYMid meet"/>
+    <text x="128" y="276" class="title">Sữa mẹ bầu</text>
+    <text x="128" y="362" class="accent">&amp; trẻ em</text>
+    <text x="132" y="430" class="sub">Lựa chọn sản phẩm phù hợp theo từng giai đoạn</text>
+    <rect x="132" y="476" width="430" height="58" rx="29" fill="#EAF7E5"/>
+    <text x="162" y="513" class="shelf">Tư vấn nhẹ nhàng • Dễ theo dõi</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="930" y="70" width="550" height="510" rx="36" fill="#D8AD6A"/>
+    <rect x="964" y="104" width="482" height="442" rx="28" fill="#F9E2B1"/>
+    <g>
+      <rect x="1010" y="150" width="390" height="22" rx="11" fill="#B98242"/>
+      <rect x="1010" y="284" width="390" height="22" rx="11" fill="#B98242"/>
+      <rect x="1010" y="418" width="390" height="22" rx="11" fill="#B98242"/>
+      <rect x="1040" y="190" width="74" height="94" rx="12" fill="#E8F4FC"/>
+      <rect x="1136" y="178" width="74" height="106" rx="12" fill="#FFFDF7"/>
+      <rect x="1232" y="202" width="74" height="82" rx="12" fill="#FCE4EC"/>
+      <rect x="1328" y="188" width="58" height="96" rx="10" fill="#EAF7E5"/>
+      <rect x="1040" y="324" width="78" height="94" rx="12" fill="#FFFDF7"/>
+      <rect x="1142" y="314" width="72" height="104" rx="12" fill="#E8F4FC"/>
+      <rect x="1240" y="336" width="72" height="82" rx="12" fill="#FFF3D7"/>
+      <rect x="1334" y="306" width="52" height="112" rx="10" fill="#EAF7E5"/>
+    </g>
+    <text x="1042" y="500" class="shelf">Kệ sản phẩm dinh dưỡng</text>
+  </g>
+</svg>
