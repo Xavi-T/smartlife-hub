@@ -26,6 +26,9 @@ import {
   AppstoreOutlined,
   PictureOutlined,
   TagsOutlined,
+  ReadOutlined,
+  CalculatorOutlined,
+  MedicineBoxOutlined,
   LogoutOutlined,
   MenuUnfoldOutlined,
   HistoryOutlined,
@@ -44,6 +47,7 @@ const { useBreakpoint } = Grid;
 const roleLabelMap: Record<AppRole, string> = {
   admin: "Admin",
   manager: "Manager",
+  doctor: "Bác sĩ dinh dưỡng",
   employee: "Employee",
 };
 
@@ -131,6 +135,29 @@ const menuItems: MenuProps["items"] = [
     key: "/admin/stock-history",
     icon: <HistoryOutlined />,
     label: "Lịch sử kho",
+  },
+  {
+    type: "divider",
+  },
+  {
+    key: "nutrition",
+    label: "Dinh dưỡng",
+    type: "group",
+  },
+  {
+    key: "/admin/nutrition/articles",
+    icon: <ReadOutlined />,
+    label: "Bài viết",
+  },
+  {
+    key: "/admin/nutrition/clients",
+    icon: <MedicineBoxOutlined />,
+    label: "Hồ sơ tư vấn",
+  },
+  {
+    key: "/admin/nutrition/calculator",
+    icon: <CalculatorOutlined />,
+    label: "Tính dinh dưỡng",
   },
   {
     type: "divider",
@@ -225,6 +252,39 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const filteredMenuItems = useMemo(() => {
     if (currentUserRole !== "employee") {
+      if (currentUserRole === "doctor") {
+        return [
+          {
+            key: "nutrition",
+            label: "Dinh dưỡng",
+            type: "group",
+          },
+          {
+            key: "/admin/nutrition/articles",
+            icon: <ReadOutlined />,
+            label: "Bài viết",
+          },
+          {
+            key: "/admin/nutrition/clients",
+            icon: <MedicineBoxOutlined />,
+            label: "Hồ sơ tư vấn",
+          },
+          {
+            key: "/admin/nutrition/calculator",
+            icon: <CalculatorOutlined />,
+            label: "Tính dinh dưỡng",
+          },
+          {
+            type: "divider",
+          },
+          {
+            key: "/admin/media",
+            icon: <PictureOutlined />,
+            label: "Quản lý media",
+          },
+        ] as MenuProps["items"];
+      }
+
       return menuItems;
     }
 
@@ -306,6 +366,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       orders: "Đơn hàng",
       customers: "Khách hàng",
       "priority-customers": "Khách hàng ưu tiên",
+      nutrition: "Dinh dưỡng",
+      articles: "Bài viết",
+      clients: "Hồ sơ tư vấn",
+      calculator: "Tính dinh dưỡng",
       "quick-sales": "Bán hàng nhanh",
       inventory: "Kho hàng",
       "stock-inbound": "Nhập kho",

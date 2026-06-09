@@ -56,7 +56,7 @@ export async function GET() {
   const users: Array<{
     id: string;
     email: string;
-    role: "admin" | "manager" | "employee";
+    role: "admin" | "manager" | "doctor" | "employee";
     fullName: string;
     createdAt: string;
     lastSignInAt: string | null;

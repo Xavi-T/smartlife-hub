@@ -995,7 +995,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
           <Alert
             type="info"
             showIcon
-            message="Chưa có ảnh media cho sản phẩm này"
+            title="Chưa có ảnh media cho sản phẩm này"
             description="Vui lòng upload ảnh ở trang media sản phẩm trước, sau đó quay lại chọn ảnh cho loại."
           />
         ) : (

@@ -603,7 +603,7 @@ function PriorityCustomersContent() {
               <Statistic
                 title="Đang áp dụng"
                 value={stats.active}
-                valueStyle={{ color: "#52c41a" }}
+                styles={{ content: { color: "#52c41a" } }}
               />
             </Card>
           </Col>
@@ -720,8 +720,8 @@ function PriorityCustomersContent() {
           </Typography.Paragraph>
 
           <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-            Nhấn "Thêm phân loại" để tạo mới. Các phân loại hiện có có thể chỉnh
-            trực tiếp trong bảng bên dưới.
+            Nhấn &quot;Thêm phân loại&quot; để tạo mới. Các phân loại hiện có có
+            thể chỉnh trực tiếp trong bảng bên dưới.
           </Typography.Paragraph>
 
           <Table

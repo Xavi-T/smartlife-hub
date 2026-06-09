@@ -1,14 +1,19 @@
 import type { User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "manager" | "employee";
+export type AppRole = "admin" | "manager" | "doctor" | "employee";
 
-const VALID_ROLES: AppRole[] = ["admin", "manager", "employee"];
+const VALID_ROLES: AppRole[] = ["admin", "manager", "doctor", "employee"];
 
 const RECOVERY_ADMIN_EMAILS = ["admin@smartlife.com"];
 
 export const EMPLOYEE_ALLOWED_ADMIN_PATHS = [
   "/admin/quick-sales",
   "/admin/orders",
+];
+
+export const DOCTOR_ALLOWED_ADMIN_PATHS = [
+  "/admin/nutrition",
+  "/admin/media",
 ];
 
 export function normalizeRole(value: unknown): AppRole | null {
@@ -49,6 +54,13 @@ export function canAccessAdminPath(role: AppRole, pathname: string): boolean {
     return isEmployeeAllowedAdminPath(pathname);
   }
 
+  if (role === "doctor") {
+    return DOCTOR_ALLOWED_ADMIN_PATHS.some(
+      (allowedPath) =>
+        pathname === allowedPath || pathname.startsWith(`${allowedPath}/`),
+    );
+  }
+
   if (pathname.startsWith("/admin/users")) {
     return canManageAccounts(role);
   }
@@ -59,6 +71,10 @@ export function canAccessAdminPath(role: AppRole, pathname: string): boolean {
 export function getAdminHomePath(role: AppRole): string {
   if (role === "employee") {
     return "/admin/quick-sales";
+  }
+
+  if (role === "doctor") {
+    return "/admin/nutrition/articles";
   }
 
   return "/admin";

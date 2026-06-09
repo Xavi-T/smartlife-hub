@@ -19,6 +19,7 @@ import {
   Select,
   Space,
   Spin,
+  Tag,
   Typography,
   message,
 } from "antd";
@@ -339,7 +340,7 @@ function HomeContent() {
 
   if (isLoading || !isLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 grid place-items-center">
+      <div className="sl-public-shell grid place-items-center">
         <Space orientation="vertical" align="center" size="middle">
           <Spin size="large" />
           <Typography.Text type="secondary">
@@ -351,7 +352,7 @@ function HomeContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="sl-public-shell">
       {contextHolder}
 
       {/* Header */}
@@ -361,61 +362,117 @@ function HomeContent() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8">
-        <Card
-          className="hidden md:block"
-          style={{ marginBottom: 24, padding: 0 }}
-          styles={{ body: { padding: 0 } }}
-        >
-          <Carousel autoplay dots infinite>
-            {carouselItems.map((item) => (
-              <div key={item.image}>
-                <div
-                  style={{
-                    width: "100%",
-                    overflow: "hidden",
-                    borderRadius: 8,
-                    aspectRatio: "16 / 6.5", // Increased height for banner
-                    background: "#f5f5f5",
-                    position: "relative",
-                  }}
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 md:py-8 pb-24 md:pb-8">
+        <section className="sl-hero sl-animate-in mb-5 rounded-2xl p-4 sm:p-6 lg:p-8">
+          <div className="sl-hero-content grid grid-cols-1 items-center gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
+            <div className="space-y-4">
+              <div className="sl-brand-pill px-3 py-2 text-sm font-semibold">
+                <Image
+                  src="/logoSH.png"
+                  alt="SmartLife Hub"
+                  width={26}
+                  height={26}
+                  className="rounded-md object-contain"
+                />
+                SmartLife Hub
+              </div>
+              <div>
+                <Typography.Title
+                  level={1}
+                  className="sl-section-title !mb-3 !text-[32px] sm:!text-[44px] lg:!text-[52px]"
                 >
-                  {item.type === "video" ? (
-                    <video
-                      src={item.image}
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
+                  Nâng tầm sức khỏe gia đình Việt
+                </Typography.Title>
+                <Typography.Paragraph
+                  className="!mb-0 !text-base sm:!text-lg"
+                  style={{ color: "var(--sl-muted)", maxWidth: 620 }}
+                >
+                  Không gian tư vấn dinh dưỡng và mua sắm sản phẩm chăm sóc sức
+                  khỏe với phong cách sạch, ấm và gần gũi.
+                </Typography.Paragraph>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {["Dinh dưỡng gia đình", "Sữa mẹ & bé", "Tư vấn sức khỏe"].map(
+                  (item) => (
+                    <Tag
+                      key={item}
+                      color="green"
+                      className="!m-0 !rounded-full !px-3 !py-1"
+                    >
+                      {item}
+                    </Tag>
+                  ),
+                )}
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  type="primary"
+                  size="large"
+                  onClick={() => router.push("/nutrition/calculator")}
+                >
+                  Tính nhu cầu dinh dưỡng
+                </Button>
+                <Button
+                  size="large"
+                  onClick={() => router.push("/nutrition")}
+                  style={{ borderColor: "rgba(22, 139, 208, 0.32)" }}
+                >
+                  Đọc kiến thức dinh dưỡng
+                </Button>
+              </div>
+            </div>
+
+            <div className="sl-hero-media hidden md:block">
+              <Carousel autoplay dots infinite>
+                {carouselItems.map((item) => (
+                  <div key={item.image}>
+                    <div
                       style={{
                         width: "100%",
-                        height: "100%",
-                        display: "block",
-                        objectFit: "cover",
+                        overflow: "hidden",
+                        aspectRatio: "16 / 8",
+                        background: "#fff8e8",
+                        position: "relative",
                       }}
-                    />
-                  ) : (
-                    <Image
-                      src={item.image}
-                      alt={item.alt}
-                      fill
-                      priority={item === carouselItems[0]}
-                      sizes="(max-width: 768px) 100vw, 1200px"
-                      style={{
-                        display: "block",
-                        objectFit: "cover",
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
-            ))}
-          </Carousel>
-        </Card>
+                    >
+                      {item.type === "video" ? (
+                        <video
+                          src={item.image}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "block",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <Image
+                          src={item.image}
+                          alt={item.alt}
+                          fill
+                          priority={item === carouselItems[0]}
+                          sizes="(max-width: 1024px) 100vw, 720px"
+                          style={{
+                            display: "block",
+                            objectFit: "cover",
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </Carousel>
+            </div>
+          </div>
+        </section>
 
         <Card
-          className="hidden md:block"
-          style={{ marginBottom: 16, background: "#fafafa" }}
+          className="sl-animate-in sl-animate-delay-1 hidden md:block"
+          style={{ marginBottom: 16, background: "rgba(255,255,255,0.86)" }}
         >
           <Space wrap size={12} style={{ width: "100%" }}>
             <Input.Search
@@ -465,7 +522,7 @@ function HomeContent() {
           </Space>
         </Card>
 
-        <div className="md:hidden mb-3">
+        <div className="sl-animate-in sl-animate-delay-1 md:hidden mb-3">
           <Input.Search
             allowClear
             placeholder="Tìm theo tên, mô tả, danh mục"
@@ -488,7 +545,7 @@ function HomeContent() {
         {isMobileFilterOpen && (
           <Card
             className="md:hidden"
-            style={{ marginBottom: 12, background: "#fafafa" }}
+            style={{ marginBottom: 12, background: "rgba(255,255,255,0.9)" }}
           >
             <Space orientation="vertical" size={10} style={{ width: "100%" }}>
               <Typography.Text type="secondary">
@@ -544,11 +601,26 @@ function HomeContent() {
         )}
 
         {/* Product Grid */}
-        <ProductGrid
-          products={displayedProducts}
-          onAddToCart={handleAddToCart}
-          onViewDetail={handleViewDetail}
-        />
+        <section className="sl-animate-in sl-animate-delay-2">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <Typography.Title
+                level={3}
+                className="sl-section-title !mb-1 !text-2xl sm:!text-3xl"
+              >
+                Sản phẩm chăm sóc sức khỏe
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                {visibleProducts.length} sản phẩm phù hợp
+              </Typography.Text>
+            </div>
+          </div>
+          <ProductGrid
+            products={displayedProducts}
+            onAddToCart={handleAddToCart}
+            onViewDetail={handleViewDetail}
+          />
+        </section>
 
         {hasMoreProducts && (
           <div className="mt-4 flex justify-center py-1 md:py-2">
@@ -598,7 +670,7 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <div className="sl-public-shell grid place-items-center">
           <Space orientation="vertical" align="center" size="middle">
             <Spin size="large" />
             <Typography.Text type="secondary">Đang tải...</Typography.Text>

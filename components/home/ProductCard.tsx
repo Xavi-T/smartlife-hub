@@ -41,6 +41,7 @@ export function ProductCard({
 
   return (
     <Card
+      className="sl-product-card"
       hoverable={!isOutOfStock}
       styles={{
         body: {
@@ -72,9 +73,9 @@ export function ProductCard({
           aspectRatio: "1 / 1",
           borderRadius: 10,
           overflow: "hidden",
-          background: "#f5f5f5",
           marginBottom: 10,
         }}
+        className="sl-product-image"
       >
         {imageUrl ? (
           <NextImage
@@ -167,7 +168,7 @@ export function ProductCard({
         className="w-full flex-1"
       >
         <div style={{ minHeight: 24 }}>
-          <Tag color="blue" style={{ margin: 0 }}>
+          <Tag color="green" style={{ margin: 0 }}>
             {product.category}
           </Tag>
         </div>
@@ -221,7 +222,7 @@ export function ProductCard({
               onAddToCart(product);
             }}
             disabled={isOutOfStock}
-            style={{ borderRadius: 8 }}
+            style={{ borderRadius: 10 }}
           >
             Thêm
           </Button>

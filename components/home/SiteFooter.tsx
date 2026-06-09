@@ -36,8 +36,9 @@ export function SiteFooter() {
   return (
     <footer
       style={{
-        borderTop: "1px solid #e5e7eb",
-        background: "#fff",
+        borderTop: "1px solid rgba(29, 63, 93, 0.1)",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,250,240,0.96))",
       }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -1,4 +1,18 @@
 export type OrderStatus = "pending" | "processing" | "delivered" | "cancelled";
+export type NutritionArticleStatus = "draft" | "published" | "archived";
+export type NutritionGender = "male" | "female" | "other";
+export type NutritionActivityLevel =
+  | "sedentary"
+  | "light"
+  | "moderate"
+  | "active"
+  | "very_active";
+export type NutritionGoal =
+  | "lose_weight"
+  | "maintain"
+  | "gain_weight"
+  | "improve_health";
+export type NutritionClientStatus = "new" | "active" | "paused" | "completed";
 
 export interface ProductRow {
   id: string;
@@ -121,6 +135,80 @@ export interface PriorityCustomer {
   updated_at: string;
 }
 
+export interface NutritionCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NutritionArticle {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  cover_image_url: string | null;
+  category_id: string | null;
+  author_name: string | null;
+  status: NutritionArticleStatus;
+  related_product_ids: string[];
+  published_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NutritionClient {
+  id: string;
+  full_name: string;
+  phone: string;
+  gender: NutritionGender;
+  birth_date: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  activity_level: NutritionActivityLevel;
+  goal: NutritionGoal;
+  medical_notes: string | null;
+  allergies: string | null;
+  doctor_notes: string | null;
+  status: NutritionClientStatus;
+  consent_given: boolean;
+  consent_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NutritionAssessment {
+  id: string;
+  client_id: string;
+  assessed_at: string;
+  age_years: number | null;
+  gender: NutritionGender;
+  height_cm: number;
+  weight_kg: number;
+  activity_level: NutritionActivityLevel;
+  goal: NutritionGoal;
+  bmi: number;
+  bmi_category: string;
+  bmr: number;
+  tdee: number;
+  target_calories: number;
+  protein_g: number;
+  fat_g: number;
+  carb_g: number;
+  doctor_notes: string | null;
+  recommendation_text: string | null;
+  related_product_ids: string[];
+  formula_version: string;
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface DashboardStats {
   totalRevenue: number;
   totalProfit: number;
@@ -184,6 +272,36 @@ export interface Database {
         Update: Partial<
           Omit<PriorityCustomer, "id" | "created_at" | "updated_at">
         >;
+        Relationships: [];
+      };
+      nutrition_categories: {
+        Row: NutritionCategory;
+        Insert: Omit<NutritionCategory, "id" | "created_at" | "updated_at">;
+        Update: Partial<
+          Omit<NutritionCategory, "id" | "created_at" | "updated_at">
+        >;
+        Relationships: [];
+      };
+      nutrition_articles: {
+        Row: NutritionArticle;
+        Insert: Omit<NutritionArticle, "id" | "created_at" | "updated_at">;
+        Update: Partial<
+          Omit<NutritionArticle, "id" | "created_at" | "updated_at">
+        >;
+        Relationships: [];
+      };
+      nutrition_clients: {
+        Row: NutritionClient;
+        Insert: Omit<NutritionClient, "id" | "created_at" | "updated_at">;
+        Update: Partial<
+          Omit<NutritionClient, "id" | "created_at" | "updated_at">
+        >;
+        Relationships: [];
+      };
+      nutrition_assessments: {
+        Row: NutritionAssessment;
+        Insert: Omit<NutritionAssessment, "id" | "created_at">;
+        Update: Partial<Omit<NutritionAssessment, "id" | "created_at">>;
         Relationships: [];
       };
     };

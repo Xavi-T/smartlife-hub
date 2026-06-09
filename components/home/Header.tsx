@@ -5,8 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Badge, Button, Space, Typography } from "antd";
 import {
+  CalculatorOutlined,
   HomeOutlined,
-  InfoCircleOutlined,
+  ReadOutlined,
   SearchOutlined,
   ShoppingCartOutlined,
   StarOutlined,
@@ -62,7 +63,12 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   const mobileNavItems = useMemo(
     () => [
       { href: "/", label: "Trang chủ", icon: <HomeOutlined /> },
-      { href: "/about", label: "Về chúng tôi", icon: <InfoCircleOutlined /> },
+      { href: "/nutrition", label: "Dinh dưỡng", icon: <ReadOutlined /> },
+      {
+        href: "/nutrition/calculator",
+        label: "Tính calo",
+        icon: <CalculatorOutlined />,
+      },
       {
         href: "/priority-customers",
         label: "KH ưu tiên",
@@ -92,22 +98,20 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
 
   return (
     <header
+      className="sl-public-header"
       style={{
         position: "sticky",
         top: 0,
         zIndex: 50,
-        background: "#fff",
-        borderBottom: "1px solid #f0f0f0",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
       }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div
+          className="min-h-16 sm:min-h-[76px]"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            minHeight: 76,
             flexWrap: "wrap",
             rowGap: 8,
           }}
@@ -121,10 +125,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
             }}
           >
             <div
+              className="sl-logo-frame w-12 h-12 sm:w-14 sm:h-14"
               style={{
-                width: 56,
-                height: 56,
-                border: "2px solid #1677ff",
+                border: "2px solid rgba(22, 139, 208, 0.9)",
                 borderRadius: 12,
                 display: "grid",
                 placeItems: "center",
@@ -137,15 +140,22 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 alt={`${APP_CONFIG.shopName} Logo`}
                 width={48}
                 height={48}
-                className="w-12 h-12 object-contain"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
                 priority
               />
             </div>
-            <div>
-              <Typography.Title level={4} style={{ margin: 0 }}>
+            <div className="min-w-0">
+              <Typography.Title
+                level={4}
+                className="!mb-0 !text-lg sm:!text-xl"
+              >
                 {APP_CONFIG.shopName}
               </Typography.Title>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text
+                type="secondary"
+                className="hidden sm:block"
+                style={{ fontSize: 12 }}
+              >
                 {APP_CONFIG.shopTagline}
               </Typography.Text>
             </div>
@@ -154,13 +164,29 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           <div className="hidden md:block">
             <Space size="small" wrap>
               <Link href="/about">
-                <Button type="text">Về chúng tôi</Button>
+                <Button className="sl-nav-link" type="text">
+                  Về chúng tôi
+                </Button>
+              </Link>
+              <Link href="/nutrition">
+                <Button className="sl-nav-link" type="text">
+                  Dinh dưỡng
+                </Button>
+              </Link>
+              <Link href="/nutrition/calculator">
+                <Button className="sl-nav-link" type="text">
+                  Tính dinh dưỡng
+                </Button>
               </Link>
               <Link href="/priority-customers">
-                <Button type="text">Danh sách KH ưu tiên</Button>
+                <Button className="sl-nav-link" type="text">
+                  Danh sách KH ưu tiên
+                </Button>
               </Link>
               <Link href="/orders/track">
-                <Button type="text">Tra cứu đơn</Button>
+                <Button className="sl-nav-link" type="text">
+                  Tra cứu đơn
+                </Button>
               </Link>
               <Badge
                 count={cartItemsCount > 9 ? "9+" : cartItemsCount}
@@ -195,16 +221,13 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
       </div>
 
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0"
+        className="sl-bottom-nav md:hidden fixed bottom-0 left-0 right-0"
         style={{
           zIndex: 60,
-          background: "#fff",
-          borderTop: "1px solid #f0f0f0",
-          boxShadow: "0 -1px 4px rgba(0,0,0,0.06)",
         }}
         aria-label="Điều hướng mobile"
       >
-        <div className="grid grid-cols-5 px-1 py-1">
+        <div className="grid grid-cols-6 px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]">
           {mobileNavItems.map((item) => {
             const isActive = pathname === item.href;
 
@@ -212,21 +235,27 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex flex-col items-center justify-center py-1"
+                aria-current={isActive ? "page" : undefined}
+                className="sl-bottom-nav-item flex min-w-0 flex-col items-center justify-center px-0.5 py-1"
                 style={{
                   color: isActive ? "#1677ff" : "rgba(0,0,0,0.65)",
                   textDecoration: "none",
                 }}
               >
                 <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
-                <span style={{ fontSize: 11, marginTop: 4 }}>{item.label}</span>
+                <span
+                  className="max-w-full truncate"
+                  style={{ fontSize: 10, marginTop: 4 }}
+                >
+                  {item.label}
+                </span>
               </Link>
             );
           })}
 
           <button
             type="button"
-            className="flex flex-col items-center justify-center py-1"
+            className="sl-bottom-nav-item flex min-w-0 flex-col items-center justify-center px-0.5 py-1"
             style={{
               border: "none",
               background: "transparent",
@@ -244,7 +273,12 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 <ShoppingCartOutlined />
               </span>
             </Badge>
-            <span style={{ fontSize: 11, marginTop: 4 }}>Giỏ hàng</span>
+            <span
+              className="max-w-full truncate"
+              style={{ fontSize: 10, marginTop: 4 }}
+            >
+              Giỏ hàng
+            </span>
           </button>
         </div>
       </nav>
