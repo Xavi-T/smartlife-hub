@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import DOMPurify from "dompurify";
 import {
@@ -16,11 +15,12 @@ import {
   Typography,
   message,
 } from "antd";
-import { ArrowLeftOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
+import { ProductGrid } from "@/components/home/ProductGrid";
 import { useCart } from "@/hooks/useCart";
-import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
+import { getOptimizedImageUrl } from "@/lib/imageUtils";
 import type {
   NutritionArticle,
   NutritionCategory,
@@ -51,24 +51,33 @@ export default function NutritionArticlePage() {
 
   useEffect(() => {
     if (!slug) return;
+    const controller = new AbortController();
+
     fetch(`/api/nutrition/articles/${slug}`, {
       cache: "no-store",
+      signal: controller.signal,
     })
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) {
           throw new Error(result.error || "Không thể tải bài viết");
         }
+        if (controller.signal.aborted) return;
         setArticle(result.article || null);
         setRelatedProducts(
           Array.isArray(result.relatedProducts) ? result.relatedProducts : [],
         );
       })
       .catch((error) => {
+        if (controller.signal.aborted) return;
         console.error("Error loading nutrition article:", error);
         messageApi.error("Không thể tải bài viết");
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+
+    return () => controller.abort();
   }, [messageApi, slug]);
 
   const sanitizedContent = useMemo(() => {
@@ -76,6 +85,23 @@ export default function NutritionArticlePage() {
       USE_PROFILES: { html: true },
     });
   }, [article?.content]);
+
+  const coverImageUrl = useMemo(() => {
+    return getOptimizedImageUrl(article?.cover_image_url, {
+      width: 1200,
+      quality: 74,
+      format: "webp",
+    });
+  }, [article?.cover_image_url]);
+
+  const handleAddToCart = (product: Product) => {
+    addToCart(product);
+    messageApi.success("Đã thêm vào giỏ hàng");
+  };
+
+  const handleViewProduct = (product: Product) => {
+    router.push(`/products/${product.id}`);
+  };
 
   return (
     <div className="sl-public-shell">
@@ -136,7 +162,7 @@ export default function NutritionArticlePage() {
                   </Typography.Paragraph>
                 )}
 
-                {article.cover_image_url && (
+                {coverImageUrl && (
                   <div
                     style={{
                       position: "relative",
@@ -147,7 +173,7 @@ export default function NutritionArticlePage() {
                     }}
                   >
                     <Image
-                      src={article.cover_image_url}
+                      src={coverImageUrl}
                       alt={article.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 960px"
@@ -182,63 +208,11 @@ export default function NutritionArticlePage() {
 
             {relatedProducts.length > 0 && (
               <Card title="Sản phẩm liên quan">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {relatedProducts.map((product) => {
-                    const finalPrice = calculateDiscountedPrice(
-                      product.price,
-                      product.discount_percent,
-                    );
-                    return (
-                      <div
-                        key={product.id}
-                        className="border rounded-lg p-3 bg-white"
-                      >
-                        <Link
-                          href={`/products/${product.id}`}
-                          style={{ textDecoration: "none", color: "inherit" }}
-                        >
-                          <div
-                            style={{
-                              position: "relative",
-                              aspectRatio: "1 / 1",
-                              background: "#f5f5f5",
-                              borderRadius: 8,
-                              overflow: "hidden",
-                              marginBottom: 8,
-                            }}
-                          >
-                            {product.image_url ? (
-                              <Image
-                                src={product.image_url}
-                                alt={product.name}
-                                fill
-                                sizes="220px"
-                                style={{ objectFit: "cover" }}
-                              />
-                            ) : null}
-                          </div>
-                          <Typography.Text strong>{product.name}</Typography.Text>
-                          <div style={{ color: "#cf1322", fontWeight: 700 }}>
-                            {formatCurrency(finalPrice)}
-                          </div>
-                        </Link>
-                        <Button
-                          type="primary"
-                          icon={<ShoppingCartOutlined />}
-                          block
-                          style={{ marginTop: 10 }}
-                          disabled={product.stock_quantity <= 0}
-                          onClick={() => {
-                            addToCart(product);
-                            messageApi.success("Đã thêm vào giỏ hàng");
-                          }}
-                        >
-                          Thêm vào giỏ
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ProductGrid
+                  products={relatedProducts}
+                  onAddToCart={handleAddToCart}
+                  onViewDetail={handleViewProduct}
+                />
               </Card>
             )}
           </Space>

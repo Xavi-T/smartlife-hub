@@ -217,23 +217,26 @@ export default function CheckoutPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="sl-public-shell flex items-center justify-center">
         <Typography.Text type="secondary">Đang tải giỏ hàng...</Typography.Text>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="sl-public-shell">
       {contextHolder}
       <Header
         cartItemsCount={cart.length}
         onCartClick={() => router.push("/")}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pb-36 md:pb-0">
         <div className="py-8">
-          <Typography.Title level={2} style={{ marginBottom: 8 }}>
+          <Typography.Title
+            level={1}
+            className="sl-section-title !mb-2 !text-[30px] sm:!text-[40px]"
+          >
             Thanh toán đơn hàng
           </Typography.Title>
           <Typography.Text type="secondary">
@@ -472,8 +475,8 @@ export default function CheckoutPage() {
                                 mask: "Nhấn để xem ảnh lớn",
                               }}
                               style={{
-                                width: "clamp(170px, 24vw, 220px)",
-                                height: "clamp(170px, 24vw, 220px)",
+                                width: "min(220px, 100%)",
+                                aspectRatio: "1 / 1",
                                 objectFit: "contain",
                                 borderRadius: 8,
                                 border: "1px solid #d9d9d9",

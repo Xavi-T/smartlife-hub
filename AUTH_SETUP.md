@@ -73,7 +73,7 @@ WHERE email = 'admin@smartlife.com';
 
 ## 3. Cách hoạt động
 
-### Middleware (`middleware.ts`)
+### Proxy (`proxy.ts`)
 
 - Kiểm tra session cho mọi request đến `/admin/*`
 - Nếu chưa đăng nhập → redirect về `/login`
@@ -120,13 +120,13 @@ Các bảng dữ liệu đã được bảo vệ bằng RLS policies trong `data
 ### Session bị mất khi reload?
 
 1. Kiểm tra cookies có được set đúng không (DevTools → Application → Cookies)
-2. Verify middleware đang chạy (check console logs)
+2. Verify proxy đang chạy (check console logs)
 3. Clear cookies và đăng nhập lại
 
-### Middleware không hoạt động?
+### Proxy không hoạt động?
 
-1. Verify `middleware.ts` ở root folder của project
-2. Check matcher config trong middleware
+1. Verify `proxy.ts` ở root folder của project
+2. Check matcher config trong proxy
 3. Restart dev server: `npm run dev`
 
 ## 6. Testing

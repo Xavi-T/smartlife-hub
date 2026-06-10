@@ -17,7 +17,6 @@ import {
 import type { CarouselRef } from "antd/es/carousel";
 import {
   ArrowLeftOutlined,
-  SafetyCertificateOutlined,
   LeftOutlined,
   RightOutlined,
   ShoppingCartOutlined,
@@ -303,7 +302,7 @@ export default function ProductDetailPage() {
 
   if (isLoading || !isLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="sl-public-shell flex items-center justify-center">
         <div className="text-gray-600">Đang tải chi tiết sản phẩm...</div>
       </div>
     );
@@ -311,7 +310,7 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="sl-public-shell">
         {contextHolder}
         <Header
           cartItemsCount={getTotalItems()}
@@ -365,7 +364,7 @@ export default function ProductDetailPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+    <div className="sl-public-shell overflow-x-hidden">
       {contextHolder}
 
       <Header
@@ -373,7 +372,7 @@ export default function ProductDetailPage() {
         onCartClick={() => setIsCartOpen(true)}
       />
 
-      <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 overflow-x-hidden">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 pb-36 md:pb-8 space-y-4 sm:space-y-6 overflow-x-hidden">
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={() => router.push("/")}

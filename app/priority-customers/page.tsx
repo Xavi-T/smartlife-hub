@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, Space, Tag, Typography } from "antd";
+import { Button, Card, Empty, Input, Space, Spin, Tag, Typography } from "antd";
+import { SearchOutlined, StarOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { useCart } from "@/hooks/useCart";
 import { APP_CONFIG } from "@/lib/appConfig";
@@ -17,7 +18,7 @@ type PublicPriorityCustomer = {
 
 export default function PriorityCustomersPublicPage() {
   const router = useRouter();
-  const { cart, isLoaded } = useCart();
+  const { getTotalItems, isLoaded } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [customers, setCustomers] = useState<PublicPriorityCustomer[]>([]);
@@ -49,16 +50,23 @@ export default function PriorityCustomersPublicPage() {
   }, [customers, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="sl-public-shell">
       <Header
-        cartItemsCount={isLoaded ? cart.length : 0}
+        cartItemsCount={isLoaded ? getTotalItems() : 0}
         onCartClick={() => router.push("/")}
       />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-36 md:pb-8">
         <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-          <div>
-            <Typography.Title level={2} style={{ marginBottom: 4 }}>
+          <div className="sl-animate-in">
+            <div className="sl-brand-pill mb-3 px-3 py-2 text-sm font-semibold">
+              <StarOutlined />
+              Khách hàng ưu tiên
+            </div>
+            <Typography.Title
+              level={1}
+              className="sl-section-title !mb-2 !text-[30px] sm:!text-[40px]"
+            >
               Danh sách khách hàng ưu tiên
             </Typography.Title>
             <Typography.Text type="secondary">
@@ -67,8 +75,12 @@ export default function PriorityCustomersPublicPage() {
             </Typography.Text>
           </div>
 
-          <Card>
+          <Card
+            className="sl-animate-in sl-animate-delay-1"
+            styles={{ body: { padding: 16 } }}
+          >
             <Input
+              prefix={<SearchOutlined />}
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Tìm theo tên khách hàng"
@@ -76,25 +88,30 @@ export default function PriorityCustomersPublicPage() {
             />
           </Card>
 
-          <Card>
+          <Card
+            className="sl-animate-in sl-animate-delay-2"
+            styles={{ body: { padding: 16 } }}
+          >
             {isLoading ? (
-              <Typography.Text type="secondary">Đang tải...</Typography.Text>
+              <div className="py-8 text-center">
+                <Spin />
+                <Typography.Text
+                  type="secondary"
+                  style={{ display: "block", marginTop: 10 }}
+                >
+                  Đang tải danh sách...
+                </Typography.Text>
+              </div>
             ) : filteredCustomers.length === 0 ? (
-              <Typography.Text type="secondary">
-                Chưa có khách hàng ưu tiên
-              </Typography.Text>
+              <Empty description="Chưa có khách hàng ưu tiên" />
             ) : (
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {filteredCustomers.map((customer) => (
                   <div
                     key={customer.id}
-                    style={{
-                      border: "1px solid #f0f0f0",
-                      borderRadius: 8,
-                      padding: 12,
-                    }}
+                    className="rounded-lg border border-gray-200 bg-white p-3"
                   >
-                    <Space orientation="vertical" size={2} style={{ width: "100%" }}>
+                    <Space orientation="vertical" size={6} style={{ width: "100%" }}>
                       <Space wrap>
                         <Typography.Text strong>
                           {customer.customer_name}
@@ -115,7 +132,9 @@ export default function PriorityCustomersPublicPage() {
           </Card>
 
           <div>
-            <Button onClick={() => router.push("/")}>Quay về trang chủ</Button>
+            <Button type="primary" onClick={() => router.push("/")}>
+              Quay về trang chủ
+            </Button>
           </div>
         </Space>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/home/Header";
@@ -69,6 +69,10 @@ const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
   },
 ];
 const CLIENT_CACHE_TTL_MS = 2 * 60 * 1000;
+const MOBILE_PRODUCTS_STEP = 8;
+const DESKTOP_PRODUCTS_STEP = 12;
+const MOBILE_MEDIA_QUERY = "(max-width: 767px)";
+const DEPRECATED_BANNER_PATH = "/banners/banner-default-smartlife.svg";
 
 const normalizeText = (value: string | null | undefined) =>
   (value || "")
@@ -84,9 +88,60 @@ let cachedProductsAt = 0;
 let cachedCarouselItems: CarouselItem[] | null = null;
 let cachedCarouselAt = 0;
 
+function isCacheFresh(timestamp: number) {
+  return Date.now() - timestamp < CLIENT_CACHE_TTL_MS;
+}
+
+function getBannerImageKey(image: string) {
+  try {
+    return new URL(image, "http://smartlife.local").pathname;
+  } catch {
+    return image.split("?")[0] || image;
+  }
+}
+
+const DEFAULT_BANNER_IMAGE_KEYS = new Set(
+  DEFAULT_CAROUSEL_ITEMS.map((item) => getBannerImageKey(item.image)),
+);
+
+function toCarouselItems(banners: HomeBanner[]): CarouselItem[] {
+  return banners
+    .filter((item) => item.image_url)
+    .sort((a, b) => {
+      const orderA =
+        typeof a.display_order === "number"
+          ? a.display_order
+          : Number.MAX_SAFE_INTEGER;
+      const orderB =
+        typeof b.display_order === "number"
+          ? b.display_order
+          : Number.MAX_SAFE_INTEGER;
+      return orderA - orderB;
+    })
+    .map((item, index) => ({
+      image: getOptimizedImageUrl(item.image_url, {
+        width: 1600,
+        quality: 72,
+        format: "webp",
+      }),
+      alt: item.alt_text || `Banner trang chủ ${index + 1}`,
+      type: item.mime_type?.startsWith("video/") ? "video" : "image",
+    }));
+}
+
+function mergeCarouselItems(items: CarouselItem[]) {
+  const seen = new Set(DEFAULT_BANNER_IMAGE_KEYS);
+  const customItems = items.filter((item) => {
+    const key = getBannerImageKey(item.image);
+    if (key.endsWith(DEPRECATED_BANNER_PATH) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return [...DEFAULT_CAROUSEL_ITEMS, ...customItems];
+}
+
 function HomeContent() {
-  const MOBILE_PRODUCTS_STEP = 8;
-  const DESKTOP_PRODUCTS_STEP = 12;
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
@@ -120,14 +175,80 @@ function HomeContent() {
     isLoaded,
   } = useCart();
 
-  // Fetch products
-  useEffect(() => {
-    fetchProducts();
-    fetchHomepageBanners();
+  const fetchProducts = useCallback(async (signal?: AbortSignal) => {
+    if (cachedProducts && isCacheFresh(cachedProductsAt)) {
+      setProducts(cachedProducts);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/products?activeOnly=true", { signal });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      const data = await res.json();
+      if (signal?.aborted) return;
+      const activeProducts = data.filter((p: Product) => p.is_active);
+      cachedProducts = activeProducts;
+      cachedProductsAt = Date.now();
+      setProducts(activeProducts);
+    } catch (error) {
+      if (!signal?.aborted) {
+        console.error("Error fetching products:", error);
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  const fetchHomepageBanners = useCallback(async (signal?: AbortSignal) => {
+    if (cachedCarouselItems && isCacheFresh(cachedCarouselAt)) {
+      setCarouselItems(cachedCarouselItems);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/media?purpose=homepage_banner", {
+        signal,
+      });
+
+      if (!response.ok) return;
+
+      const result = await response.json();
+      if (signal?.aborted) return;
+      const banners = (
+        Array.isArray(result.media) ? result.media : []
+      ) as HomeBanner[];
+
+      if (banners.length === 0) return;
+
+      const mapped = toCarouselItems(banners);
+      if (mapped.length > 0) {
+        const nextCarouselItems = mergeCarouselItems(mapped);
+        cachedCarouselItems = nextCarouselItems;
+        cachedCarouselAt = Date.now();
+        setCarouselItems(nextCarouselItems);
+      }
+    } catch (error) {
+      if (!signal?.aborted) {
+        console.error("Error fetching homepage banners:", error);
+      }
+    }
   }, []);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const controller = new AbortController();
+    fetchProducts(controller.signal);
+    fetchHomepageBanners(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [fetchHomepageBanners, fetchProducts]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
     const updateMobileState = () => {
       setIsMobileView(mediaQuery.matches);
     };
@@ -139,95 +260,6 @@ function HomeContent() {
       mediaQuery.removeEventListener("change", updateMobileState);
     };
   }, []);
-
-  const fetchProducts = async () => {
-    if (cachedProducts && Date.now() - cachedProductsAt < CLIENT_CACHE_TTL_MS) {
-      setProducts(cachedProducts);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/products?activeOnly=true");
-      if (!res.ok) throw new Error("Failed to fetch products");
-      const data = await res.json();
-      // Chỉ hiển thị sản phẩm đang hoạt động
-      const activeProducts = data.filter((p: Product) => p.is_active);
-      cachedProducts = activeProducts;
-      cachedProductsAt = Date.now();
-      setProducts(activeProducts);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchHomepageBanners = async () => {
-    if (
-      cachedCarouselItems &&
-      Date.now() - cachedCarouselAt < CLIENT_CACHE_TTL_MS
-    ) {
-      setCarouselItems(cachedCarouselItems);
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/media?purpose=homepage_banner");
-
-      if (!response.ok) return;
-
-      const result = await response.json();
-      const banners = (
-        Array.isArray(result.media) ? result.media : []
-      ) as HomeBanner[];
-
-      if (banners.length === 0) return;
-
-      const mapped: CarouselItem[] = banners
-        .filter((item) => item.image_url)
-        .sort((a, b) => {
-          const orderA =
-            typeof a.display_order === "number"
-              ? a.display_order
-              : Number.MAX_SAFE_INTEGER;
-          const orderB =
-            typeof b.display_order === "number"
-              ? b.display_order
-              : Number.MAX_SAFE_INTEGER;
-          return orderA - orderB;
-        })
-        .map((item, index) => ({
-          image: getOptimizedImageUrl(item.image_url, {
-            width: 1600,
-            quality: 72,
-            format: "webp",
-          }),
-          alt: item.alt_text || `Banner trang chủ ${index + 1}`,
-          type: item.mime_type?.startsWith("video/") ? "video" : "image",
-        }));
-
-      if (mapped.length > 0) {
-        const defaultBannerImages = new Set(
-          DEFAULT_CAROUSEL_ITEMS.map((item) => item.image),
-        );
-        const nextCarouselItems = [
-          ...DEFAULT_CAROUSEL_ITEMS,
-          ...mapped.filter(
-            (item) =>
-              !defaultBannerImages.has(item.image) &&
-              !item.image.includes("banner-default-smartlife.svg"),
-          ),
-        ];
-
-        cachedCarouselItems = nextCarouselItems;
-        cachedCarouselAt = Date.now();
-        setCarouselItems(nextCarouselItems);
-      }
-    } catch {
-      // Keep fallback carousel items
-    }
-  };
 
   const handleAddToCart = (product: Product) => {
     addToCart(product);

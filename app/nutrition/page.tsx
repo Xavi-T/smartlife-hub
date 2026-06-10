@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -36,6 +36,8 @@ type ArticleListItem = Pick<
   nutrition_categories?: NutritionCategory | null;
 };
 
+const SEARCH_DEBOUNCE_MS = 350;
+
 function NutritionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,7 +45,10 @@ function NutritionContent() {
   const [categories, setCategories] = useState<NutritionCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [searchInput, setSearchInput] = useState(
+    searchParams.get("search") || "",
+  );
+  const [debouncedSearch, setDebouncedSearch] = useState(searchInput);
   const [category, setCategory] = useState(searchParams.get("category") || "");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const {
@@ -54,19 +59,45 @@ function NutritionContent() {
     getTotalPrice,
   } = useCart();
 
+  const updateUrl = useCallback(
+    (nextSearch: string, nextCategory: string) => {
+      const query = new URLSearchParams();
+      if (nextSearch.trim()) query.set("search", nextSearch.trim());
+      if (nextCategory) query.set("category", nextCategory);
+      const suffix = query.toString() ? `?${query.toString()}` : "";
+      router.replace(`/nutrition${suffix}`);
+    },
+    [router],
+  );
+
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  useEffect(() => {
+    updateUrl(debouncedSearch, category);
+  }, [category, debouncedSearch, updateUrl]);
+
+  useEffect(() => {
+    const controller = new AbortController();
     const query = new URLSearchParams();
-    if (search.trim()) query.set("search", search.trim());
+    if (debouncedSearch.trim()) query.set("search", debouncedSearch.trim());
     if (category) query.set("category", category);
 
     fetch(`/api/nutrition/articles?${query.toString()}`, {
       cache: "no-store",
+      signal: controller.signal,
     })
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) {
           throw new Error(result.error || "Không thể tải bài viết");
         }
+        if (controller.signal.aborted) return;
         setErrorMessage("");
         setArticles(Array.isArray(result.articles) ? result.articles : []);
         setCategories(
@@ -74,14 +105,19 @@ function NutritionContent() {
         );
       })
       .catch((error) => {
+        if (controller.signal.aborted) return;
         console.error("Error loading nutrition articles:", error);
         setErrorMessage(
           error instanceof Error ? error.message : "Không thể tải bài viết",
         );
         setArticles([]);
       })
-      .finally(() => setIsLoading(false));
-  }, [category, search]);
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [category, debouncedSearch]);
 
   const categoryOptions = useMemo(
     () => [
@@ -93,14 +129,6 @@ function NutritionContent() {
     ],
     [categories],
   );
-
-  const updateUrl = (nextSearch: string, nextCategory: string) => {
-    const query = new URLSearchParams();
-    if (nextSearch.trim()) query.set("search", nextSearch.trim());
-    if (nextCategory) query.set("category", nextCategory);
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-    router.replace(`/nutrition${suffix}`);
-  };
 
   return (
     <div className="sl-public-shell">
@@ -169,19 +197,23 @@ function NutritionContent() {
             <Input.Search
               allowClear
               placeholder="Tìm bài viết theo tiêu đề"
-              value={search}
+              value={searchInput}
               onChange={(event) => {
-                const value = event.target.value;
-                setSearch(value);
-                updateUrl(value, category);
+                setIsLoading(true);
+                setSearchInput(event.target.value);
+              }}
+              onSearch={(value) => {
+                setIsLoading(true);
+                setSearchInput(value);
+                setDebouncedSearch(value);
               }}
               style={{ width: "100%" }}
             />
             <Select
               value={category}
               onChange={(value) => {
+                setIsLoading(true);
                 setCategory(value);
-                updateUrl(search, value);
               }}
               options={categoryOptions}
               style={{ width: "100%" }}
@@ -243,7 +275,11 @@ function NutritionContent() {
                     </div>
                   }
                 >
-                  <Space orientation="vertical" size={8} style={{ width: "100%" }}>
+                  <Space
+                    orientation="vertical"
+                    size={8}
+                    style={{ width: "100%" }}
+                  >
                     {article.nutrition_categories && (
                       <Tag color="green" style={{ width: "fit-content" }}>
                         {article.nutrition_categories.name}
@@ -299,7 +335,7 @@ export default function NutritionPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50 grid place-items-center">
+        <div className="sl-public-shell grid place-items-center">
           <Spin size="large" />
         </div>
       }

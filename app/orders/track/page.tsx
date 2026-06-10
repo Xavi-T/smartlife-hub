@@ -187,25 +187,25 @@ function OrderTrackingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="sl-public-shell">
       {contextHolder}
       <Header cartItemsCount={0} onCartClick={() => router.push("/")} />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-36 md:pb-8">
         <Typography.Title
-          level={2}
-          style={{ marginBottom: 8, fontSize: "clamp(24px, 3.6vw, 34px)" }}
+          level={1}
+          className="sl-section-title !mb-2 !text-[30px] sm:!text-[40px]"
         >
           Kiểm tra đơn hàng
         </Typography.Title>
-        <Typography.Text
-          type="secondary"
-          style={{ fontSize: "clamp(13px, 2.1vw, 15px)" }}
-        >
+        <Typography.Text type="secondary">
           Nhập số điện thoại đã đặt hàng để xem danh sách và trạng thái đơn.
         </Typography.Text>
 
-        <Card style={{ marginTop: 20, marginBottom: 20 }}>
+        <Card
+          style={{ marginTop: 20, marginBottom: 20 }}
+          styles={{ body: { padding: 16 } }}
+        >
           <Space.Compact style={{ width: "100%" }}>
             <Input
               value={phone}
@@ -286,7 +286,7 @@ function OrderTrackingContent() {
                 children: (
                   <div>
                     <Typography.Text
-                      style={{ display: "block", fontSize: "clamp(13px,2vw,15px)" }}
+                      style={{ display: "block", fontSize: 14 }}
                     >
                       Người nhận: {order.customer_name} - {order.customer_phone}
                     </Typography.Text>
@@ -294,7 +294,7 @@ function OrderTrackingContent() {
                       style={{
                         display: "block",
                         marginBottom: 10,
-                        fontSize: "clamp(13px,2vw,15px)",
+                        fontSize: 14,
                       }}
                     >
                       Địa chỉ: {order.customer_address}
@@ -405,7 +405,7 @@ export default function OrderTrackingPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="sl-public-shell flex items-center justify-center">
           <Spin size="large" />
         </div>
       }
