@@ -42,9 +42,9 @@ export default function AboutPage() {
               Về chúng tôi
             </Typography.Title>
             <Typography.Paragraph className="!mb-0 !text-base sm:!text-lg">
-              {APP_CONFIG.shopName} xây dựng không gian tư vấn và mua sắm sản
-              phẩm chăm sóc sức khỏe theo hướng gần gũi, rõ ràng và phù hợp nhu
-              cầu từng gia đình.
+              {APP_CONFIG.shopName} theo đuổi định hướng{" "}
+              <q>{APP_CONFIG.shopTagline}</q>, kết hợp tư vấn dinh dưỡng, kiến
+              thức ăn uống lành mạnh và sản phẩm phù hợp cho từng gia đình.
             </Typography.Paragraph>
           </div>
 

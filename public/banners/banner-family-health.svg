@@ -25,8 +25,8 @@
 
   <g filter="url(#shadow)">
     <rect x="78" y="74" width="780" height="502" rx="38" fill="white" opacity=".88"/>
-    <text x="126" y="218" class="title">Nâng tầm sức khỏe</text>
-    <text x="126" y="306" class="title" fill="url(#blueGreen)">gia đình Việt</text>
+    <text x="126" y="218" class="title">Giải pháp dinh dưỡng</text>
+    <text x="126" y="306" class="title" fill="url(#blueGreen)">cho tương lai khoẻ</text>
     <text x="130" y="376" class="sub">Kiến thức dễ áp dụng cho bữa ăn mỗi ngày</text>
     <g transform="translate(130 430)">
       <rect width="186" height="58" rx="29" fill="#EAF7E5"/>

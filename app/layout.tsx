@@ -5,28 +5,38 @@ import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { FaviconSync } from "@/components/home/FaviconSync";
 import { PublicSiteWidgets } from "@/components/home/PublicSiteWidgets";
 import { APP_CONFIG } from "@/lib/appConfig";
+import {
+  DEFAULT_OG_IMAGE,
+  DEFAULT_SEO_DESCRIPTION,
+  SEO_KEYWORDS,
+  SITE_URL,
+} from "@/lib/seo";
 import { TitleSync } from "@/components/seo/TitleSync";
 import "./globals.css";
 
-const siteUrl = APP_CONFIG.shopWebsite;
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
+  applicationName: APP_CONFIG.shopName,
   title: {
     default: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
     template: `%s | ${APP_CONFIG.shopName}`,
   },
-  description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
+  description: DEFAULT_SEO_DESCRIPTION,
+  keywords: SEO_KEYWORDS,
+  authors: [{ name: APP_CONFIG.shopName, url: SITE_URL }],
+  creator: APP_CONFIG.shopName,
+  publisher: APP_CONFIG.shopName,
+  category: "nutrition",
   openGraph: {
     type: "website",
     locale: "vi_VN",
-    url: siteUrl,
+    url: SITE_URL,
     siteName: APP_CONFIG.shopName,
     title: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
-    description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
+    description: DEFAULT_SEO_DESCRIPTION,
     images: [
       {
-        url: "/opengraph-image",
+        url: DEFAULT_OG_IMAGE,
         width: 1200,
         height: 630,
         alt: `${APP_CONFIG.shopName} - ${APP_CONFIG.shopTagline}`,
@@ -36,8 +46,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
-    description: `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`,
-    images: ["/opengraph-image"],
+    description: DEFAULT_SEO_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
   },
   robots: {
     index: true,
@@ -45,6 +55,10 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "/",
+  },
+  icons: {
+    icon: APP_CONFIG.defaultLogo,
+    apple: APP_CONFIG.defaultLogo,
   },
 };
 

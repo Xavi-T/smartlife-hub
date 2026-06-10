@@ -131,7 +131,7 @@ BEGIN
     (
       'homepage_banner_family_health',
       'homepage_banner',
-      'Nâng tầm sức khỏe gia đình Việt',
+      'Giải pháp dinh dưỡng cho tương lai khoẻ',
       'banner-family-health.svg',
       'image/svg+xml',
       1,

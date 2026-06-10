@@ -26,6 +26,7 @@ import {
 import { useRouter } from "next/navigation";
 import { trackBeginCheckout, trackSelectItem } from "@/lib/analytics";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
+import { APP_CONFIG } from "@/lib/appConfig";
 
 const CartModal = dynamic(
   () =>
@@ -54,7 +55,7 @@ const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
   },
   {
     image: "/banners/banner-family-health.svg",
-    alt: "Nâng tầm sức khỏe gia đình Việt",
+    alt: "Giải pháp dinh dưỡng cho tương lai khoẻ",
     type: "image",
   },
   {
@@ -435,18 +436,18 @@ function HomeContent() {
                   level={1}
                   className="sl-section-title !mb-3 !text-[32px] sm:!text-[44px] xl:!text-[50px]"
                 >
-                  Nâng tầm sức khỏe gia đình Việt
+                  {APP_CONFIG.shopTagline}
                 </Typography.Title>
                 <Typography.Paragraph
                   className="!mb-0 !text-base sm:!text-lg"
                   style={{ color: "var(--sl-muted)", maxWidth: 620 }}
                 >
-                  Không gian tư vấn dinh dưỡng và mua sắm sản phẩm chăm sóc sức
-                  khỏe với phong cách sạch, ấm và gần gũi.
+                  Tư vấn dinh dưỡng, tính nhu cầu calo và chọn sản phẩm phù hợp
+                  cho gia đình với phong cách sạch, ấm và gần gũi.
                 </Typography.Paragraph>
               </div>
               <div className="flex flex-wrap gap-2">
-                {["Dinh dưỡng gia đình", "Sữa mẹ & bé", "Tư vấn sức khỏe"].map(
+                {["Dinh dưỡng gia đình", "Tính calo", "Sản phẩm phù hợp"].map(
                   (item) => (
                     <Tag
                       key={item}
@@ -663,7 +664,7 @@ function HomeContent() {
                 level={3}
                 className="sl-section-title !mb-1 !text-2xl sm:!text-3xl"
               >
-                Sản phẩm chăm sóc sức khỏe
+                Sản phẩm dinh dưỡng & chăm sóc sức khỏe
               </Typography.Title>
               <Typography.Text type="secondary">
                 {visibleProducts.length} sản phẩm phù hợp

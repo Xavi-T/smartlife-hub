@@ -6,6 +6,9 @@ import { APP_CONFIG } from "@/lib/appConfig";
 
 const TITLE_MAP: Record<string, string> = {
   "/": `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`,
+  "/about": "Về SmartLife Hub",
+  "/nutrition": "Kiến thức dinh dưỡng",
+  "/nutrition/calculator": "Tính nhu cầu dinh dưỡng",
   "/checkout": "Thanh toán đơn hàng",
   "/orders/track": "Tra cứu đơn hàng",
   "/priority-customers": "Danh sách khách hàng ưu tiên",
@@ -29,10 +32,7 @@ export function TitleSync() {
 
     if (customTitle) {
       document.title = `${customTitle} | ${baseName}`;
-      return;
     }
-
-    document.title = `${baseName} – ${APP_CONFIG.shopTagline}`;
   }, [pathname]);
 
   return null;

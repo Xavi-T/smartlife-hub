@@ -2,6 +2,15 @@ import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { APP_CONFIG } from "@/lib/appConfig";
 import type { Database } from "@/types/database";
+import {
+  DEFAULT_SEO_DESCRIPTION,
+  buildCanonical,
+  buildPageTitle,
+  getDefaultSocialImage,
+  stripHtml,
+  toAbsoluteUrl,
+  truncateDescription,
+} from "@/lib/seo";
 
 interface ProductMetadataLayoutProps {
   children: React.ReactNode;
@@ -21,30 +30,6 @@ interface ProductMetadataRow {
 
 interface ProductMediaRow {
   image_url: string | null;
-}
-
-function stripHtml(input: string) {
-  return input
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function toAbsoluteUrl(pathOrUrl: string): string {
-  if (/^https?:\/\//i.test(pathOrUrl)) {
-    return pathOrUrl;
-  }
-
-  const base = APP_CONFIG.shopWebsite.replace(/\/$/, "");
-  const normalizedPath = pathOrUrl.startsWith("/")
-    ? pathOrUrl
-    : `/${pathOrUrl}`;
-  return `${base}${normalizedPath}`;
-}
-
-function truncateDescription(input: string, maxLength = 180): string {
-  if (input.length <= maxLength) return input;
-  return `${input.slice(0, maxLength - 3).trim()}...`;
 }
 
 async function getProductMetadata(id: string) {
@@ -132,16 +117,14 @@ export async function generateMetadata({
   params,
 }: ProductMetadataParams): Promise<Metadata> {
   const { id } = await params;
-  const siteUrl = APP_CONFIG.shopWebsite;
-  const fallbackTitle = `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}`;
-  const fallbackDescription = `${APP_CONFIG.shopName} – ${APP_CONFIG.shopTagline}.`;
-  const canonical = `${siteUrl.replace(/\/$/, "")}/products/${id}`;
+  const fallbackTitle = buildPageTitle();
+  const canonical = buildCanonical(`/products/${id}`);
   const productMeta = await getProductMetadata(id);
 
   if (!productMeta) {
     return {
-      title: fallbackTitle,
-      description: fallbackDescription,
+      title: { absolute: fallbackTitle },
+      description: DEFAULT_SEO_DESCRIPTION,
       alternates: { canonical },
       robots: {
         index: false,
@@ -153,29 +136,22 @@ export async function generateMetadata({
         siteName: APP_CONFIG.shopName,
         url: canonical,
         title: fallbackTitle,
-        description: fallbackDescription,
-        images: [
-          {
-            url: toAbsoluteUrl("/opengraph-image"),
-            width: 1200,
-            height: 630,
-            alt: fallbackTitle,
-          },
-        ],
+        description: DEFAULT_SEO_DESCRIPTION,
+        images: [getDefaultSocialImage()],
       },
       twitter: {
         card: "summary_large_image",
         title: fallbackTitle,
-        description: fallbackDescription,
-        images: [toAbsoluteUrl("/opengraph-image")],
+        description: DEFAULT_SEO_DESCRIPTION,
+        images: [getDefaultSocialImage().url],
       },
     };
   }
 
-  const pageTitle = `${productMeta.name} | ${APP_CONFIG.shopName}`;
+  const pageTitle = buildPageTitle(productMeta.name);
 
   return {
-    title: pageTitle,
+    title: { absolute: pageTitle },
     description: productMeta.description,
     alternates: { canonical },
     openGraph: {
@@ -193,7 +169,7 @@ export async function generateMetadata({
           alt: productMeta.name,
         },
         {
-          url: toAbsoluteUrl("/opengraph-image"),
+          url: getDefaultSocialImage().url,
           width: 1200,
           height: 630,
           alt: `${APP_CONFIG.shopName} - ${APP_CONFIG.shopTagline}`,
