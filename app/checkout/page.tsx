@@ -25,6 +25,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { CheckoutMethod } from "@/types/order";
 import { trackBeginCheckout, trackPurchase } from "@/lib/analytics";
 import { APP_CONFIG } from "@/lib/appConfig";
+import { buildVietQrUrl } from "@/lib/vietqr";
 
 interface CheckoutFormValues {
   name: string;
@@ -38,16 +39,9 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [form] = Form.useForm<CheckoutFormValues>();
   const [messageApi, contextHolder] = message.useMessage();
-  const {
-    cart,
-    updateQuantity,
-    removeFromCart,
-    clearCart,
-    getTotalPrice,
-    isLoaded,
-  } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, isLoaded } =
+    useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bankQrSrc, setBankQrSrc] = useState("/qrcode.png");
   const hasTrackedBeginCheckout = useRef(false);
 
   const examplePhone = useMemo(
@@ -58,6 +52,11 @@ export default function CheckoutPage() {
   const checkoutMethod = Form.useWatch("checkoutMethod", form) || "cod";
   const customerName = Form.useWatch("name", form) || "";
   const customerPhone = Form.useWatch("phone", form) || "";
+  const totalPrice = useMemo(
+    () =>
+      cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    [cart],
+  );
 
   const splitProductAndVariant = (cartProductId: string) => {
     const [productId, variantId] = String(cartProductId || "").split("::");
@@ -75,6 +74,17 @@ export default function CheckoutPage() {
     const result = `${cleanName}-${cleanPhone}`.trim();
     return result || "Ten KH + SDT";
   }, [customerName, customerPhone]);
+
+  const bankQrSrc = useMemo(() => {
+    return buildVietQrUrl({
+      bankName: APP_CONFIG.bank.name,
+      accountNo: APP_CONFIG.bank.accountNumber,
+      amount: Math.round(totalPrice),
+      addInfo: transferContent,
+      accountName: APP_CONFIG.bank.accountName,
+      template: "compact2",
+    }).qr_url;
+  }, [totalPrice, transferContent]);
 
   const handleCopy = async (value: string, label: string) => {
     try {
@@ -97,37 +107,6 @@ export default function CheckoutPage() {
     trackBeginCheckout(cart);
     hasTrackedBeginCheckout.current = true;
   }, [cart, isLoaded]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadBankQrCode = async () => {
-      try {
-        const response = await fetch("/api/media?purpose=bank_qrcode", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) return;
-
-        const result = await response.json();
-        const firstQrCode = Array.isArray(result.media)
-          ? result.media[0]
-          : null;
-
-        if (active && firstQrCode?.image_url) {
-          setBankQrSrc(firstQrCode.image_url);
-        }
-      } catch {
-        // Keep default QR code fallback
-      }
-    };
-
-    loadBankQrCode();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const stepItems = useMemo(
     () => [
@@ -193,7 +172,7 @@ export default function CheckoutPage() {
       if (result.success) {
         trackPurchase({
           transactionId: result.orderId || `order-${Date.now()}`,
-          value: Number(result.totalAmount || getTotalPrice()),
+          value: Number(result.totalAmount || totalPrice),
           paymentType: values.checkoutMethod,
           items: cart,
         });
@@ -451,7 +430,8 @@ export default function CheckoutPage() {
                               }}
                             >
                               <span>
-                                Nội dung CK: <strong>{transferContent}</strong>
+                                Nội dung CK: <strong>{transferContent}</strong>{" "}
+                                (Không bắt buộc)
                               </span>
                               <Button
                                 size="small"
@@ -483,6 +463,18 @@ export default function CheckoutPage() {
                                 background: "#fff",
                               }}
                             />
+                            <Typography.Text
+                              type="secondary"
+                              style={{
+                                display: "block",
+                                maxWidth: 220,
+                                marginTop: 6,
+                                fontSize: 12,
+                                textAlign: "center",
+                              }}
+                            >
+                              QR đã kèm số tiền và nội dung chuyển khoản.
+                            </Typography.Text>
                           </div>
                         </div>
                       }
@@ -547,7 +539,7 @@ export default function CheckoutPage() {
                 >
                   <Typography.Text>Tạm tính</Typography.Text>
                   <Typography.Text>
-                    {formatCurrency(getTotalPrice())}
+                    {formatCurrency(totalPrice)}
                   </Typography.Text>
                 </div>
                 <div
@@ -568,7 +560,7 @@ export default function CheckoutPage() {
                 >
                   <Typography.Text strong>Tổng tạm tính</Typography.Text>
                   <Typography.Text strong style={{ color: "#1677ff" }}>
-                    {formatCurrency(getTotalPrice())}
+                    {formatCurrency(totalPrice)}
                   </Typography.Text>
                 </div>
                 <Alert
