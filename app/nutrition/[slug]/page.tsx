@@ -19,6 +19,7 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
 import { ProductGrid } from "@/components/home/ProductGrid";
+import { ConsultationRequestCard } from "@/components/nutrition/ConsultationRequestCard";
 import { useCart } from "@/hooks/useCart";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
 import type {
@@ -54,7 +55,6 @@ export default function NutritionArticlePage() {
     const controller = new AbortController();
 
     fetch(`/api/nutrition/articles/${slug}`, {
-      cache: "no-store",
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -205,6 +205,13 @@ export default function NutritionArticlePage() {
                 </Typography.Text>
               )}
             </Card>
+
+            <ConsultationRequestCard
+              source="nutrition_article"
+              title="Muốn được tư vấn theo bài viết này?"
+              description="Gửi thông tin để SmartLife Hub xem nhu cầu của bạn và liên hệ lại với hướng tư vấn phù hợp."
+              defaultMessage={`Tôi vừa đọc bài "${article.title}" và muốn được tư vấn thêm.`}
+            />
 
             {relatedProducts.length > 0 && (
               <Card title="Sản phẩm liên quan">

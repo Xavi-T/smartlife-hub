@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
   Statistic,
   Tag,
   Typography,
+  message,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -22,6 +23,8 @@ import {
 } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
+import { ProductGrid } from "@/components/home/ProductGrid";
+import { ConsultationRequestCard } from "@/components/nutrition/ConsultationRequestCard";
 import { useCart } from "@/hooks/useCart";
 import {
   ACTIVITY_LEVEL_OPTIONS,
@@ -34,6 +37,7 @@ import {
   type NutritionGoal,
 } from "@/lib/nutrition";
 import { formatNumber } from "@/lib/utils";
+import type { Product } from "@/types/database";
 
 interface PublicCalculatorFormValues {
   ageYears: number;
@@ -109,18 +113,83 @@ function getGoalSuggestion(goal: NutritionGoal) {
   return "Duy trì khẩu phần ổn định, ăn đủ nhóm chất và điều chỉnh theo mức vận động thực tế.";
 }
 
+function getSuggestedProducts(products: Product[], goal: NutritionGoal) {
+  const keywordMap: Record<NutritionGoal, string[]> = {
+    lose_weight: [
+      "healthy",
+      "ít đường",
+      "granola",
+      "meal prep",
+      "yến mạch",
+      "rau",
+    ],
+    maintain: ["healthy", "meal prep", "dinh dưỡng", "ngũ cốc", "bữa phụ"],
+    gain_weight: ["protein", "sữa", "bột", "dinh dưỡng", "hạt", "tăng cân"],
+    improve_health: [
+      "healthy",
+      "ít đường",
+      "dinh dưỡng",
+      "vitamin",
+      "bổ sung",
+      "sức khỏe",
+    ],
+  };
+  const keywords = keywordMap[goal];
+
+  return [...products]
+    .map((product) => {
+      const haystack = `${product.name} ${product.category} ${
+        product.description || ""
+      }`.toLowerCase();
+      const score = keywords.reduce(
+        (total, keyword) => total + (haystack.includes(keyword) ? 1 : 0),
+        0,
+      );
+      return { product, score };
+    })
+    .filter((item) => item.score > 0 && item.product.stock_quantity > 0)
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 4)
+    .map((item) => item.product);
+}
+
 export default function PublicNutritionCalculatorPage() {
   const router = useRouter();
   const [form] = Form.useForm<PublicCalculatorFormValues>();
+  const [messageApi, contextHolder] = message.useMessage();
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
   const watchedValues = Form.useWatch([], form);
   const {
     cart,
+    addToCart,
     updateQuantity,
     removeFromCart,
     getTotalItems,
     getTotalPrice,
   } = useCart();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/products?activeOnly=true", {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) return [];
+        const result = await response.json();
+        return Array.isArray(result) ? result : [];
+      })
+      .then((items) => {
+        if (!controller.signal.aborted) setProducts(items);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.error("Error loading suggested products:", error);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const calculationResult = useMemo(() => {
     const values =
@@ -148,9 +217,37 @@ export default function PublicNutritionCalculatorPage() {
   }, [watchedValues]);
 
   const currentGoal = watchedValues?.goal || "maintain";
+  const suggestedProducts = useMemo(
+    () => getSuggestedProducts(products, currentGoal).slice(0, 4),
+    [currentGoal, products],
+  );
+  const consultationCalculation = useMemo(() => {
+    const values =
+      watchedValues as Partial<PublicCalculatorFormValues> | undefined;
+    if (!values || !calculationResult) return null;
+    return {
+      ageYears: values.ageYears,
+      gender: values.gender,
+      heightCm: values.heightCm,
+      weightKg: values.weightKg,
+      activityLevel: values.activityLevel,
+      goal: values.goal,
+      result: calculationResult,
+    };
+  }, [calculationResult, watchedValues]);
+
+  const handleAddToCart = (product: Product) => {
+    addToCart(product);
+    messageApi.success("Đã thêm vào giỏ hàng");
+  };
+
+  const handleViewProduct = (product: Product) => {
+    router.push(`/products/${product.id}`);
+  };
 
   return (
     <div className="sl-public-shell">
+      {contextHolder}
       <Header
         cartItemsCount={getTotalItems()}
         onCartClick={() => setIsCartOpen(true)}
@@ -344,6 +441,31 @@ export default function PublicNutritionCalculatorPage() {
             )}
           </Card>
         </div>
+
+        <div className="mt-4">
+          <ConsultationRequestCard
+            source="nutrition_calculator"
+            title="Gửi chỉ số để được tư vấn"
+            description="Thông tin bạn vừa tính sẽ được lưu vào hồ sơ tư vấn và gửi email cho SmartLife Hub."
+            defaultMessage="Tôi muốn được tư vấn chế độ ăn và sản phẩm phù hợp theo các chỉ số vừa tính."
+            calculation={consultationCalculation}
+          />
+        </div>
+
+        {suggestedProducts.length > 0 && (
+          <Card
+            className="sl-animate-in sl-animate-delay-3"
+            style={{ marginTop: 16 }}
+            styles={{ body: { padding: 16 } }}
+            title="Sản phẩm gợi ý theo mục tiêu"
+          >
+            <ProductGrid
+              products={suggestedProducts}
+              onAddToCart={handleAddToCart}
+              onViewDetail={handleViewProduct}
+            />
+          </Card>
+        )}
 
         <Card
           className="sl-animate-in sl-animate-delay-3"

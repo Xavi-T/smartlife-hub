@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const dynamic = "force-dynamic";
+const PUBLIC_ARTICLE_CACHE_CONTROL =
+  "public, max-age=60, stale-while-revalidate=300";
 
 function createPublicClient() {
   return createClient(
@@ -21,11 +22,19 @@ function getErrorMessage(error: unknown): string {
   return "Không thể tải bài viết";
 }
 
+function sanitizeSearchTerm(value: string): string {
+  return value
+    .replace(/[()%,.*_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const categorySlug = searchParams.get("category") || "";
-    const search = (searchParams.get("search") || "").trim().toLowerCase();
+    const search = (searchParams.get("search") || "").trim();
     const supabase = createPublicClient();
 
     let categoryId = "";
@@ -72,6 +81,15 @@ export async function GET(request: NextRequest) {
       query = query.eq("category_id", categoryId);
     }
 
+    if (search) {
+      const safeSearch = sanitizeSearchTerm(search);
+      if (safeSearch) {
+        query = query.or(
+          `title.ilike.%${safeSearch}%,excerpt.ilike.%${safeSearch}%`,
+        );
+      }
+    }
+
     const [{ data: articles, error }, { data: categories }] =
       await Promise.all([
         query,
@@ -84,19 +102,11 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    let rows = articles || [];
-    if (search) {
-      rows = rows.filter((article) => {
-        const haystack = `${article.title} ${article.excerpt || ""}`.toLowerCase();
-        return haystack.includes(search);
-      });
-    }
-
     return NextResponse.json(
-      { articles: rows, categories: categories || [] },
+      { articles: articles || [], categories: categories || [] },
       {
         headers: {
-          "Cache-Control": "no-store, max-age=0",
+          "Cache-Control": PUBLIC_ARTICLE_CACHE_CONTROL,
         },
       },
     );

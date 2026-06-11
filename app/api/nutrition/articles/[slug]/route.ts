@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const dynamic = "force-dynamic";
+const PUBLIC_ARTICLE_CACHE_CONTROL =
+  "public, max-age=60, stale-while-revalidate=300";
 
 function createPublicClient() {
   return createClient(
@@ -66,7 +67,7 @@ export async function GET(
       { article, relatedProducts: products || [] },
       {
         headers: {
-          "Cache-Control": "no-store, max-age=0",
+          "Cache-Control": PUBLIC_ARTICLE_CACHE_CONTROL,
         },
       },
     );

@@ -19,6 +19,7 @@ import {
 import { CalculatorOutlined } from "@ant-design/icons";
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
+import { ConsultationRequestCard } from "@/components/nutrition/ConsultationRequestCard";
 import { useCart } from "@/hooks/useCart";
 import type { NutritionArticle, NutritionCategory } from "@/types/database";
 
@@ -89,7 +90,6 @@ function NutritionContent() {
     if (category) query.set("category", category);
 
     fetch(`/api/nutrition/articles?${query.toString()}`, {
-      cache: "no-store",
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -187,6 +187,15 @@ function NutritionContent() {
             </Button>
           </div>
         </Card>
+
+        <div className="mb-4">
+          <ConsultationRequestCard
+            source="nutrition_page"
+            title="Cần bác sĩ/chuyên viên tư vấn?"
+            description="Gửi nhu cầu của bạn, SmartLife Hub sẽ liên hệ lại để tư vấn chế độ ăn hoặc sản phẩm phù hợp."
+            defaultMessage="Tôi muốn được tư vấn dinh dưỡng và lựa chọn sản phẩm phù hợp."
+          />
+        </div>
 
         <Card
           className="sl-animate-in sl-animate-delay-2"
