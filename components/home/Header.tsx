@@ -97,95 +97,112 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
   }, []);
 
   return (
-    <header
-      className="sl-public-header md:sticky md:top-0"
-      style={{
-        zIndex: 50,
-      }}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div
-          className="min-h-14 sm:min-h-[76px]"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            rowGap: 8,
-          }}
-        >
-          <Link
-            href="/"
+    <>
+      <header
+        className="sl-public-header md:sticky md:top-0"
+        style={{
+          zIndex: 50,
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div
+            className="min-h-14 sm:min-h-[76px]"
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              rowGap: 8,
             }}
           >
-            <div
-              className="sl-logo-frame w-10 h-10 sm:w-14 sm:h-14"
+            <Link
+              href="/"
               style={{
-                border: "2px solid rgba(22, 139, 208, 0.9)",
-                borderRadius: 12,
-                display: "grid",
-                placeItems: "center",
-                overflow: "hidden",
-                background: "#fff",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
               }}
             >
-              <Image
-                src={logoSrc}
-                alt={`${APP_CONFIG.shopName} Logo`}
-                width={48}
-                height={48}
-                className="w-8 h-8 sm:w-12 sm:h-12 object-contain"
-                priority
-              />
-            </div>
-            <div className="hidden min-w-0 sm:block">
-              <Typography.Title
-                level={4}
-                className="!mb-0 !text-lg sm:!text-xl"
+              <div
+                className="sl-logo-frame w-10 h-10 sm:w-14 sm:h-14"
+                style={{
+                  border: "2px solid rgba(22, 139, 208, 0.9)",
+                  borderRadius: 12,
+                  display: "grid",
+                  placeItems: "center",
+                  overflow: "hidden",
+                  background: "#fff",
+                }}
               >
-                {APP_CONFIG.shopName}
-              </Typography.Title>
-              <Typography.Text
-                type="secondary"
-                className="hidden sm:block"
-                style={{ fontSize: 12 }}
-              >
-                {APP_CONFIG.shopTagline}
-              </Typography.Text>
-            </div>
-          </Link>
+                <Image
+                  src={logoSrc}
+                  alt={`${APP_CONFIG.shopName} Logo`}
+                  width={48}
+                  height={48}
+                  className="w-8 h-8 sm:w-12 sm:h-12 object-contain"
+                  priority
+                />
+              </div>
+              <div className="hidden min-w-0 sm:block">
+                <Typography.Title
+                  level={4}
+                  className="!mb-0 !text-lg sm:!text-xl"
+                >
+                  {APP_CONFIG.shopName}
+                </Typography.Title>
+                <Typography.Text
+                  type="secondary"
+                  className="hidden sm:block"
+                  style={{ fontSize: 12 }}
+                >
+                  {APP_CONFIG.shopTagline}
+                </Typography.Text>
+              </div>
+            </Link>
 
-          <div className="hidden md:block">
-            <Space size="small" wrap>
-              <Link href="/about">
-                <Button className="sl-nav-link" type="text">
-                  Về chúng tôi
-                </Button>
-              </Link>
-              <Link href="/nutrition">
-                <Button className="sl-nav-link" type="text">
-                  Dinh dưỡng
-                </Button>
-              </Link>
-              <Link href="/nutrition/calculator">
-                <Button className="sl-nav-link" type="text">
-                  Tính dinh dưỡng
-                </Button>
-              </Link>
-              <Link href="/priority-customers">
-                <Button className="sl-nav-link" type="text">
-                  Danh sách KH ưu tiên
-                </Button>
-              </Link>
-              <Link href="/orders/track">
-                <Button className="sl-nav-link" type="text">
-                  Tra cứu đơn
-                </Button>
-              </Link>
+            <div className="hidden md:block">
+              <Space size="small" wrap>
+                <Link href="/about">
+                  <Button className="sl-nav-link" type="text">
+                    Về chúng tôi
+                  </Button>
+                </Link>
+                <Link href="/nutrition">
+                  <Button className="sl-nav-link" type="text">
+                    Dinh dưỡng
+                  </Button>
+                </Link>
+                <Link href="/nutrition/calculator">
+                  <Button className="sl-nav-link" type="text">
+                    Tính dinh dưỡng
+                  </Button>
+                </Link>
+                <Link href="/priority-customers">
+                  <Button className="sl-nav-link" type="text">
+                    Danh sách KH ưu tiên
+                  </Button>
+                </Link>
+                <Link href="/orders/track">
+                  <Button className="sl-nav-link" type="text">
+                    Tra cứu đơn
+                  </Button>
+                </Link>
+                <Badge
+                  count={cartItemsCount > 9 ? "9+" : cartItemsCount}
+                  size="small"
+                >
+                  <Button
+                    type="text"
+                    shape="circle"
+                    icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
+                    onClick={onCartClick}
+                    aria-label="Giỏ hàng"
+                  />
+                </Badge>
+              </Space>
+            </div>
+
+            <div className="block md:hidden">
               <Badge
                 count={cartItemsCount > 9 ? "9+" : cartItemsCount}
                 size="small"
@@ -198,25 +215,10 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                   aria-label="Giỏ hàng"
                 />
               </Badge>
-            </Space>
-          </div>
-
-          <div className="block md:hidden">
-            <Badge
-              count={cartItemsCount > 9 ? "9+" : cartItemsCount}
-              size="small"
-            >
-              <Button
-                type="text"
-                shape="circle"
-                icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
-                onClick={onCartClick}
-                aria-label="Giỏ hàng"
-              />
-            </Badge>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <nav
         className="sl-bottom-nav md:hidden fixed bottom-0 left-0 right-0"
@@ -280,6 +282,6 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
           </button>
         </div>
       </nav>
-    </header>
+    </>
   );
 }

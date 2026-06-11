@@ -1,7 +1,7 @@
 "use client";
 
 import NextImage from "next/image";
-import { Button, Card, Space, Tag, Typography } from "antd";
+import { Button, Card, Tag, Typography } from "antd";
 import { ShoppingCartOutlined } from "@ant-design/icons";
 import {
   calculateDiscountedPrice,
@@ -45,7 +45,7 @@ export function ProductCard({
       hoverable={!isOutOfStock}
       styles={{
         body: {
-          padding: 12,
+          padding: 10,
           height: "100%",
           display: "flex",
           flexDirection: "column",
@@ -73,7 +73,7 @@ export function ProductCard({
           aspectRatio: "1 / 1",
           borderRadius: 10,
           overflow: "hidden",
-          marginBottom: 8,
+          marginBottom: 6,
         }}
         className="sl-product-image"
       >
@@ -163,7 +163,7 @@ export function ProductCard({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mb-2 min-h-7 overflow-hidden">
+        <div className="mb-1 overflow-hidden leading-none">
           <Tag
             color="green"
             style={{
@@ -172,13 +172,17 @@ export function ProductCard({
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              fontSize: 13,
+              lineHeight: 1.25,
+              paddingInline: 8,
+              paddingBlock: 2,
             }}
           >
             {product.category}
           </Tag>
         </div>
 
-        <div className="mb-3 min-h-[42px] overflow-hidden">
+        <div className="mb-2 min-h-[39px] overflow-hidden">
           <Typography.Text
             strong
             ellipsis={{ tooltip: product.name }}
@@ -188,36 +192,34 @@ export function ProductCard({
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
               fontSize: 15,
-              lineHeight: 1.32,
+              lineHeight: 1.28,
             }}
           >
             {product.name}
           </Typography.Text>
         </div>
 
-        <div className="min-w-0">
+        <div className="min-h-[45px] min-w-0">
           <div className="text-[18px] font-semibold leading-tight text-red-500 whitespace-nowrap sm:text-[20px]">
             {formatCurrency(finalPrice)}
           </div>
           {hasDiscount && (
-            <Space orientation="vertical" size={1} className="mt-1">
+            <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden leading-none">
               <Typography.Text delete type="secondary" style={{ fontSize: 13 }}>
                 {formatCurrency(product.price)}
               </Typography.Text>
-              <Typography.Text
-                style={{ fontSize: 14, fontWeight: 700, color: "#ff4d4f" }}
-              >
+              <span className="hidden min-w-0 truncate text-[12px] font-semibold leading-none text-red-500 sm:inline">
                 Tiết kiệm {formatCurrency(savingAmount)}
-              </Typography.Text>
-            </Space>
+              </span>
+            </div>
           )}
         </div>
 
-        <div className="mt-auto pt-3">
+        <div className="mt-auto pt-2">
           <Button
             type="primary"
             icon={<ShoppingCartOutlined />}
-            className="h-11 w-full"
+            className="h-10 w-full"
             onClick={(event) => {
               event.stopPropagation();
               onAddToCart(product);
