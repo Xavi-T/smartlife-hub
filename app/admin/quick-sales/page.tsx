@@ -719,22 +719,30 @@ export default function QuickSalesPage() {
                               }}
                             >
                               <Text>{item.product.name}</Text>
-                              <Form.Item
-                                name={[
-                                  "discountProductPercents",
-                                  item.product.id,
-                                ]}
-                                style={{ marginBottom: 0 }}
-                              >
-                                <InputNumber
-                                  min={0}
-                                  max={100}
-                                  precision={0}
-                                  step={1}
-                                  placeholder="0%"
-                                  style={{ width: "100%" }}
-                                  addonAfter="%"
-                                />
+                              <Form.Item style={{ marginBottom: 0 }}>
+                                <Space.Compact style={{ width: "100%" }}>
+                                  <Form.Item
+                                    name={[
+                                      "discountProductPercents",
+                                      item.product.id,
+                                    ]}
+                                    noStyle
+                                  >
+                                    <InputNumber
+                                      min={0}
+                                      max={100}
+                                      precision={0}
+                                      step={1}
+                                      placeholder="0"
+                                      style={{ width: "100%" }}
+                                    />
+                                  </Form.Item>
+                                  <Input
+                                    value="%"
+                                    readOnly
+                                    style={{ width: 44, textAlign: "center" }}
+                                  />
+                                </Space.Compact>
                               </Form.Item>
                             </div>
                           ))

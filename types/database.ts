@@ -13,6 +13,7 @@ export type NutritionGoal =
   | "gain_weight"
   | "improve_health";
 export type NutritionClientStatus = "new" | "active" | "paused" | "completed";
+export type ClinicalNutritionProductUnit = "ml" | "g";
 
 export interface ProductRow {
   id: string;
@@ -209,6 +210,22 @@ export interface NutritionAssessment {
   created_at: string;
 }
 
+export interface ClinicalNutritionProductRow {
+  id: string;
+  name: string;
+  unit: ClinicalNutritionProductUnit;
+  protein_per100: number;
+  lipid_per100: number;
+  glucose_per100: number;
+  energy_per100: number;
+  note: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardStats {
   totalRevenue: number;
   totalProfit: number;
@@ -302,6 +319,17 @@ export interface Database {
         Row: NutritionAssessment;
         Insert: Omit<NutritionAssessment, "id" | "created_at">;
         Update: Partial<Omit<NutritionAssessment, "id" | "created_at">>;
+        Relationships: [];
+      };
+      clinical_nutrition_products: {
+        Row: ClinicalNutritionProductRow;
+        Insert: Omit<
+          ClinicalNutritionProductRow,
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<
+          Omit<ClinicalNutritionProductRow, "id" | "created_at" | "updated_at">
+        >;
         Relationships: [];
       };
     };

@@ -39,7 +39,7 @@ import { Toaster } from "sonner";
 import { toast } from "sonner";
 import { logout } from "@/actions/auth";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
-import { canAccessAdminPath, getRoleFromUser, type AppRole } from "@/lib/rbac";
+import { getRoleFromUser, type AppRole } from "@/lib/rbac";
 
 const { Header, Sider, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -160,6 +160,11 @@ const menuItems: MenuProps["items"] = [
     label: "Tính dinh dưỡng",
   },
   {
+    key: "/admin/nutrition/clinical-calculator",
+    icon: <CalculatorOutlined />,
+    label: "Phối khẩu phần",
+  },
+  {
     type: "divider",
   },
   {
@@ -183,6 +188,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const screens = useBreakpoint();
+  const [hasMounted, setHasMounted] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState("");
   const [priorityCustomers, setPriorityCustomers] = useState<
@@ -195,7 +201,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   );
   const [currentUserName, setCurrentUserName] = useState("Administrator");
 
-  const isMobile = screens.xs || screens.sm;
+  const isMobile = hasMounted ? Boolean(screens.xs || screens.sm) : false;
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -273,6 +283,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             key: "/admin/nutrition/calculator",
             icon: <CalculatorOutlined />,
             label: "Tính dinh dưỡng",
+          },
+          {
+            key: "/admin/nutrition/clinical-calculator",
+            icon: <CalculatorOutlined />,
+            label: "Phối khẩu phần",
           },
           {
             type: "divider",
@@ -370,6 +385,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       articles: "Bài viết",
       clients: "Hồ sơ tư vấn",
       calculator: "Tính dinh dưỡng",
+      "clinical-calculator": "Phối khẩu phần",
       "quick-sales": "Bán hàng nhanh",
       inventory: "Kho hàng",
       "stock-inbound": "Nhập kho",
