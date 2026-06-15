@@ -287,8 +287,9 @@ export default function NutritionArticlesAdminPage() {
     {
       title: "Bài viết",
       key: "article",
+      width: 360,
       render: (_value, record) => (
-        <Space size={12}>
+        <Space size={12} align="start" style={{ maxWidth: "100%" }}>
           {record.cover_image_url ? (
             <Image
               src={record.cover_image_url}
@@ -296,7 +297,7 @@ export default function NutritionArticlesAdminPage() {
               width={72}
               height={48}
               preview={false}
-              style={{ objectFit: "cover", borderRadius: 6 }}
+              style={{ objectFit: "cover", borderRadius: 6, flexShrink: 0 }}
             />
           ) : (
             <div
@@ -314,10 +315,15 @@ export default function NutritionArticlesAdminPage() {
               No image
             </div>
           )}
-          <div>
-            <Typography.Text strong>{record.title}</Typography.Text>
+          <div style={{ minWidth: 0 }}>
+            <Typography.Text strong ellipsis style={{ maxWidth: 240 }}>
+              {record.title}
+            </Typography.Text>
             <div>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text
+                type="secondary"
+                style={{ fontSize: 12, wordBreak: "break-word" }}
+              >
                 /nutrition/{record.slug}
               </Typography.Text>
             </div>
@@ -381,13 +387,33 @@ export default function NutritionArticlesAdminPage() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f5f5", padding: 16 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f5f5f5",
+        padding: 12,
+        maxWidth: "100%",
+        overflowX: "hidden",
+      }}
+    >
       {contextHolder}
 
-      <Card
-        title="Bài viết dinh dưỡng"
-        extra={
-          <Space>
+      <Card>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Typography.Title level={3} style={{ margin: 0 }}>
+              Bài viết dinh dưỡng
+            </Typography.Title>
+            <Typography.Text
+              type="secondary"
+              className="md:hidden"
+              style={{ display: "block", marginTop: 4 }}
+            >
+              Trên điện thoại chỉ nên xem, lọc và chỉnh nhanh. Soạn bài đầy đủ
+              nên dùng desktop.
+            </Typography.Text>
+          </div>
+          <Space wrap className="w-full lg:w-auto">
             <Button
               icon={<ReloadOutlined spin={isRefreshing} />}
               loading={isRefreshing}
@@ -405,20 +431,24 @@ export default function NutritionArticlesAdminPage() {
               Tạo bài viết
             </Button>
           </Space>
-        }
-      >
-        <Space wrap style={{ marginBottom: 16 }}>
+        </div>
+
+        <Space
+          wrap
+          style={{ marginBottom: 16, width: "100%" }}
+          className="admin-articles-filter"
+        >
           <Input.Search
             allowClear
             placeholder="Tìm tiêu đề"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            style={{ width: 280 }}
+            style={{ width: "min(280px, 100%)" }}
           />
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
-            style={{ width: 180 }}
+            style={{ width: "min(180px, 100%)" }}
             options={[{ label: "Tất cả", value: "all" }, ...statusOptions]}
           />
         </Space>
@@ -429,6 +459,7 @@ export default function NutritionArticlesAdminPage() {
           dataSource={articles}
           columns={columns}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 960 }}
         />
       </Card>
 
@@ -440,9 +471,22 @@ export default function NutritionArticlesAdminPage() {
         confirmLoading={isSubmitting}
         okText="Lưu"
         cancelText="Hủy"
-        width={980}
+        width="min(980px, calc(100vw - 24px))"
+        style={{ top: 12 }}
+        styles={{
+          body: {
+            maxHeight: "calc(100dvh - 190px)",
+            overflowY: "auto",
+            overflowX: "hidden",
+          },
+        }}
         destroyOnHidden
       >
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 md:hidden">
+          <Typography.Text type="secondary">
+            Soạn nội dung dài và chèn media sẽ thuận tiện hơn trên desktop.
+          </Typography.Text>
+        </div>
         <Form<ArticleFormValues>
           form={form}
           layout="vertical"
@@ -516,7 +560,7 @@ export default function NutritionArticlesAdminPage() {
               value={editorContent}
               onChange={(value) => form.setFieldValue("content", value)}
               placeholder="Nhập nội dung bài viết dinh dưỡng..."
-              minHeight={360}
+              minHeight={280}
             />
           </Form.Item>
         </Form>
@@ -530,6 +574,8 @@ export default function NutritionArticlesAdminPage() {
         confirmLoading={isCategorySubmitting}
         okText="Tạo"
         cancelText="Hủy"
+        width="min(520px, calc(100vw - 24px))"
+        style={{ top: 24 }}
       >
         <Form
           form={categoryForm}

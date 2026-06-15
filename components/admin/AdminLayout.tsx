@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Layout,
@@ -403,6 +404,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     });
   };
 
+  const breadcrumbItems = getBreadcrumbItems();
+  const visibleBreadcrumbItems = isMobile
+    ? breadcrumbItems.slice(-1)
+    : breadcrumbItems;
+
   const siderContent = (
     <>
       {/* Logo */}
@@ -417,9 +423,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
         }}
       >
-        <img
+        <Image
           src="/logoSH.png"
           alt="SmartLife Logo"
+          width={40}
+          height={40}
           style={{
             height: 40,
             width: 40,
@@ -483,7 +491,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             left: mobileDrawerOpen ? 0 : -240,
             top: 0,
             bottom: 0,
-            zIndex: 1000,
+            zIndex: 1100,
             transition: "left 0.3s",
           }}
         >
@@ -502,7 +510,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             right: 0,
             bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.45)",
-            zIndex: 999,
+            zIndex: 1090,
           }}
         />
       )}
@@ -517,7 +525,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <Header
           style={{
             background: "#fff",
-            padding: "0 32px",
+            padding: isMobile ? "0 12px" : "0 32px",
+            height: isMobile ? 56 : 64,
+            lineHeight: isMobile ? "56px" : "64px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -526,10 +536,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             top: 0,
             zIndex: 100,
             boxShadow: "0 1px 4px rgba(0,21,41,.08)",
+            overflow: "hidden",
           }}
         >
           {/* Left: Breadcrumb */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: isMobile ? 10 : 16,
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
             {isMobile && (
               <MenuUnfoldOutlined
                 style={{ fontSize: 20, cursor: "pointer", color: "#1890ff" }}
@@ -537,7 +556,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               />
             )}
 
-            <Breadcrumb items={getBreadcrumbItems()} />
+            <div
+              style={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <Breadcrumb items={visibleBreadcrumbItems} />
+            </div>
 
             {!isMobile && currentUserRole !== "employee" && (
               <Space size={8}>
@@ -583,9 +611,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
+                gap: isMobile ? 8 : 12,
                 cursor: "pointer",
-                padding: "6px 16px",
+                padding: isMobile ? "6px 8px" : "6px 16px",
                 borderRadius: 8,
                 transition: "all 0.2s",
                 border: "1px solid transparent",
@@ -599,13 +627,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 e.currentTarget.style.borderColor = "transparent";
               }}
             >
-              <Badge dot status="success" offset={[-4, 36]}>
+              <Badge
+                dot
+                status="success"
+                offset={isMobile ? [-4, 30] : [-4, 36]}
+              >
                 <div
                   title={`${currentUserName} (${roleLabelMap[currentUserRole]})`}
                 >
                   <Avatar
                     icon={<UserOutlined />}
-                    size={40}
+                    size={isMobile ? 34 : 40}
                     style={{
                       backgroundColor: "#1890ff",
                       border: "2px solid #e6f7ff",
@@ -653,8 +685,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Content */}
         <Content
           style={{
-            margin: "24px 16px",
-            padding: 24,
+            margin: isMobile ? 0 : "24px 16px",
+            padding: isMobile ? 0 : 24,
             minHeight: 280,
             background: "#f5f5f5",
           }}
@@ -665,7 +697,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Toast Notifications */}
       <Toaster
-        position="top-right"
+        position={isMobile ? "top-center" : "top-right"}
         richColors
         expand={false}
         closeButton

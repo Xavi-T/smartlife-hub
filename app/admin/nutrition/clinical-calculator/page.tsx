@@ -152,6 +152,276 @@ function TargetProgress(props: {
   );
 }
 
+function MobileMetric(props: {
+  label: string;
+  value: string;
+  unit?: string;
+  color?: string;
+}) {
+  const { label, value, unit, color } = props;
+
+  return (
+    <div className="rounded-md bg-gray-50 p-2">
+      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+        {label}
+      </Typography.Text>
+      <div
+        className="mt-1 text-[15px] font-semibold leading-tight"
+        style={{ color }}
+      >
+        {value}
+        {unit ? <span className="ml-1 text-xs font-medium">{unit}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function MobileCalculationLineCard(props: {
+  record: ClinicalNutritionLineResult;
+  productOptions: Array<{ label: string; value: string }>;
+  clinicalProducts: ClinicalNutritionCatalogProduct[];
+  updateLine: (
+    lineId: string,
+    patch: Partial<ClinicalNutritionLineInput>,
+  ) => void;
+  removeLine: (lineId: string) => void;
+}) {
+  const {
+    record,
+    productOptions,
+    clinicalProducts,
+    updateLine,
+    removeLine,
+  } = props;
+
+  return (
+    <div className="rounded-md border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Typography.Text strong className="block truncate">
+            {record.product?.name || "Chưa chọn sản phẩm"}
+          </Typography.Text>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <Tag style={{ margin: 0 }}>{record.unit || "-"}</Tag>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {formatClinicalNutritionNumber(record.totalAmount, 2)}{" "}
+              {record.unit || "đơn vị"}
+            </Typography.Text>
+          </div>
+        </div>
+        <Button
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => removeLine(record.id)}
+          aria-label="Xóa dòng"
+        />
+      </div>
+
+      <Select
+        size="large"
+        showSearch
+        allowClear
+        placeholder="Chọn sản phẩm"
+        options={productOptions}
+        value={record.productId || undefined}
+        onChange={(productId?: string) => {
+          const product = productId
+            ? findClinicalNutritionProduct(productId, clinicalProducts)
+            : null;
+          updateLine(record.id, {
+            productId: productId || "",
+            amount: record.amount || (product ? 100 : 0),
+            note: record.note || product?.note || "",
+          });
+        }}
+        filterOption={(input, option) =>
+          String(option?.label || "")
+            .toLowerCase()
+            .includes(input.toLowerCase())
+        }
+        style={{ width: "100%" }}
+      />
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div>
+          <Typography.Text strong style={{ fontSize: 12 }}>
+            Số lượng
+          </Typography.Text>
+          <InputNumber
+            size="large"
+            min={0}
+            step={0.25}
+            precision={2}
+            value={record.quantity}
+            onChange={(value) =>
+              updateLine(record.id, { quantity: Number(value ?? 0) })
+            }
+            style={{ marginTop: 6, width: "100%" }}
+          />
+        </div>
+        <div>
+          <Typography.Text strong style={{ fontSize: 12 }}>
+            Hàm lượng
+          </Typography.Text>
+          <Space.Compact style={{ marginTop: 6, width: "100%" }}>
+            <InputNumber
+              size="large"
+              min={0}
+              step={record.unit === "g" ? 1 : 10}
+              precision={2}
+              value={record.amount}
+              onChange={(value) =>
+                updateLine(record.id, { amount: Number(value ?? 0) })
+              }
+              style={{ flex: 1, width: "100%" }}
+            />
+            <Input
+              size="large"
+              value={record.unit || "-"}
+              readOnly
+              style={{ width: 48, textAlign: "center" }}
+            />
+          </Space.Compact>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <MobileMetric
+          label="Protein"
+          value={formatClinicalNutritionNumber(record.proteinG, 2)}
+          unit="g"
+          color="#389e0d"
+        />
+        <MobileMetric
+          label="Lipid"
+          value={formatClinicalNutritionNumber(record.lipidG, 2)}
+          unit="g"
+          color="#d48806"
+        />
+        <MobileMetric
+          label="Glucose"
+          value={formatClinicalNutritionNumber(record.glucoseG, 2)}
+          unit="g"
+          color="#1677ff"
+        />
+        <MobileMetric
+          label="Năng lượng"
+          value={formatClinicalNutritionNumber(record.energyKcal, 2)}
+          unit="kcal"
+          color="#0958d9"
+        />
+      </div>
+
+      <div className="mt-3">
+        <Typography.Text strong style={{ fontSize: 12 }}>
+          Chú ý
+        </Typography.Text>
+        <Input
+          size="large"
+          value={record.note || ""}
+          onChange={(event) =>
+            updateLine(record.id, { note: event.target.value })
+          }
+          style={{ marginTop: 6 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MobileCatalogProductCard(props: {
+  product: ClinicalNutritionCatalogProduct;
+  addLine: (productId?: string) => void;
+  editClinicalProduct: (product: ClinicalNutritionCatalogProduct) => void;
+  deleteClinicalProduct: (productId: string) => void;
+}) {
+  const { product, addLine, editClinicalProduct, deleteClinicalProduct } =
+    props;
+
+  return (
+    <div className="rounded-md border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Typography.Text strong className="block">
+            {product.name}
+          </Typography.Text>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <Tag style={{ margin: 0 }}>{product.unit}</Tag>
+            <Tag
+              color={product.isActive ? "green" : "default"}
+              style={{ margin: 0 }}
+            >
+              {product.isActive ? "Đang dùng" : "Ẩn"}
+            </Tag>
+          </div>
+        </div>
+        <Button
+          size="small"
+          type="primary"
+          icon={<PlusOutlined />}
+          disabled={!product.isActive}
+          onClick={() => addLine(product.id)}
+          aria-label={`Thêm ${product.name}`}
+        />
+      </div>
+
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        <MobileMetric
+          label="P/100"
+          value={formatClinicalNutritionNumber(product.proteinPer100, 2)}
+        />
+        <MobileMetric
+          label="L/100"
+          value={formatClinicalNutritionNumber(product.lipidPer100, 2)}
+        />
+        <MobileMetric
+          label="G/100"
+          value={formatClinicalNutritionNumber(product.glucosePer100, 2)}
+        />
+        <MobileMetric
+          label="E/100"
+          value={formatClinicalNutritionNumber(product.energyPer100, 2)}
+        />
+      </div>
+
+      {product.note ? (
+        <Typography.Paragraph
+          type="secondary"
+          style={{ marginBottom: 0, marginTop: 10, fontSize: 12 }}
+        >
+          {product.note}
+        </Typography.Paragraph>
+      ) : null}
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Button
+          size="middle"
+          type="primary"
+          icon={<PlusOutlined />}
+          disabled={!product.isActive}
+          onClick={() => addLine(product.id)}
+        >
+          Thêm
+        </Button>
+        <Button size="middle" onClick={() => editClinicalProduct(product)}>
+          Sửa
+        </Button>
+        <Popconfirm
+          title="Xóa sản phẩm này?"
+          okText="Xóa"
+          cancelText="Hủy"
+          onConfirm={() => deleteClinicalProduct(product.id)}
+        >
+          <Button size="middle" danger>
+            Xóa
+          </Button>
+        </Popconfirm>
+      </div>
+    </div>
+  );
+}
+
 export default function ClinicalNutritionCalculatorPage() {
   const screens = Grid.useBreakpoint();
   const [hasMounted, setHasMounted] = useState(false);
@@ -925,14 +1195,18 @@ export default function ClinicalNutritionCalculatorPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] p-3 pb-28 sm:p-4 md:pb-4">
+    <div className="min-h-screen bg-[#f5f5f5] p-2 pb-28 sm:p-4 md:pb-4">
       {contextHolder}
 
-      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+      <Space
+        orientation="vertical"
+        size={isMobile ? 10 : 16}
+        style={{ width: "100%" }}
+      >
         <div>
           <Typography.Title
             level={2}
-            className="!mb-1 !text-[22px] sm:!text-[30px]"
+            className="!mb-1 !text-[20px] !leading-tight sm:!text-[30px]"
           >
             Bảng phối sản phẩm dinh dưỡng lâm sàng
           </Typography.Title>
@@ -1398,21 +1672,32 @@ export default function ClinicalNutritionCalculatorPage() {
               Số dòng:{" "}
               {calculation.lines.filter((line) => line.product).length}
             </Typography.Text>
-            <Space wrap style={{ justifyContent: "flex-end" }}>
+            <Space
+              wrap
+              className="w-full sm:w-auto"
+              style={{ justifyContent: isMobile ? "stretch" : "flex-end" }}
+            >
               <Button
                 size={controlSize}
                 icon={<PlusOutlined />}
                 onClick={() => addLine()}
+                className={isMobile ? "flex-1" : undefined}
               >
                 Thêm dòng
               </Button>
-              <Button size={controlSize} icon={<CopyOutlined />} onClick={copyTable}>
+              <Button
+                size={controlSize}
+                icon={<CopyOutlined />}
+                onClick={copyTable}
+                className={isMobile ? "flex-1" : undefined}
+              >
                 Sao chép
               </Button>
               <Button
                 size={controlSize}
                 icon={<DownloadOutlined />}
                 onClick={exportCsv}
+                className={isMobile ? "flex-1" : undefined}
               >
                 CSV
               </Button>
@@ -1438,81 +1723,174 @@ export default function ClinicalNutritionCalculatorPage() {
               </Popconfirm>
             </Space>
           </div>
-          <Table
-            rowKey="id"
-            columns={lineColumns}
-            dataSource={calculation.lines}
-            pagination={false}
-            size={isMobile ? "small" : "middle"}
-            scroll={{ x: 1500 }}
-            summary={() => (
-              <Table.Summary fixed>
-                <Table.Summary.Row>
-                  <Table.Summary.Cell index={0} colSpan={5}>
-                    <Typography.Text strong>TỔNG</Typography.Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} align="right">
-                    <Typography.Text strong>
-                      {formatClinicalNutritionNumber(
+          {isMobile ? (
+            <div className="space-y-3">
+              {calculation.lines.length ? (
+                calculation.lines.map((line) => (
+                  <MobileCalculationLineCard
+                    key={line.id}
+                    record={line}
+                    productOptions={productOptions}
+                    clinicalProducts={clinicalProducts}
+                    updateLine={updateLine}
+                    removeLine={removeLine}
+                  />
+                ))
+              ) : (
+                <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center">
+                  <Typography.Text type="secondary">
+                    Chưa có dòng tính toán. Chọn sản phẩm ở phần trên để bắt đầu.
+                  </Typography.Text>
+                </div>
+              )}
+
+              {calculation.lines.length ? (
+                <div className="rounded-md border border-blue-100 bg-blue-50 p-3">
+                  <Typography.Text strong>Tổng nhanh</Typography.Text>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <MobileMetric
+                      label="Protein"
+                      value={formatClinicalNutritionNumber(
                         calculation.totals.proteinG,
                         2,
                       )}
-                    </Typography.Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right">
-                    <Typography.Text strong>
-                      {formatClinicalNutritionNumber(
+                      unit="g"
+                      color="#389e0d"
+                    />
+                    <MobileMetric
+                      label="Lipid"
+                      value={formatClinicalNutritionNumber(
                         calculation.totals.lipidG,
                         2,
                       )}
-                    </Typography.Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} align="right">
-                    <Typography.Text strong>
-                      {formatClinicalNutritionNumber(
+                      unit="g"
+                      color="#d48806"
+                    />
+                    <MobileMetric
+                      label="Glucose"
+                      value={formatClinicalNutritionNumber(
                         calculation.totals.glucoseG,
                         2,
                       )}
-                    </Typography.Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={8} align="right">
-                    <Typography.Text strong>
-                      {formatClinicalNutritionNumber(
+                      unit="g"
+                      color="#1677ff"
+                    />
+                    <MobileMetric
+                      label="Năng lượng"
+                      value={formatClinicalNutritionNumber(
                         calculation.totals.energyKcal,
                         2,
                       )}
-                    </Typography.Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={9} colSpan={2} />
-                </Table.Summary.Row>
-                <Table.Summary.Row>
-                  <Table.Summary.Cell index={0} colSpan={5}>
-                    <Typography.Text strong>P:L:G</Typography.Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} align="right">
-                    {formatClinicalNutritionNumber(
-                      calculation.totals.proteinEnergyPercent,
-                      2,
-                    )}
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right">
-                    {formatClinicalNutritionNumber(
-                      calculation.totals.lipidEnergyPercent,
-                      2,
-                    )}
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} align="right">
-                    {formatClinicalNutritionNumber(
-                      calculation.totals.glucoseEnergyPercent,
-                      2,
-                    )}
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={8} />
-                  <Table.Summary.Cell index={9} colSpan={2} />
-                </Table.Summary.Row>
-              </Table.Summary>
-            )}
-          />
+                      unit="kcal"
+                      color="#0958d9"
+                    />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Tag color="green" style={{ margin: 0 }}>
+                      P{" "}
+                      {formatClinicalNutritionNumber(
+                        calculation.totals.proteinEnergyPercent,
+                        2,
+                      )}
+                      %
+                    </Tag>
+                    <Tag color="gold" style={{ margin: 0 }}>
+                      L{" "}
+                      {formatClinicalNutritionNumber(
+                        calculation.totals.lipidEnergyPercent,
+                        2,
+                      )}
+                      %
+                    </Tag>
+                    <Tag color="blue" style={{ margin: 0 }}>
+                      G{" "}
+                      {formatClinicalNutritionNumber(
+                        calculation.totals.glucoseEnergyPercent,
+                        2,
+                      )}
+                      %
+                    </Tag>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Table
+              rowKey="id"
+              columns={lineColumns}
+              dataSource={calculation.lines}
+              pagination={false}
+              size="middle"
+              scroll={{ x: 1500 }}
+              summary={() => (
+                <Table.Summary fixed>
+                  <Table.Summary.Row>
+                    <Table.Summary.Cell index={0} colSpan={5}>
+                      <Typography.Text strong>TỔNG</Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={5} align="right">
+                      <Typography.Text strong>
+                        {formatClinicalNutritionNumber(
+                          calculation.totals.proteinG,
+                          2,
+                        )}
+                      </Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={6} align="right">
+                      <Typography.Text strong>
+                        {formatClinicalNutritionNumber(
+                          calculation.totals.lipidG,
+                          2,
+                        )}
+                      </Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} align="right">
+                      <Typography.Text strong>
+                        {formatClinicalNutritionNumber(
+                          calculation.totals.glucoseG,
+                          2,
+                        )}
+                      </Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={8} align="right">
+                      <Typography.Text strong>
+                        {formatClinicalNutritionNumber(
+                          calculation.totals.energyKcal,
+                          2,
+                        )}
+                      </Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={9} colSpan={2} />
+                  </Table.Summary.Row>
+                  <Table.Summary.Row>
+                    <Table.Summary.Cell index={0} colSpan={5}>
+                      <Typography.Text strong>P:L:G</Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={5} align="right">
+                      {formatClinicalNutritionNumber(
+                        calculation.totals.proteinEnergyPercent,
+                        2,
+                      )}
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={6} align="right">
+                      {formatClinicalNutritionNumber(
+                        calculation.totals.lipidEnergyPercent,
+                        2,
+                      )}
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} align="right">
+                      {formatClinicalNutritionNumber(
+                        calculation.totals.glucoseEnergyPercent,
+                        2,
+                      )}
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={8} />
+                    <Table.Summary.Cell index={9} colSpan={2} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              )}
+            />
+          )}
         </Card>
 
         <Card styles={cardStyles}>
@@ -1543,8 +1921,8 @@ export default function ClinicalNutritionCalculatorPage() {
                 </Button>
               ) : null}
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-              <div className="xl:col-span-2">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <div className="col-span-2 xl:col-span-2">
                 <Typography.Text strong>Tên sản phẩm</Typography.Text>
                 <Input
                   size={controlSize}
@@ -1654,7 +2032,7 @@ export default function ClinicalNutritionCalculatorPage() {
                   style={{ marginTop: 6, width: "100%" }}
                 />
               </div>
-              <div className="xl:col-span-3">
+              <div className="col-span-2 xl:col-span-3">
                 <Typography.Text strong>Ghi chú</Typography.Text>
                 <Input
                   size={controlSize}
@@ -1682,7 +2060,7 @@ export default function ClinicalNutritionCalculatorPage() {
                   />
                 </div>
               </div>
-              <div className="flex items-end">
+              <div className="col-span-2 flex items-end xl:col-span-1">
                 <Button
                   size={controlSize}
                   type="primary"
@@ -1696,19 +2074,47 @@ export default function ClinicalNutritionCalculatorPage() {
               </div>
             </div>
           </div>
-          <Table
-            rowKey="id"
-            columns={catalogColumns}
-            dataSource={filteredProducts}
-            loading={isLoadingProducts}
-            size="small"
-            pagination={{ pageSize: isMobile ? 5 : 8, showSizeChanger: false }}
-            scroll={{ x: 1180 }}
-          />
+          {isMobile ? (
+            <div className="space-y-3">
+              {isLoadingProducts ? (
+                <div className="rounded-md border border-gray-200 bg-white p-4 text-center">
+                  <Typography.Text type="secondary">
+                    Đang tải danh mục sản phẩm...
+                  </Typography.Text>
+                </div>
+              ) : filteredProducts.length ? (
+                filteredProducts.map((product) => (
+                  <MobileCatalogProductCard
+                    key={product.id}
+                    product={product}
+                    addLine={addLine}
+                    editClinicalProduct={editClinicalProduct}
+                    deleteClinicalProduct={deleteClinicalProduct}
+                  />
+                ))
+              ) : (
+                <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center">
+                  <Typography.Text type="secondary">
+                    Không có sản phẩm phù hợp.
+                  </Typography.Text>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Table
+              rowKey="id"
+              columns={catalogColumns}
+              dataSource={filteredProducts}
+              loading={isLoadingProducts}
+              size="small"
+              pagination={{ pageSize: 8, showSizeChanger: false }}
+              scroll={{ x: 1180 }}
+            />
+          )}
         </Card>
       </Space>
 
-      <div className="fixed bottom-0 left-0 right-0 z-[1000] border-t border-gray-200 bg-white px-3 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] md:hidden">
+      <div className="fixed bottom-0 left-0 right-0 z-[900] border-t border-gray-200 bg-white px-3 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] md:hidden">
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
           <div>
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>

@@ -117,9 +117,9 @@ export function RichTextEditor({
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: "100%", overflowX: "hidden" }}>
       {contextHolder}
-      <Space wrap style={{ marginBottom: 8 }}>
+      <Space wrap style={{ marginBottom: 8, maxWidth: "100%" }}>
         <Button
           icon={<BoldOutlined />}
           onClick={() => runCommand("bold")}
@@ -187,7 +187,15 @@ export function RichTextEditor({
         open={isMediaModalOpen}
         onCancel={() => setIsMediaModalOpen(false)}
         footer={null}
-        width={760}
+        width="min(760px, calc(100vw - 24px))"
+        style={{ top: 16 }}
+        styles={{
+          body: {
+            maxHeight: "calc(100dvh - 160px)",
+            overflowY: "auto",
+            overflowX: "hidden",
+          },
+        }}
       >
         <div
           style={{
@@ -241,6 +249,8 @@ export function RichTextEditor({
             padding: 12,
             fontFamily: "monospace",
             fontSize: 13,
+            maxWidth: "100%",
+            wordBreak: "break-word",
           }}
           placeholder={placeholder}
         />
@@ -257,6 +267,8 @@ export function RichTextEditor({
             padding: 12,
             background: "#fff",
             overflow: "auto",
+            maxWidth: "100%",
+            wordBreak: "break-word",
           }}
         />
       )}
