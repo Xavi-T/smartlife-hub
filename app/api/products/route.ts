@@ -667,12 +667,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (normalizedStockQuantity !== null && normalizedStockQuantity !== 0) {
+    if (
+      normalizedStockQuantity !== null &&
+      !Number.isInteger(normalizedStockQuantity)
+    ) {
       return NextResponse.json(
-        {
-          error:
-            "Sản phẩm mới mặc định tồn kho bằng 0. Vui lòng dùng chức năng Nhập kho để thêm hàng.",
-        },
+        { error: "Tồn kho phải là số nguyên" },
         { status: 400 },
       );
     }
@@ -719,13 +719,40 @@ export async function POST(request: NextRequest) {
     );
     await syncProductVariants(supabase, data.id, normalizedVariants);
 
+    const initialStockQuantity = normalizedStockQuantity ?? 0;
+    if (initialStockQuantity > 0) {
+      const { error: inboundError } = await supabase.rpc(
+        "process_stock_inbound",
+        {
+          p_product_id: data.id,
+          p_quantity_added: initialStockQuantity,
+          p_cost_price_at_time: effectiveCreateCost,
+          p_supplier: "Tạo mới sản phẩm",
+          p_notes: "Tồn kho ban đầu khi tạo sản phẩm",
+        },
+      );
+
+      if (inboundError) throw inboundError;
+
+      await AuditLogger.stockInbound(
+        data.id,
+        data.name,
+        initialStockQuantity,
+        effectiveCreateCost,
+        "Tạo mới sản phẩm",
+      );
+    }
+
     // Log audit
     await AuditLogger.createProduct(data.id, data.name);
 
     return NextResponse.json({
       success: true,
       message: "Tạo sản phẩm thành công",
-      product: data,
+      product: {
+        ...data,
+        stock_quantity: initialStockQuantity,
+      },
     });
   } catch (error: unknown) {
     console.error("Error creating product:", error);
