@@ -18,6 +18,7 @@ import type { CarouselRef } from "antd/es/carousel";
 import {
   ArrowLeftOutlined,
   LeftOutlined,
+  PhoneOutlined,
   RightOutlined,
   ShoppingCartOutlined,
   TruckOutlined,
@@ -25,6 +26,7 @@ import {
 import { Header } from "@/components/home/Header";
 import { CartModal } from "@/components/home/CartModal";
 import { useCart } from "@/hooks/useCart";
+import { APP_CONFIG } from "@/lib/appConfig";
 import {
   calculateDiscountedPrice,
   formatCurrency,
@@ -37,6 +39,8 @@ import {
   trackSelectItem,
   trackViewItem,
 } from "@/lib/analytics";
+import { normalizeHtmlContent } from "@/lib/htmlContent";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 
 interface ProductMedia {
   id: string;
@@ -181,8 +185,17 @@ export default function ProductDetailPage() {
     return [product.category];
   }, [product]);
 
+  const openContactForProduct = () => {
+    window.open(APP_CONFIG.socials.zalo, "_blank", "noopener");
+  };
+
   const handleAddToCart = () => {
     if (!product) return;
+    if (isPriceOnRequestProduct(product)) {
+      openContactForProduct();
+      return;
+    }
+
     const maxAllowed = Math.max(1, product.stock_quantity);
     const safeQuantity = Math.min(Math.max(1, quantity), maxAllowed);
     const selectedVariant = activeVariants.find(
@@ -211,6 +224,11 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = () => {
     if (!product) return;
+    if (isPriceOnRequestProduct(product)) {
+      openContactForProduct();
+      return;
+    }
+
     const maxAllowed = Math.max(1, product.stock_quantity);
     const safeQuantity = Math.min(Math.max(1, quantity), maxAllowed);
     const selectedVariant = activeVariants.find(
@@ -336,6 +354,7 @@ export default function ProductDetailPage() {
   }
 
   const isOutOfStock = product.stock_quantity <= 0;
+  const priceOnRequest = isPriceOnRequestProduct(product);
   const fallbackMediaUrl =
     selectedVariant?.image_url || product.image_url || null;
   const discountPercent = getEffectiveDiscountPercent({
@@ -344,7 +363,7 @@ export default function ProductDetailPage() {
     discountEndAt: product.discount_end_at,
     nowMs,
   });
-  const hasDiscount = discountPercent > 0;
+  const hasDiscount = !priceOnRequest && discountPercent > 0;
   const basePrice = Number(selectedVariant?.price || product.price);
   const finalPrice = calculateDiscountedPrice(basePrice, discountPercent);
   const savingAmount = basePrice - finalPrice;
@@ -359,9 +378,12 @@ export default function ProductDetailPage() {
     if (!imageUrl) return;
     setPreviewImageUrl(imageUrl);
   };
-  const sanitizedDescription = DOMPurify.sanitize(product.description || "", {
-    USE_PROFILES: { html: true },
-  });
+  const sanitizedDescription = DOMPurify.sanitize(
+    normalizeHtmlContent(product.description),
+    {
+      USE_PROFILES: { html: true },
+    },
+  );
 
   return (
     <div className="sl-public-shell overflow-x-hidden">
@@ -539,9 +561,21 @@ export default function ProductDetailPage() {
                 </h1>
 
                 <div className="space-y-2">
-                  <div className="text-[26px] sm:text-3xl md:text-4xl font-extrabold text-red-600 leading-none">
-                    {formatCurrency(finalPrice)}
-                  </div>
+                  {priceOnRequest ? (
+                    <div className="space-y-1">
+                      <div className="text-[26px] sm:text-3xl md:text-4xl font-extrabold text-blue-600 leading-none">
+                        Liên hệ
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Sản phẩm đang chờ cập nhật giá bán. Vui lòng liên hệ
+                        SmartLife Hub để được tư vấn và đặt mua.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[26px] sm:text-3xl md:text-4xl font-extrabold text-red-600 leading-none">
+                      {formatCurrency(finalPrice)}
+                    </div>
+                  )}
                   {activeVariants.length > 0 && (
                     <div className="space-y-2">
                       <div className="text-sm font-semibold text-gray-700 tracking-wide">
@@ -581,9 +615,11 @@ export default function ProductDetailPage() {
                                   <div className="font-semibold text-gray-800 text-sm sm:text-base leading-tight line-clamp-2">
                                     {variant.variant_name}
                                   </div>
-                                  <div className="text-[12px] text-gray-500">
-                                    {formatCurrency(variant.price)}
-                                  </div>
+                                  {!priceOnRequest && (
+                                    <div className="text-[12px] text-gray-500">
+                                      {formatCurrency(variant.price)}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </button>
@@ -616,19 +652,21 @@ export default function ProductDetailPage() {
                     )}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <span className="text-sm text-gray-700 min-w-17">
-                  Số lượng:
-                </span>
-                <InputNumber
-                  min={1}
-                  max={Math.max(1, product.stock_quantity)}
-                  value={quantity}
-                  onChange={(value) => setQuantity(Number(value || 1))}
-                  disabled={isOutOfStock}
-                  style={{ width: 120 }}
-                />
-              </div>
+              {!priceOnRequest && (
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="text-sm text-gray-700 min-w-17">
+                    Số lượng:
+                  </span>
+                  <InputNumber
+                    min={1}
+                    max={Math.max(1, product.stock_quantity)}
+                    value={quantity}
+                    onChange={(value) => setQuantity(Number(value || 1))}
+                    disabled={isOutOfStock}
+                    style={{ width: 120 }}
+                  />
+                </div>
+              )}
 
               <br />
               <Tag
@@ -647,24 +685,39 @@ export default function ProductDetailPage() {
                 Miễn phí vận chuyển toàn quốc
               </Tag>
               <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<ShoppingCartOutlined />}
-                  disabled={isOutOfStock}
-                  onClick={handleAddToCart}
-                  className="w-full sm:w-auto"
-                >
-                  Thêm vào giỏ hàng
-                </Button>
-                <Button
-                  size="large"
-                  disabled={isOutOfStock}
-                  onClick={handleBuyNow}
-                  className="w-full sm:w-auto"
-                >
-                  Mua ngay
-                </Button>
+                {priceOnRequest ? (
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<PhoneOutlined />}
+                    disabled={isOutOfStock}
+                    onClick={openContactForProduct}
+                    className="w-full sm:w-auto"
+                  >
+                    Liên hệ đặt mua
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<ShoppingCartOutlined />}
+                      disabled={isOutOfStock}
+                      onClick={handleAddToCart}
+                      className="w-full sm:w-auto"
+                    >
+                      Thêm vào giỏ hàng
+                    </Button>
+                    <Button
+                      size="large"
+                      disabled={isOutOfStock}
+                      onClick={handleBuyNow}
+                      className="w-full sm:w-auto"
+                    >
+                      Mua ngay
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -717,16 +770,18 @@ export default function ProductDetailPage() {
                       {item.name}
                     </div>
                     <div className="font-semibold text-blue-600">
-                      {formatCurrency(
-                        calculateDiscountedPrice(
-                          item.price,
-                          getEffectiveDiscountPercent({
-                            discountPercent: item.discount_percent,
-                            discountStartAt: item.discount_start_at,
-                            discountEndAt: item.discount_end_at,
-                          }),
-                        ),
-                      )}
+                      {isPriceOnRequestProduct(item)
+                        ? "Liên hệ"
+                        : formatCurrency(
+                            calculateDiscountedPrice(
+                              item.price,
+                              getEffectiveDiscountPercent({
+                                discountPercent: item.discount_percent,
+                                discountStartAt: item.discount_start_at,
+                                discountEndAt: item.discount_end_at,
+                              }),
+                            ),
+                          )}
                     </div>
                   </div>
                 </button>

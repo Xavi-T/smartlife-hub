@@ -22,6 +22,8 @@ import { ProductGrid } from "@/components/home/ProductGrid";
 import { ConsultationRequestCard } from "@/components/nutrition/ConsultationRequestCard";
 import { useCart } from "@/hooks/useCart";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
+import { APP_CONFIG } from "@/lib/appConfig";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 import type {
   NutritionArticle,
   NutritionCategory,
@@ -95,6 +97,11 @@ export default function NutritionArticlePage() {
   }, [article?.cover_image_url]);
 
   const handleAddToCart = (product: Product) => {
+    if (isPriceOnRequestProduct(product)) {
+      window.open(APP_CONFIG.socials.zalo, "_blank", "noopener");
+      return;
+    }
+
     addToCart(product);
     messageApi.success("Đã thêm vào giỏ hàng");
   };

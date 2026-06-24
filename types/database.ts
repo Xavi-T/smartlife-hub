@@ -27,6 +27,7 @@ export interface ProductRow {
   stock_quantity: number;
   image_url: string | null;
   category: string;
+  price_on_request: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;

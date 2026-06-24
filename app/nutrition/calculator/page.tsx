@@ -37,6 +37,8 @@ import {
   type NutritionGoal,
 } from "@/lib/nutrition";
 import { formatNumber } from "@/lib/utils";
+import { APP_CONFIG } from "@/lib/appConfig";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 import type { Product } from "@/types/database";
 
 interface PublicCalculatorFormValues {
@@ -237,6 +239,11 @@ export default function PublicNutritionCalculatorPage() {
   }, [calculationResult, watchedValues]);
 
   const handleAddToCart = (product: Product) => {
+    if (isPriceOnRequestProduct(product)) {
+      window.open(APP_CONFIG.socials.zalo, "_blank", "noopener");
+      return;
+    }
+
     addToCart(product);
     messageApi.success("Đã thêm vào giỏ hàng");
   };

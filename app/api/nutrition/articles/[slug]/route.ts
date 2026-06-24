@@ -58,7 +58,7 @@ export async function GET(
       productIds.length > 0
         ? await supabase
             .from("products")
-            .select("id, name, price, discount_percent, image_url, category, stock_quantity, is_active, created_at, updated_at, description, cost_price, discount_start_at, discount_end_at")
+            .select("id, name, price, discount_percent, image_url, category, stock_quantity, is_active, price_on_request, created_at, updated_at, description, cost_price, discount_start_at, discount_end_at")
             .in("id", productIds)
             .eq("is_active", true)
         : { data: [] };

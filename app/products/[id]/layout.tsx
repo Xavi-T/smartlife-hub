@@ -11,6 +11,7 @@ import {
   toAbsoluteUrl,
   truncateDescription,
 } from "@/lib/seo";
+import { normalizeHtmlContent } from "@/lib/htmlContent";
 
 interface ProductMetadataLayoutProps {
   children: React.ReactNode;
@@ -100,7 +101,7 @@ async function getProductMetadata(id: string) {
     ? mediaRows[0]?.image_url
     : null;
   const imageUrl = mediaImageUrl || product.image_url || "/opengraph-image";
-  const descriptionText = stripHtml(product.description || "");
+  const descriptionText = stripHtml(normalizeHtmlContent(product.description));
   const description = truncateDescription(
     descriptionText || `${product.name} - ${APP_CONFIG.shopTagline}.`,
   );

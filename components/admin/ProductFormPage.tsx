@@ -32,6 +32,7 @@ import {
   getImageDimensions,
   validateImageFile,
 } from "@/lib/imageUtils";
+import { normalizeHtmlContent } from "@/lib/htmlContent";
 
 const { RangePicker } = DatePicker;
 
@@ -43,6 +44,7 @@ interface ProductFormValues {
   discount_period?: [Dayjs, Dayjs];
   cost_price?: number;
   stock_quantity?: number;
+  price_on_request?: boolean;
   categories: string[];
   has_variants?: boolean;
   variants?: Array<{
@@ -421,6 +423,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
         price: 0,
         cost_price: 0,
         stock_quantity: 0,
+        price_on_request: false,
         categories: [],
         variants: [],
       });
@@ -447,7 +450,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
 
         form.setFieldsValue({
           name: product.name,
-          description: product.description || undefined,
+          description: normalizeHtmlContent(product.description) || undefined,
           price: product.price,
           discount_percent: product.discount_percent || 0,
           discount_period:
@@ -458,6 +461,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                 ]
               : undefined,
           cost_price: product.cost_price,
+          price_on_request: product.price_on_request === true,
           categories: Array.from(
             new Set(
               (product.categories && product.categories.length > 0
@@ -571,6 +575,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
         categories: normalizedCategories,
         category: normalizedCategories[0] || null,
         variants: useVariants ? normalizedVariants : [],
+        price_on_request: values.price_on_request === true,
       };
 
       const response = await fetch("/api/products", {
@@ -643,6 +648,60 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     }
   };
 
+  const renderSaveActions = (options?: {
+    includeBack?: boolean;
+    justify?: "start" | "end";
+  }) => (
+    <Space
+      wrap
+      style={{
+        width: options?.justify === "end" ? "100%" : undefined,
+        justifyContent:
+          options?.justify === "end" ? "flex-end" : "flex-start",
+      }}
+    >
+      {options?.includeBack ? (
+        <Button icon={<ArrowLeftOutlined />} onClick={navigateBackToProducts}>
+          Quay lại
+        </Button>
+      ) : null}
+      {isEditMode ? (
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={() => form.submit()}
+          loading={isSubmitting}
+        >
+          Lưu thay đổi
+        </Button>
+      ) : (
+        <>
+          <Button
+            icon={<SaveOutlined />}
+            onClick={() => {
+              createSaveTargetRef.current = "list";
+              form.submit();
+            }}
+            loading={isSubmitting}
+          >
+            Tạo và về danh sách
+          </Button>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={() => {
+              createSaveTargetRef.current = "edit";
+              form.submit();
+            }}
+            loading={isSubmitting}
+          >
+            Tạo và chỉnh tiếp
+          </Button>
+        </>
+      )}
+    </Space>
+  );
+
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", padding: 24 }}>
       {contextHolder}
@@ -670,48 +729,7 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                 </Typography.Text>
               </Space>
 
-              <Space>
-                <Button
-                  icon={<ArrowLeftOutlined />}
-                  onClick={navigateBackToProducts}
-                >
-                  Quay lại
-                </Button>
-                {isEditMode ? (
-                  <Button
-                    type="primary"
-                    icon={<SaveOutlined />}
-                    onClick={() => form.submit()}
-                    loading={isSubmitting}
-                  >
-                    Lưu thay đổi
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      icon={<SaveOutlined />}
-                      onClick={() => {
-                        createSaveTargetRef.current = "list";
-                        form.submit();
-                      }}
-                      loading={isSubmitting}
-                    >
-                      Tạo và về danh sách
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      onClick={() => {
-                        createSaveTargetRef.current = "edit";
-                        form.submit();
-                      }}
-                      loading={isSubmitting}
-                    >
-                      Tạo và chỉnh tiếp
-                    </Button>
-                  </>
-                )}
-              </Space>
+              {renderSaveActions({ includeBack: true })}
             </div>
           </Card>
 
@@ -833,6 +851,18 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                       </Form.Item>
                     </>
                   )}
+
+                  <Form.Item
+                    label="Giá bán công khai"
+                    name="price_on_request"
+                    valuePropName="checked"
+                    tooltip="Bật khi sản phẩm chưa có giá bán. Website vẫn hiển thị sản phẩm nhưng đổi nút mua thành Liên hệ đặt mua."
+                  >
+                    <Switch
+                      checkedChildren="Liên hệ"
+                      unCheckedChildren="Hiện giá"
+                    />
+                  </Form.Item>
 
                   {!isEditMode && (
                     <Form.Item
@@ -1436,6 +1466,12 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                   <Switch checkedChildren="Hiển thị" unCheckedChildren="Ẩn" />
                 </Form.Item>
               </Form>
+
+              <Divider style={{ margin: "8px 0 0" }} />
+
+              <div style={{ paddingTop: 16 }}>
+                {renderSaveActions({ justify: "end" })}
+              </div>
             </Card>
           )}
         </Space>

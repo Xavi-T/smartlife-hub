@@ -30,6 +30,7 @@ import {
   AppstoreOutlined,
 } from "@ant-design/icons";
 import { calculateDiscountedPrice, formatCurrency } from "@/lib/utils";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 import type { Product } from "@/types/database";
 
 function getProductCategoryNames(product: Product): string[] {
@@ -256,6 +257,10 @@ export default function ProductsPage() {
       width: 130,
       align: "right" as const,
       render: (value: number, record: Product) => {
+        if (isPriceOnRequestProduct(record)) {
+          return <Tag color="blue">Liên hệ</Tag>;
+        }
+
         const finalPrice = calculateDiscountedPrice(
           value,
           record.discount_percent,

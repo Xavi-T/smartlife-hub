@@ -2,6 +2,7 @@ import { AlertOutlined } from "@ant-design/icons";
 import { Card, Table, Tag, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 import type { Product } from "@/types/database";
 
 const { Text } = Typography;
@@ -48,7 +49,12 @@ export function ProductTable({ products }: ProductTableProps) {
       dataIndex: "price",
       key: "price",
       align: "right",
-      render: (price: number) => <Text strong>{formatCurrency(price)}</Text>,
+      render: (price: number, product) =>
+        isPriceOnRequestProduct(product) ? (
+          <Tag color="blue">Liên hệ</Tag>
+        ) : (
+          <Text strong>{formatCurrency(price)}</Text>
+        ),
     },
     {
       title: "Giá vốn",

@@ -7,6 +7,7 @@ import {
   getEffectiveDiscountPercent,
 } from "@/lib/utils";
 import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 
 export interface CartItem {
   product: Product;
@@ -23,7 +24,14 @@ export function useCart() {
       const savedCart = localStorage.getItem("smartlife-cart");
       if (savedCart) {
         try {
-          setCart(JSON.parse(savedCart));
+          const parsedCart = JSON.parse(savedCart) as CartItem[];
+          setCart(
+            Array.isArray(parsedCart)
+              ? parsedCart.filter(
+                  (item) => !isPriceOnRequestProduct(item.product),
+                )
+              : [],
+          );
         } catch (error) {
           console.error("Error loading cart:", error);
         }
@@ -42,6 +50,8 @@ export function useCart() {
   }, [cart, isLoaded]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
+    if (isPriceOnRequestProduct(product)) return;
+
     const safeQuantity = Math.max(1, Math.floor(quantity));
     const effectiveDiscountPercent = getEffectiveDiscountPercent({
       discountPercent: product.discount_percent,

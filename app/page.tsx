@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { trackBeginCheckout, trackSelectItem } from "@/lib/analytics";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
 import { APP_CONFIG } from "@/lib/appConfig";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 
 const CartModal = dynamic(
   () =>
@@ -263,6 +264,11 @@ function HomeContent() {
   }, []);
 
   const handleAddToCart = (product: Product) => {
+    if (isPriceOnRequestProduct(product)) {
+      window.open(APP_CONFIG.socials.zalo, "_blank", "noopener");
+      return;
+    }
+
     addToCart(product);
     messageApi.success(`${product.name} đã được thêm vào giỏ hàng`);
   };

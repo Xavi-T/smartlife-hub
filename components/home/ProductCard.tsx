@@ -2,7 +2,7 @@
 
 import NextImage from "next/image";
 import { Button, Card, Tag, Typography } from "antd";
-import { ShoppingCartOutlined } from "@ant-design/icons";
+import { PhoneOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import {
   calculateDiscountedPrice,
   formatCurrency,
@@ -10,6 +10,8 @@ import {
 } from "@/lib/utils";
 import type { Product } from "@/types/database";
 import { getOptimizedImageUrl } from "@/lib/imageUtils";
+import { APP_CONFIG } from "@/lib/appConfig";
+import { isPriceOnRequestProduct } from "@/lib/productPricing";
 
 interface ProductCardProps {
   product: Product;
@@ -23,12 +25,13 @@ export function ProductCard({
   onViewDetail,
 }: ProductCardProps) {
   const isOutOfStock = product.stock_quantity === 0;
+  const priceOnRequest = isPriceOnRequestProduct(product);
   const discountPercent = getEffectiveDiscountPercent({
     discountPercent: product.discount_percent,
     discountStartAt: product.discount_start_at,
     discountEndAt: product.discount_end_at,
   });
-  const hasDiscount = discountPercent > 0;
+  const hasDiscount = !priceOnRequest && discountPercent > 0;
   const finalPrice = calculateDiscountedPrice(product.price, discountPercent);
   const savingAmount = product.price - finalPrice;
   const imageUrl = product.image_url
@@ -200,9 +203,15 @@ export function ProductCard({
         </div>
 
         <div className="min-h-[45px] min-w-0">
-          <div className="text-[18px] font-semibold leading-tight text-red-500 whitespace-nowrap sm:text-[20px]">
-            {formatCurrency(finalPrice)}
-          </div>
+          {priceOnRequest ? (
+            <div className="text-[18px] font-semibold leading-tight text-blue-600 whitespace-nowrap sm:text-[20px]">
+              Liên hệ
+            </div>
+          ) : (
+            <div className="text-[18px] font-semibold leading-tight text-red-500 whitespace-nowrap sm:text-[20px]">
+              {formatCurrency(finalPrice)}
+            </div>
+          )}
           {hasDiscount && (
             <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden leading-none">
               <Typography.Text delete type="secondary" style={{ fontSize: 13 }}>
@@ -218,16 +227,20 @@ export function ProductCard({
         <div className="mt-auto pt-2">
           <Button
             type="primary"
-            icon={<ShoppingCartOutlined />}
+            icon={priceOnRequest ? <PhoneOutlined /> : <ShoppingCartOutlined />}
             className="h-10 w-full"
             onClick={(event) => {
               event.stopPropagation();
+              if (priceOnRequest) {
+                window.open(APP_CONFIG.socials.zalo, "_blank", "noopener");
+                return;
+              }
               onAddToCart(product);
             }}
             disabled={isOutOfStock}
             style={{ borderRadius: 12 }}
           >
-            Thêm
+            {priceOnRequest ? "Liên hệ" : "Thêm"}
           </Button>
         </div>
       </div>

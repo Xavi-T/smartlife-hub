@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  type ClipboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button, Image, Modal, Space, Tag, Typography, message } from "antd";
 import {
   BoldOutlined,
@@ -13,6 +18,10 @@ import {
   CodeOutlined,
   FontSizeOutlined,
 } from "@ant-design/icons";
+import {
+  looksLikeHtmlContent,
+  normalizeHtmlContent,
+} from "@/lib/htmlContent";
 
 interface ProductMediaImage {
   id: string;
@@ -37,12 +46,13 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [messageApi, contextHolder] = message.useMessage();
   const [isHtmlMode, setIsHtmlMode] = useState(false);
+  const [htmlDraft, setHtmlDraft] = useState("");
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!editorRef.current || isHtmlMode) return;
-    const nextValue = value || "";
+    const nextValue = normalizeHtmlContent(value);
     if (editorRef.current.innerHTML !== nextValue) {
       editorRef.current.innerHTML = nextValue;
     }
@@ -54,6 +64,42 @@ export function RichTextEditor({
 
   const handleInput = () => {
     emitChange(editorRef.current?.innerHTML || "");
+  };
+
+  const handleHtmlDraftChange = (nextValue: string) => {
+    const normalizedValue = normalizeHtmlContent(nextValue);
+    setHtmlDraft(normalizedValue);
+    emitChange(normalizedValue);
+  };
+
+  const handleToggleHtmlMode = () => {
+    if (isHtmlMode) {
+      const normalizedValue = normalizeHtmlContent(htmlDraft);
+      emitChange(normalizedValue);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = normalizedValue;
+      }
+      setIsHtmlMode(false);
+      return;
+    }
+
+    const currentHtml = editorRef.current?.innerHTML || value || "";
+    setHtmlDraft(normalizeHtmlContent(currentHtml));
+    setIsHtmlMode(true);
+  };
+
+  const handleEditorPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const pastedText = event.clipboardData.getData("text/plain");
+    const normalizedPastedText = normalizeHtmlContent(pastedText);
+
+    if (!looksLikeHtmlContent(normalizedPastedText)) {
+      return;
+    }
+
+    event.preventDefault();
+    editorRef.current?.focus();
+    document.execCommand("insertHTML", false, normalizedPastedText);
+    handleInput();
   };
 
   const runCommand = (command: string, commandValue?: string) => {
@@ -176,7 +222,7 @@ export function RichTextEditor({
         <Button
           icon={<CodeOutlined />}
           type={isHtmlMode ? "primary" : "default"}
-          onClick={() => setIsHtmlMode((prev) => !prev)}
+          onClick={handleToggleHtmlMode}
         >
           HTML
         </Button>
@@ -238,8 +284,8 @@ export function RichTextEditor({
 
       {isHtmlMode ? (
         <textarea
-          value={value || ""}
-          onChange={(event) => emitChange(event.target.value)}
+          value={htmlDraft}
+          onChange={(event) => handleHtmlDraftChange(event.target.value)}
           style={{
             width: "100%",
             minHeight,
@@ -253,6 +299,7 @@ export function RichTextEditor({
             wordBreak: "break-word",
           }}
           placeholder={placeholder}
+          spellCheck={false}
         />
       ) : (
         <div
@@ -260,6 +307,7 @@ export function RichTextEditor({
           contentEditable
           suppressContentEditableWarning
           onInput={handleInput}
+          onPaste={handleEditorPaste}
           style={{
             minHeight,
             border: "1px solid #d9d9d9",

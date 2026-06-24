@@ -566,6 +566,7 @@ export async function POST(request: NextRequest) {
       category,
       categories,
       variants,
+      price_on_request,
       is_active,
     } = body;
 
@@ -697,6 +698,7 @@ export async function POST(request: NextRequest) {
         stock_quantity: 0,
         category: normalizedCategoryNames[0],
         image_url: null,
+        price_on_request: price_on_request === true,
         is_active: is_active !== undefined ? is_active : true,
       })
       .select()
@@ -792,6 +794,7 @@ export async function PATCH(request: NextRequest) {
       category,
       categories,
       variants,
+      price_on_request,
       is_active,
     } = body;
 
@@ -1009,6 +1012,10 @@ export async function PATCH(request: NextRequest) {
         );
       }
       updates.stock_quantity = normalizedStockQuantity;
+    }
+
+    if (price_on_request !== undefined) {
+      updates.price_on_request = price_on_request === true;
     }
 
     if (category !== undefined || categories !== undefined) {
