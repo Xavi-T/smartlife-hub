@@ -118,16 +118,16 @@ export async function POST() {
           customer_phone: phone,
           customer_name: order.customer_name,
           total_orders: 1,
-          delivered_orders: order.status === "delivered" ? 1 : 0,
+          delivered_orders: order.status === "completed" ? 1 : 0,
           total_spent:
-            order.status === "delivered" ? Number(order.total_amount || 0) : 0,
+            order.status === "completed" ? Number(order.total_amount || 0) : 0,
           last_order_at: order.created_at,
         });
         return;
       }
 
       existing.total_orders += 1;
-      if (order.status === "delivered") {
+      if (order.status === "completed") {
         existing.delivered_orders += 1;
         existing.total_spent += Number(order.total_amount || 0);
       }

@@ -79,7 +79,7 @@ export function TopSellingProducts() {
             <h2 className="text-lg font-bold text-gray-900">
               Top 5 Sản phẩm bán chạy
             </h2>
-            <p className="text-xs text-gray-500">Dựa trên đơn đã giao</p>
+            <p className="text-xs text-gray-500">Dựa trên đơn đã hoàn thành</p>
           </div>
         </div>
       </div>

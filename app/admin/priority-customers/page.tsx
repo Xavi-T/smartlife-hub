@@ -430,7 +430,7 @@ function PriorityCustomersContent() {
       width: 260,
       render: (_value, record) => (
         <div>
-          <div>{record.delivered_orders_snapshot} đơn đã giao</div>
+          <div>{record.delivered_orders_snapshot} đơn đã hoàn thành</div>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {formatCurrency(record.total_spent_snapshot)}
           </Typography.Text>
@@ -487,7 +487,7 @@ function PriorityCustomersContent() {
       width: 220,
     },
     {
-      title: "Điều kiện đơn đã giao",
+      title: "Điều kiện đơn hoàn thành",
       key: "min_delivered_orders",
       width: 180,
       render: (_value, record) => (
@@ -817,7 +817,7 @@ function PriorityCustomersContent() {
             <Col span={12}>
               <Form.Item
                 name="minDeliveredOrders"
-                label="Đơn đã giao tối thiểu"
+                label="Đơn hoàn thành tối thiểu"
               >
                 <InputNumber min={0} style={{ width: "100%" }} />
               </Form.Item>

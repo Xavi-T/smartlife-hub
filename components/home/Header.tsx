@@ -137,9 +137,9 @@ export function Header({ cartItemsCount, onCartClick }: HeaderProps) {
                 <Image
                   src={logoSrc}
                   alt={`${APP_CONFIG.shopName} Logo`}
-                  width={48}
-                  height={48}
-                  className="w-8 h-8 sm:w-12 sm:h-12 object-contain"
+                  width={112}
+                  height={112}
+                  className="sl-header-logo-image h-full w-full object-contain"
                   priority
                 />
               </div>

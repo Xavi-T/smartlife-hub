@@ -63,6 +63,35 @@ interface CategoryOption {
   value: string;
 }
 
+function normalizeCategoryName(value: unknown): string {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function getCategoryNameKey(value: unknown): string {
+  return normalizeCategoryName(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLocaleLowerCase("vi");
+}
+
+function getUniqueCategoryNames(values: unknown[]): string[] {
+  const categoriesByKey = new Map<string, string>();
+
+  values.forEach((value) => {
+    const name = normalizeCategoryName(value);
+    const key = getCategoryNameKey(name);
+    if (name && key && !categoriesByKey.has(key)) {
+      categoriesByKey.set(key, name);
+    }
+  });
+
+  return Array.from(categoriesByKey.values());
+}
+
 interface ProductGalleryItem {
   id: string;
   image_url: string;
@@ -396,10 +425,18 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
         const result = await response.json();
         if (!response.ok) return;
 
+        const categoryNames = getUniqueCategoryNames(
+          (result.categories || []).map(
+            (item: { name?: string }) => item.name,
+          ),
+        ).sort((first, second) =>
+          first.localeCompare(second, "vi", { sensitivity: "base" }),
+        );
+
         setCategoryOptions(
-          (result.categories || []).map((item: { name: string }) => ({
-            label: item.name,
-            value: item.name,
+          categoryNames.map((name) => ({
+            label: name,
+            value: name,
           })),
         );
       } catch {
@@ -462,15 +499,10 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
               : undefined,
           cost_price: product.cost_price,
           price_on_request: product.price_on_request === true,
-          categories: Array.from(
-            new Set(
-              (product.categories && product.categories.length > 0
-                ? product.categories.map((item) => item.name)
-                : [product.category]
-              )
-                .map((item) => String(item || "").trim())
-                .filter(Boolean),
-            ),
+          categories: getUniqueCategoryNames(
+            product.categories && product.categories.length > 0
+              ? product.categories.map((item) => item.name)
+              : [product.category],
           ),
           has_variants: (product.variants || []).length > 0,
           variants: (product.variants || []).map((variant, index) => ({
@@ -507,10 +539,8 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
     setIsSubmitting(true);
 
     try {
-      const normalizedCategories = Array.from(
-        new Set(
-          (values.categories || []).map((item) => item.trim()).filter(Boolean),
-        ),
+      const normalizedCategories = getUniqueCategoryNames(
+        values.categories || [],
       );
 
       const normalizedVariants = (values.variants || [])
@@ -979,6 +1009,9 @@ export function ProductFormPage({ mode, productId }: ProductFormPageProps) {
                     showSearch
                     mode="tags"
                     options={categoryOptions}
+                    optionFilterProp="label"
+                    listHeight={320}
+                    maxTagCount="responsive"
                   />
                 </Form.Item>
 

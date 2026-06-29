@@ -144,7 +144,7 @@ export default function AdminDashboard() {
                 styles={{ content: { color: "#1890ff" } }}
               />
               <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 8 }}>
-                Từ đơn hàng đã giao
+                Chỉ tính đơn đã hoàn thành
               </div>
             </Card>
           </Col>

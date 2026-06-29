@@ -33,7 +33,7 @@ export async function GET() {
 
     const sb = createAdminDashboardClient();
     // Query order_items joined with products and orders
-    // Only count delivered orders for actual sales
+    // Only count completed orders for actual sales
     const { data: topProducts, error } = await sb
       .from("order_items")
       .select(
@@ -53,7 +53,7 @@ export async function GET() {
         )
       `,
       )
-      .eq("orders.status", "delivered");
+      .eq("orders.status", "completed");
 
     if (error) throw error;
 

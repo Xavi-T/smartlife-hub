@@ -13,6 +13,7 @@ import {
   Spin,
   Steps,
   Tag,
+  Timeline,
   Typography,
   message,
 } from "antd";
@@ -21,7 +22,19 @@ import { getOrdersByPhone } from "@/actions/orders";
 import { formatCurrency } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/appConfig";
 
-type OrderStatus = "pending" | "processing" | "delivered" | "cancelled";
+type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "shipping"
+  | "completed"
+  | "cancelled";
+
+interface OrderStatusHistory {
+  id: string;
+  status: OrderStatus;
+  note: string | null;
+  created_at: string;
+}
 
 interface OrderItemView {
   id: string;
@@ -41,6 +54,7 @@ interface OrderView {
   customer_address: string;
   total_amount: number;
   status: OrderStatus;
+  order_type?: "online" | "counter";
   checkout_method?: "cod" | "bank_transfer";
   payment_method?: "cod" | "bank_transfer";
   payment_confirmed?: boolean;
@@ -48,35 +62,89 @@ interface OrderView {
   notes: string | null;
   created_at: string;
   order_items: OrderItemView[];
+  order_status_history?: OrderStatusHistory[];
 }
 
 function getStatusMeta(status: OrderStatus) {
-  if (status === "pending") return { label: "Chờ xử lý", color: "gold" };
-  if (status === "processing") return { label: "Đang xử lý", color: "blue" };
-  if (status === "delivered") return { label: "Đã giao", color: "green" };
+  if (status === "pending") return { label: "Chờ xác nhận", color: "gold" };
+  if (status === "confirmed") return { label: "Đã xác nhận", color: "blue" };
+  if (status === "shipping")
+    return { label: "Đang vận chuyển", color: "cyan" };
+  if (status === "completed")
+    return { label: "Đã hoàn thành", color: "green" };
   return { label: "Đã hủy", color: "red" };
 }
 
-function getTimelineCurrent(status: OrderStatus): number {
+function getTimelineCurrent(order: OrderView): number {
+  const status = order.status;
   if (status === "pending") return 0;
-  if (status === "processing") return 2;
-  if (status === "delivered") return 3;
-  return 1;
+  if (status === "confirmed") return 1;
+  if (status === "shipping") return 2;
+  if (status === "completed") return order.order_type === "counter" ? 0 : 3;
+
+  const completedStatuses = new Set(
+    (order.order_status_history || []).map((history) => history.status),
+  );
+  if (completedStatuses.has("completed")) return 3;
+  if (completedStatuses.has("shipping")) return 2;
+  if (completedStatuses.has("confirmed")) return 1;
+  return 0;
 }
 
-function getDeliveryStepItems(status: OrderStatus) {
-  const baseItems = [
-    { title: "Chờ xác nhận", content: "Đơn hàng đã được tiếp nhận" },
-    { title: "Đã xác nhận", content: "Cửa hàng xác nhận và chuẩn bị" },
-    { title: "Đang giao", content: "Đơn vị vận chuyển đang giao" },
-    { title: "Đã giao", content: "Khách đã nhận hàng" },
-  ];
+function getHistoryNote(order: OrderView, status: OrderStatus, fallback: string) {
+  const history = [...(order.order_status_history || [])]
+    .filter((item) => item.status === status)
+    .sort(
+      (first, second) =>
+        new Date(second.created_at).getTime() -
+        new Date(first.created_at).getTime(),
+    )[0];
+  return history?.note || fallback;
+}
 
-  if (status !== "cancelled") return baseItems;
+function getDeliveryStepItems(order: OrderView) {
+  if (order.order_type === "counter") {
+    return [
+      {
+        title: "Đã hoàn thành",
+        content: getHistoryNote(
+          order,
+          "completed",
+          "Đơn mua tại quầy đã hoàn thành.",
+        ),
+      },
+    ];
+  }
 
   return [
-    { title: "Chờ xác nhận", content: "Đơn hàng đã được tiếp nhận" },
-    { title: "Đã hủy", content: "Đơn hàng đã bị hủy" },
+    {
+      title: "Chờ xác nhận",
+      content: getHistoryNote(order, "pending", "Đơn hàng đã được tiếp nhận."),
+    },
+    {
+      title: "Đã xác nhận",
+      content: getHistoryNote(
+        order,
+        "confirmed",
+        "Cửa hàng xác nhận và chuẩn bị hàng.",
+      ),
+    },
+    {
+      title: "Đang vận chuyển",
+      content: getHistoryNote(
+        order,
+        "shipping",
+        "Đơn vị vận chuyển đang giao hàng.",
+      ),
+    },
+    {
+      title: "Đã hoàn thành",
+      content: getHistoryNote(
+        order,
+        "completed",
+        "Khách hàng đã nhận hàng.",
+      ),
+    },
   ];
 }
 
@@ -320,11 +388,11 @@ function OrderTrackingContent() {
                     <div style={{ marginBottom: 14 }}>
                       <Steps
                         size="small"
-                        current={getTimelineCurrent(order.status)}
+                        current={getTimelineCurrent(order)}
                         status={
                           order.status === "cancelled" ? "error" : "process"
                         }
-                        items={getDeliveryStepItems(order.status)}
+                        items={getDeliveryStepItems(order)}
                       />
                     </div>
 
@@ -334,9 +402,64 @@ function OrderTrackingContent() {
                         showIcon
                         style={{ marginBottom: 12 }}
                         title="Đơn hàng đã bị hủy"
-                        description="Vui lòng liên hệ cửa hàng để biết thêm chi tiết hoặc đặt lại đơn mới."
+                        description={getHistoryNote(
+                          order,
+                          "cancelled",
+                          "Vui lòng liên hệ cửa hàng để biết thêm chi tiết.",
+                        )}
                       />
                     )}
+
+                    {order.order_status_history &&
+                      order.order_status_history.length > 0 && (
+                        <Card
+                          size="small"
+                          title="Cập nhật đơn hàng"
+                          style={{ marginBottom: 12 }}
+                        >
+                          <Timeline
+                            items={[...order.order_status_history]
+                              .sort(
+                                (first, second) =>
+                                  new Date(second.created_at).getTime() -
+                                  new Date(first.created_at).getTime(),
+                              )
+                              .map((history) => ({
+                                color:
+                                  history.status === "cancelled"
+                                    ? "red"
+                                    : history.status === "completed"
+                                      ? "green"
+                                      : "blue",
+                                children: (
+                                  <div>
+                                    <Typography.Text strong>
+                                      {getStatusMeta(history.status).label}
+                                    </Typography.Text>
+                                    <Typography.Text
+                                      type="secondary"
+                                      style={{
+                                        display: "block",
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      {new Date(
+                                        history.created_at,
+                                      ).toLocaleString("vi-VN")}
+                                    </Typography.Text>
+                                    {history.note && (
+                                      <Typography.Paragraph
+                                        style={{ marginBottom: 0 }}
+                                      >
+                                        {history.note}
+                                      </Typography.Paragraph>
+                                    )}
+                                  </div>
+                                ),
+                              }))}
+                          />
+                        </Card>
+                      )}
 
                     <Space
                       orientation="vertical"

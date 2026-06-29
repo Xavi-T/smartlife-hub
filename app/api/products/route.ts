@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { AuditLogger } from "@/lib/auditLogger";
+import { isAdminAuthFailure, requireAdminRole } from "@/lib/adminAuth";
 import type { Database } from "@/types/database";
 
 type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
@@ -154,7 +155,7 @@ function createServiceRoleSupabaseClient() {
     return null;
   }
 
-  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+  return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -282,38 +283,63 @@ async function ensureCategoryIdsByNames(
     }
   });
 
-  const upsertPayload = Array.from(slugToName.entries()).map(
-    ([slug, name]) => ({
+  const requestedEntries = Array.from(slugToName.entries());
+  if (requestedEntries.length === 0) return [];
+
+  const { data: existingRows, error: existingRowsError } = await supabase
+    .from("categories")
+    .select("id, name, slug");
+
+  if (existingRowsError) throw existingRowsError;
+
+  const existingRowsByNameKey = new Map<
+    string,
+    { id: string; slug: string }
+  >();
+  (existingRows || []).forEach(
+    (row: { id: string; name: string; slug: string }) => {
+      const nameKey = slugify(row.name);
+      if (!nameKey) return;
+
+      const current = existingRowsByNameKey.get(nameKey);
+      if (!current || row.slug === nameKey) {
+        existingRowsByNameKey.set(nameKey, {
+          id: row.id,
+          slug: row.slug,
+        });
+      }
+    },
+  );
+
+  const missingCategories = requestedEntries
+    .filter(([nameKey]) => !existingRowsByNameKey.has(nameKey))
+    .map(([slug, name]) => ({
       name,
       slug,
       is_active: true,
-    }),
-  );
+    }));
 
-  if (upsertPayload.length === 0) return [];
+  if (missingCategories.length > 0) {
+    const { data: insertedRows, error: insertError } = await supabase
+      .from("categories")
+      .upsert(missingCategories, { onConflict: "slug" })
+      .select("id, name, slug");
 
-  const { error: upsertError } = await supabase
-    .from("categories")
-    .upsert(upsertPayload, { onConflict: "slug" });
+    if (insertError) throw insertError;
 
-  if (upsertError) throw upsertError;
+    (insertedRows || []).forEach(
+      (row: { id: string; name: string; slug: string }) => {
+        existingRowsByNameKey.set(slugify(row.name), {
+          id: row.id,
+          slug: row.slug,
+        });
+      },
+    );
+  }
 
-  const slugs = upsertPayload.map((item) => item.slug);
-  const { data: rows, error: selectError } = await supabase
-    .from("categories")
-    .select("id, slug")
-    .in("slug", slugs);
-
-  if (selectError) throw selectError;
-
-  const idMap = new Map(
-    (rows || []).map((row: { slug: string; id: string }) => [row.slug, row.id]),
-  );
-  const ids = slugs
-    .map((slug) => idMap.get(slug))
+  return requestedEntries
+    .map(([nameKey]) => existingRowsByNameKey.get(nameKey)?.id)
     .filter((id): id is string => Boolean(id));
-
-  return Array.from(new Set(ids));
 }
 
 async function syncProductCategoriesByName(
@@ -541,17 +567,10 @@ export async function GET(request: NextRequest) {
 // POST: Tạo sản phẩm mới
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createApiSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Bạn chưa đăng nhập" },
-        { status: 401 },
-      );
-    }
+    const supabase = await createApiSupabaseClient();
 
     const body = await request.json();
     const {
@@ -768,17 +787,10 @@ export async function POST(request: NextRequest) {
 // PATCH: Cập nhật sản phẩm
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createApiSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Bạn chưa đăng nhập" },
-        { status: 401 },
-      );
-    }
+    const supabase = await createApiSupabaseClient();
 
     const body = await request.json();
     const {
@@ -1076,17 +1088,8 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Xóa sản phẩm (soft delete)
 export async function DELETE(request: NextRequest) {
   try {
-    const authClient = await createApiSupabaseClient();
-    const {
-      data: { user },
-    } = await authClient.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Bạn chưa đăng nhập" },
-        { status: 401 },
-      );
-    }
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
@@ -1099,7 +1102,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     const serviceRoleClient = createServiceRoleSupabaseClient();
-    const mutationClient = serviceRoleClient || authClient;
+    if (!serviceRoleClient) {
+      return NextResponse.json(
+        { error: "Thiếu cấu hình SUPABASE_SERVICE_ROLE_KEY" },
+        { status: 500 },
+      );
+    }
+    const mutationClient = serviceRoleClient;
 
     const { data: productData, error: productError } = await mutationClient
       .from("products")

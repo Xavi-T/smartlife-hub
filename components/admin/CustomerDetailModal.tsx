@@ -77,15 +77,17 @@ export function CustomerDetailModal({
 
   const statusColors = {
     pending: "bg-yellow-100 text-yellow-800",
-    processing: "bg-blue-100 text-blue-800",
-    delivered: "bg-green-100 text-green-800",
+    confirmed: "bg-blue-100 text-blue-800",
+    shipping: "bg-cyan-100 text-cyan-800",
+    completed: "bg-green-100 text-green-800",
     cancelled: "bg-red-100 text-red-800",
   };
 
   const statusLabels = {
     pending: "Chờ xác nhận",
-    processing: "Đang giao",
-    delivered: "Đã giao",
+    confirmed: "Đã xác nhận",
+    shipping: "Đang vận chuyển",
+    completed: "Đã hoàn thành",
     cancelled: "Đã hủy",
   };
 
@@ -162,7 +164,7 @@ export function CustomerDetailModal({
                   {stats.totalOrders}
                 </p>
                 <p className="text-xs text-blue-700 mt-1">
-                  {stats.deliveredOrders} đã giao
+                  {stats.deliveredOrders} đã hoàn thành
                 </p>
               </div>
 

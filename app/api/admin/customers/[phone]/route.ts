@@ -70,12 +70,17 @@ export async function GET(
       customer_phone: string;
       customer_address: string;
       total_amount: number;
-      status: "pending" | "processing" | "delivered" | "cancelled";
+      status:
+        | "pending"
+        | "confirmed"
+        | "shipping"
+        | "completed"
+        | "cancelled";
       created_at: string;
       [key: string]: unknown;
     }>;
 
-    const deliveredOrders = orderRows.filter((o) => o.status === "delivered");
+    const deliveredOrders = orderRows.filter((o) => o.status === "completed");
     const deliveredRevenue = deliveredOrders.reduce(
       (sum, o) => sum + o.total_amount,
       0,
@@ -86,7 +91,9 @@ export async function GET(
       totalOrders: orderRows.length,
       totalSpent: deliveredRevenue,
       pendingOrders: orderRows.filter((o) => o.status === "pending").length,
-      processingOrders: orderRows.filter((o) => o.status === "processing")
+      processingOrders: orderRows.filter(
+        (o) => o.status === "confirmed" || o.status === "shipping",
+      )
         .length,
       deliveredOrders: deliveredOrders.length,
       cancelledOrders: orderRows.filter((o) => o.status === "cancelled").length,

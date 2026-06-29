@@ -11,6 +11,7 @@ import {
   Space,
   Table,
   Tag,
+  Timeline,
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -36,9 +37,17 @@ interface Order {
   customer_address: string;
   total_amount: number;
   status: string;
+  order_type?: "online" | "counter";
   notes: string | null;
   created_at: string;
   order_items: OrderItem[];
+  order_status_history?: Array<{
+    id: string;
+    status: string;
+    note: string | null;
+    created_by: string | null;
+    created_at: string;
+  }>;
 }
 
 interface OrderDetailModalProps {
@@ -54,15 +63,17 @@ export function OrderDetailModal({
 }: OrderDetailModalProps) {
   const statusColors = {
     pending: "gold",
-    processing: "processing",
-    delivered: "success",
+    confirmed: "blue",
+    shipping: "processing",
+    completed: "success",
     cancelled: "error",
   } as const;
 
   const statusLabels = {
     pending: "Chờ xác nhận",
-    processing: "Đang giao",
-    delivered: "Đã giao",
+    confirmed: "Đã xác nhận",
+    shipping: "Đang vận chuyển",
+    completed: "Đã hoàn thành",
     cancelled: "Đã hủy",
   } as const;
 
@@ -179,6 +190,13 @@ export function OrderDetailModal({
                 <Descriptions.Item label="Ngày đặt hàng">
                   {new Date(order.created_at).toLocaleString("vi-VN")}
                 </Descriptions.Item>
+                <Descriptions.Item label="Loại đơn">
+                  <Tag color={order.order_type === "counter" ? "purple" : "blue"}>
+                    {order.order_type === "counter"
+                      ? "Mua tại quầy"
+                      : "Khách online"}
+                  </Tag>
+                </Descriptions.Item>
                 <Descriptions.Item label="Trạng thái">
                   <Tag
                     color={
@@ -206,6 +224,48 @@ export function OrderDetailModal({
             description={order.notes}
           />
         )}
+
+        {order.order_status_history &&
+          order.order_status_history.length > 0 && (
+            <Card title="Lịch sử trạng thái" size="small">
+              <Timeline
+                items={[...order.order_status_history]
+                  .sort(
+                    (first, second) =>
+                      new Date(second.created_at).getTime() -
+                      new Date(first.created_at).getTime(),
+                  )
+                  .map((history) => ({
+                    color:
+                      history.status === "cancelled"
+                        ? "red"
+                        : history.status === "completed"
+                          ? "green"
+                          : "blue",
+                    children: (
+                      <div>
+                        <Typography.Text strong>
+                          {statusLabels[
+                            history.status as keyof typeof statusLabels
+                          ] || history.status}
+                        </Typography.Text>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ display: "block", fontSize: 12 }}
+                        >
+                          {new Date(history.created_at).toLocaleString("vi-VN")}
+                        </Typography.Text>
+                        {history.note && (
+                          <Typography.Paragraph style={{ marginBottom: 0 }}>
+                            {history.note}
+                          </Typography.Paragraph>
+                        )}
+                      </div>
+                    ),
+                  }))}
+              />
+            </Card>
+          )}
 
         <Card
           title={`Danh sách sản phẩm (${order.order_items.length})`}

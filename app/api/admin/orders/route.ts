@@ -37,6 +37,13 @@ export async function GET() {
       .select(
         `
         *,
+        order_status_history(
+          id,
+          status,
+          note,
+          created_by,
+          created_at
+        ),
         order_items(
           id,
           quantity,

@@ -88,6 +88,17 @@ body {
     0 14px 30px rgba(22, 139, 208, 0.24);
 }
 
+.sl-header-logo-image {
+  object-position: 50% 48%;
+  transform: scale(2.15);
+  transform-origin: center;
+  transition: transform 180ms ease;
+}
+
+.sl-logo-frame:hover .sl-header-logo-image {
+  transform: scale(2.22);
+}
+
 .sl-nav-link {
   border-radius: 999px;
 }

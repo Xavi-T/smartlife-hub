@@ -3,6 +3,8 @@
 import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
 import { sendOrderNotificationEmail } from "@/lib/emailNotifications";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getRoleFromUser } from "@/lib/rbac";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type {
@@ -178,7 +180,8 @@ async function createOrderDirectly(params: {
     customer_phone: customerPhone,
     customer_address: customerAddress,
     total_amount: 0,
-    status: isCounterSale ? "delivered" : "pending",
+    status: isCounterSale ? "completed" : "pending",
+    order_type: isCounterSale ? "counter" : "online",
     notes,
   };
 
@@ -340,6 +343,35 @@ export async function createOrder(
       request.paymentMethod ||
       (checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod");
     const isCounterSale = Boolean(request.isCounterSale);
+
+    if (isCounterSale) {
+      const authClient = await createServerSupabaseClient();
+      const {
+        data: { user },
+      } = await authClient.auth.getUser();
+
+      if (!user) {
+        return {
+          success: false,
+          message: "Bạn cần đăng nhập để tạo đơn bán tại quầy",
+        };
+      }
+
+      const role = getRoleFromUser(user);
+      if (role === "doctor") {
+        return {
+          success: false,
+          message: "Tài khoản này không có quyền tạo đơn bán tại quầy",
+        };
+      }
+    }
+
+    const customerName =
+      request.customer.name?.trim() || (isCounterSale ? "Khách lẻ" : "");
+    const submittedPhone = request.customer.phone?.trim() || "";
+    const normalizedPhone = normalizePhone(submittedPhone);
+    const customerPhone =
+      normalizedPhone || (isCounterSale ? "0000000000" : "");
     const manualDiscountPercent = Math.min(
       100,
       Math.max(0, Number(request.manualDiscountPercent || 0)),
@@ -372,22 +404,21 @@ export async function createOrder(
     }
 
     // Validate input
-    if (!request.customer.name?.trim()) {
+    if (!customerName) {
       return {
         success: false,
         message: "Vui lòng nhập tên khách hàng",
       };
     }
 
-    if (!request.customer.phone?.trim()) {
+    if (!customerPhone) {
       return {
         success: false,
         message: "Vui lòng nhập số điện thoại",
       };
     }
 
-    const normalizedPhone = normalizePhone(request.customer.phone);
-    if (normalizedPhone.length < 10) {
+    if (submittedPhone && normalizedPhone.length < 10) {
       return {
         success: false,
         message: "Số điện thoại không hợp lệ",
@@ -476,8 +507,8 @@ export async function createOrder(
 
     const createResult = await createOrderDirectly({
       db: orderWriteClient,
-      customerName: request.customer.name.trim(),
-      customerPhone: normalizedPhone,
+      customerName,
+      customerPhone,
       customerAddress: resolvedAddress,
       notes: finalNotes,
       checkoutMethod,
@@ -495,24 +526,29 @@ export async function createOrder(
 
     await AuditLogger.orderCreated(
       createResult.orderId,
-      request.customer.name,
+      customerName,
       createResult.totalAmount || 0,
       request.items.length,
     );
 
-    try {
-      await sendOrderNotificationEmail({
-        orderId: createResult.orderId,
-        customerName: request.customer.name.trim(),
-        customerPhone: normalizedPhone,
-        customerAddress: resolvedAddress,
-        checkoutMethod,
-        paymentMethod,
-        totalAmount: Number(createResult.totalAmount || 0),
-        itemCount: request.items.length,
-      });
-    } catch (notifyError) {
-      console.warn("Order created but email notification failed:", notifyError);
+    if (!isCounterSale) {
+      try {
+        await sendOrderNotificationEmail({
+          orderId: createResult.orderId,
+          customerName,
+          customerPhone,
+          customerAddress: resolvedAddress,
+          checkoutMethod,
+          paymentMethod,
+          totalAmount: Number(createResult.totalAmount || 0),
+          itemCount: request.items.length,
+        });
+      } catch (notifyError) {
+        console.warn(
+          "Order created but email notification failed:",
+          notifyError,
+        );
+      }
     }
 
     return createResult;
@@ -601,6 +637,12 @@ export async function getOrderDetails(orderId: string) {
       .select(
         `
         *,
+        order_status_history (
+          id,
+          status,
+          note,
+          created_at
+        ),
         order_items (
           *,
           products (
@@ -652,12 +694,19 @@ export async function getOrdersByPhone(phone: string) {
         customer_address,
         total_amount,
         status,
+        order_type,
         checkout_method,
         payment_method,
         payment_confirmed,
         payment_confirmed_at,
         notes,
         created_at,
+        order_status_history (
+          id,
+          status,
+          note,
+          created_at
+        ),
         order_items (
           id,
           quantity,

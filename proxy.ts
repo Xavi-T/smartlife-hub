@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  canAccessAdminApiPath,
   canAccessAdminPath,
   getAdminHomePath,
   getRoleFromUser,
@@ -49,15 +50,27 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (request.nextUrl.pathname.startsWith("/admin")) {
+  const pathname = request.nextUrl.pathname;
+
+  if (pathname.startsWith("/api/admin")) {
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const role = getRoleFromUser(user);
+    if (!canAccessAdminApiPath(role, pathname)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
+  if (pathname.startsWith("/admin")) {
     if (!user) {
       const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", request.nextUrl.pathname);
+      loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
     }
 
     const role = getRoleFromUser(user);
-    const pathname = request.nextUrl.pathname;
 
     if (!canAccessAdminPath(role, pathname)) {
       return NextResponse.redirect(
@@ -76,14 +89,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - api routes (public APIs)
-     * - public files
-     */
-    "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/login",
   ],
 };

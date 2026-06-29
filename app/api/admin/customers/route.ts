@@ -49,7 +49,12 @@ export async function GET(request: NextRequest) {
       customer_name: string;
       customer_phone: string;
       total_amount: number;
-      status: "pending" | "processing" | "delivered" | "cancelled";
+      status:
+        | "pending"
+        | "confirmed"
+        | "shipping"
+        | "completed"
+        | "cancelled";
       created_at: string;
       [key: string]: unknown;
     }>;
@@ -77,8 +82,8 @@ export async function GET(request: NextRequest) {
         customer.totalOrders += 1;
         customer.orders.push(order);
 
-        // Cập nhật tổng chi tiêu (chỉ đơn đã giao)
-        if (order.status === "delivered") {
+        // Cập nhật tổng chi tiêu (chỉ đơn đã hoàn thành)
+        if (order.status === "completed") {
           customer.totalSpent += order.total_amount;
           customer.deliveredOrders += 1;
         }
@@ -97,8 +102,8 @@ export async function GET(request: NextRequest) {
           phone,
           name: order.customer_name,
           totalOrders: 1,
-          totalSpent: order.status === "delivered" ? order.total_amount : 0,
-          deliveredOrders: order.status === "delivered" ? 1 : 0,
+          totalSpent: order.status === "completed" ? order.total_amount : 0,
+          deliveredOrders: order.status === "completed" ? 1 : 0,
           lastOrderDate: order.created_at,
           firstOrderDate: order.created_at,
           orders: [order],

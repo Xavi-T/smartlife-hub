@@ -16,6 +16,20 @@ export const DOCTOR_ALLOWED_ADMIN_PATHS = [
   "/admin/media",
 ];
 
+export const EMPLOYEE_ALLOWED_ADMIN_API_PATHS = ["/api/admin/orders"];
+
+export const DOCTOR_ALLOWED_ADMIN_API_PATHS = [
+  "/api/admin/nutrition",
+  "/api/admin/media",
+];
+
+function pathnameMatchesAny(pathname: string, allowedPaths: string[]): boolean {
+  return allowedPaths.some(
+    (allowedPath) =>
+      pathname === allowedPath || pathname.startsWith(`${allowedPath}/`),
+  );
+}
+
 export function normalizeRole(value: unknown): AppRole | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
@@ -32,10 +46,12 @@ export function getRoleFromUser(
     return "admin";
   }
 
+  // New accounts store authorization roles in app_metadata. Keep the
+  // user_metadata fallback so existing production accounts retain their role.
   const role =
-    normalizeRole(user?.user_metadata?.role) ||
-    normalizeRole(user?.app_metadata?.role);
-  return role || "admin";
+    normalizeRole(user?.app_metadata?.role) ||
+    normalizeRole(user?.user_metadata?.role);
+  return role || "employee";
 }
 
 export function canManageAccounts(role: AppRole): boolean {
@@ -43,10 +59,7 @@ export function canManageAccounts(role: AppRole): boolean {
 }
 
 export function isEmployeeAllowedAdminPath(pathname: string): boolean {
-  return EMPLOYEE_ALLOWED_ADMIN_PATHS.some(
-    (allowedPath) =>
-      pathname === allowedPath || pathname.startsWith(`${allowedPath}/`),
-  );
+  return pathnameMatchesAny(pathname, EMPLOYEE_ALLOWED_ADMIN_PATHS);
 }
 
 export function canAccessAdminPath(role: AppRole, pathname: string): boolean {
@@ -55,10 +68,7 @@ export function canAccessAdminPath(role: AppRole, pathname: string): boolean {
   }
 
   if (role === "doctor") {
-    return DOCTOR_ALLOWED_ADMIN_PATHS.some(
-      (allowedPath) =>
-        pathname === allowedPath || pathname.startsWith(`${allowedPath}/`),
-    );
+    return pathnameMatchesAny(pathname, DOCTOR_ALLOWED_ADMIN_PATHS);
   }
 
   if (pathname.startsWith("/admin/users")) {
@@ -66,6 +76,21 @@ export function canAccessAdminPath(role: AppRole, pathname: string): boolean {
   }
 
   return true;
+}
+
+export function canAccessAdminApiPath(
+  role: AppRole,
+  pathname: string,
+): boolean {
+  if (role === "employee") {
+    return pathnameMatchesAny(pathname, EMPLOYEE_ALLOWED_ADMIN_API_PATHS);
+  }
+
+  if (role === "doctor") {
+    return pathnameMatchesAny(pathname, DOCTOR_ALLOWED_ADMIN_API_PATHS);
+  }
+
+  return role === "admin" || role === "manager";
 }
 
 export function getAdminHomePath(role: AppRole): string {

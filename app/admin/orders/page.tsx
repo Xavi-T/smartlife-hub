@@ -20,6 +20,8 @@ import type { MenuProps } from "antd";
 import {
   ShoppingOutlined,
   ClockCircleOutlined,
+  CheckCircleOutlined,
+  DollarOutlined,
   RocketOutlined,
   EyeOutlined,
   EditOutlined,
@@ -44,13 +46,29 @@ interface OrderItem {
   };
 }
 
+type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "shipping"
+  | "completed"
+  | "cancelled";
+
+interface OrderStatusHistory {
+  id: string;
+  status: OrderStatus;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 interface Order {
   id: string;
   customer_name: string;
   customer_phone: string;
   customer_address: string;
   total_amount: number;
-  status: "pending" | "processing" | "delivered" | "cancelled";
+  status: OrderStatus;
+  order_type?: "online" | "counter";
   checkout_method?: "cod" | "bank_transfer";
   payment_method?: "cod" | "bank_transfer";
   payment_confirmed?: boolean;
@@ -58,6 +76,7 @@ interface Order {
   notes: string | null;
   created_at: string;
   order_items: OrderItem[];
+  order_status_history?: OrderStatusHistory[];
 }
 
 export default function OrdersPage() {
@@ -122,52 +141,41 @@ export default function OrdersPage() {
   ) => {
     if (newStatus === order.status) return;
 
-    const getConfirmMessage = (
-      currentStatus: Order["status"],
-      nextStatus: Order["status"],
-    ): string | undefined => {
-      if (currentStatus === "pending" && nextStatus === "processing") {
-        return "Xác nhận đơn hàng này? Hàng sẽ được trừ khỏi kho.";
-      }
-
-      if (currentStatus === "processing" && nextStatus === "delivered") {
-        return "Đánh dấu đơn hàng này đã giao?";
-      }
-
-      if (nextStatus === "cancelled" && currentStatus === "delivered") {
-        return "Khách đã hoàn trả sau giao. Xác nhận hủy đơn và hoàn hàng về kho?";
-      }
-
-      if (nextStatus === "cancelled" && currentStatus === "processing") {
-        return "Hủy đơn đang giao? Hàng sẽ được hoàn về kho.";
-      }
-
-      if (nextStatus === "cancelled" && currentStatus === "pending") {
-        return "Hủy đơn chờ xác nhận?";
-      }
-
-      if (currentStatus === "processing" && nextStatus === "pending") {
-        return "Chuyển lại về chờ xác nhận? Hàng sẽ được hoàn về kho.";
-      }
-
-      return undefined;
+    const statusLabels: Record<OrderStatus, string> = {
+      pending: "Chờ xác nhận",
+      confirmed: "Đã xác nhận",
+      shipping: "Đang vận chuyển",
+      completed: "Đã hoàn thành",
+      cancelled: "Đã hủy",
     };
-
-    const confirmMessage = getConfirmMessage(order.status, newStatus);
-    if (confirmMessage) {
-      const shouldContinue = await new Promise<boolean>((resolve) => {
-        Modal.confirm({
-          title: "Xác nhận cập nhật trạng thái",
-          content: confirmMessage,
-          okText: "Xác nhận",
-          cancelText: "Hủy",
-          onOk: () => resolve(true),
-          onCancel: () => resolve(false),
-        });
+    let statusNote = "";
+    const confirmedNote = await new Promise<string | null>((resolve) => {
+      Modal.confirm({
+        title: `Chuyển sang “${statusLabels[newStatus]}”`,
+        content: (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ marginBottom: 8, color: "#595959" }}>
+              Ghi chú này sẽ được hiển thị cho khách hàng khi tra cứu đơn.
+            </div>
+            <Input.TextArea
+              rows={3}
+              maxLength={1200}
+              showCount
+              placeholder="Ví dụ: Đơn đã bàn giao cho đơn vị vận chuyển..."
+              onChange={(event) => {
+                statusNote = event.target.value;
+              }}
+            />
+          </div>
+        ),
+        okText: "Xác nhận",
+        cancelText: "Hủy",
+        onOk: () => resolve(statusNote.trim()),
+        onCancel: () => resolve(null),
       });
+    });
 
-      if (!shouldContinue) return;
-    }
+    if (confirmedNote === null) return;
 
     setUpdatingOrderId(order.id);
 
@@ -178,7 +186,7 @@ export default function OrdersPage() {
         body: JSON.stringify({
           orderId: order.id,
           newStatus,
-          currentStatus: order.status,
+          statusNote: confirmedNote,
         }),
       });
 
@@ -258,21 +266,21 @@ export default function OrdersPage() {
   const stats = useMemo(() => {
     const totalOrders = orders.length;
     const totalRevenue = orders
-      .filter((o) => o.status === "delivered")
+      .filter((o) => o.status === "completed")
       .reduce((sum, o) => sum + o.total_amount, 0);
 
     const pending = orders.filter((o) => o.status === "pending").length;
-    const processing = orders.filter((o) => o.status === "processing").length;
-    const delivered = orders.filter((o) => o.status === "delivered").length;
-    const cancelled = orders.filter((o) => o.status === "cancelled").length;
+    const confirmed = orders.filter((o) => o.status === "confirmed").length;
+    const shipping = orders.filter((o) => o.status === "shipping").length;
+    const completed = orders.filter((o) => o.status === "completed").length;
 
     return {
       totalOrders,
       totalRevenue,
       pending,
-      processing,
-      delivered,
-      cancelled,
+      confirmed,
+      shipping,
+      completed,
     };
   }, [orders]);
 
@@ -287,7 +295,12 @@ export default function OrdersPage() {
         orderCode.includes(keyword) ||
         order.customer_name.toLowerCase().includes(keyword) ||
         order.customer_phone.toLowerCase().includes(keyword) ||
-        order.customer_address.toLowerCase().includes(keyword)
+        order.customer_address.toLowerCase().includes(keyword) ||
+        (order.order_status_history || []).some((history) =>
+          String(history.note || "")
+            .toLowerCase()
+            .includes(keyword),
+        )
       );
     });
   }, [orders, searchQuery]);
@@ -296,8 +309,9 @@ export default function OrdersPage() {
   const getStatusTag = (status: Order["status"]) => {
     const statusConfig = {
       pending: { color: "gold", text: "Chờ xác nhận" },
-      processing: { color: "processing", text: "Đang giao" },
-      delivered: { color: "success", text: "Đã giao" },
+      confirmed: { color: "blue", text: "Đã xác nhận" },
+      shipping: { color: "processing", text: "Đang vận chuyển" },
+      completed: { color: "success", text: "Đã hoàn thành" },
       cancelled: { color: "error", text: "Đã hủy" },
     };
     const config = statusConfig[status];
@@ -369,6 +383,12 @@ export default function OrdersPage() {
           <div style={{ fontSize: 12, color: "#8c8c8c" }}>
             {record.customer_phone}
           </div>
+          <Tag
+            color={record.order_type === "counter" ? "purple" : "blue"}
+            style={{ marginTop: 4, marginInlineEnd: 0 }}
+          >
+            {record.order_type === "counter" ? "Tại quầy" : "Online"}
+          </Tag>
         </div>
       ),
     },
@@ -379,8 +399,9 @@ export default function OrdersPage() {
       width: 150,
       filters: [
         { text: "Chờ xác nhận", value: "pending" },
-        { text: "Đang giao", value: "processing" },
-        { text: "Đã giao", value: "delivered" },
+        { text: "Đã xác nhận", value: "confirmed" },
+        { text: "Đang vận chuyển", value: "shipping" },
+        { text: "Đã hoàn thành", value: "completed" },
         { text: "Đã hủy", value: "cancelled" },
       ],
       onFilter: (value, record) => record.status === value,
@@ -462,8 +483,35 @@ export default function OrdersPage() {
       key: "actions",
       fixed: "right",
       width: 320,
-      render: (_, record) => (
-        <Space>
+      render: (_, record) => {
+        const nextStatus =
+          record.order_type === "counter"
+            ? null
+            : record.status === "pending"
+              ? ("confirmed" as const)
+              : record.status === "confirmed"
+                ? ("shipping" as const)
+                : record.status === "shipping"
+                  ? ("completed" as const)
+                  : null;
+        const nextStatusLabel = nextStatus
+          ? {
+              confirmed: "Đã xác nhận",
+              shipping: "Đang vận chuyển",
+              completed: "Đã hoàn thành",
+            }[nextStatus]
+          : null;
+        const statusItems: MenuProps["items"] = [
+          ...(nextStatus && nextStatusLabel
+            ? [{ key: nextStatus, label: nextStatusLabel }]
+            : []),
+          ...(record.status !== "cancelled"
+            ? [{ key: "cancelled", label: "Đã hủy", danger: true }]
+            : []),
+        ];
+
+        return (
+          <Space>
           <Button
             type="link"
             size="small"
@@ -482,34 +530,7 @@ export default function OrdersPage() {
           </Button>
           <Dropdown
             menu={{
-              items: [
-                {
-                  key: "pending",
-                  label: "Chờ xác nhận",
-                  disabled:
-                    record.status === "pending" ||
-                    record.status === "delivered" ||
-                    record.status === "cancelled",
-                },
-                {
-                  key: "processing",
-                  label: "Đang giao",
-                  disabled:
-                    record.status === "processing" ||
-                    record.status === "delivered" ||
-                    record.status === "cancelled",
-                },
-                {
-                  key: "delivered",
-                  label: "Đã giao",
-                  disabled: record.status !== "processing",
-                },
-                {
-                  key: "cancelled",
-                  label: "Đã hủy",
-                  disabled: record.status === "cancelled",
-                },
-              ] as MenuProps["items"],
+              items: statusItems,
               onClick: ({ key }) =>
                 handleStatusChange(record, key as Order["status"]),
             }}
@@ -520,14 +541,17 @@ export default function OrdersPage() {
               icon={<EditOutlined />}
               loading={updatingOrderId === record.id}
               disabled={
-                updatingOrderId === record.id || record.status === "cancelled"
+                updatingOrderId === record.id ||
+                record.status === "cancelled" ||
+                statusItems.length === 0
               }
             >
               Sửa
             </Button>
           </Dropdown>
-        </Space>
-      ),
+          </Space>
+        );
+      },
     },
   ];
 
@@ -535,7 +559,7 @@ export default function OrdersPage() {
     <div style={{ background: "#f5f5f5", minHeight: "100vh" }}>
       {/* Stats Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card>
             <Statistic
               title="Tổng đơn hàng"
@@ -545,23 +569,54 @@ export default function OrdersPage() {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card>
             <Statistic
-              title="Chờ xử lý"
+              title="Chờ xác nhận"
               value={stats.pending}
               prefix={<ClockCircleOutlined />}
               styles={{ content: { color: "#faad14" } }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card>
             <Statistic
-              title="Đang giao"
-              value={stats.processing}
+              title="Đã xác nhận"
+              value={stats.confirmed}
+              prefix={<CheckCircleOutlined />}
+              styles={{ content: { color: "#1677ff" } }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={8} xl={4}>
+          <Card>
+            <Statistic
+              title="Đang vận chuyển"
+              value={stats.shipping}
               prefix={<RocketOutlined />}
               styles={{ content: { color: "#1890ff" } }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={8} xl={4}>
+          <Card>
+            <Statistic
+              title="Đã hoàn thành"
+              value={stats.completed}
+              prefix={<CheckCircleOutlined />}
+              styles={{ content: { color: "#52c41a" } }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={8} xl={4}>
+          <Card>
+            <Statistic
+              title="Doanh thu hoàn thành"
+              value={stats.totalRevenue}
+              formatter={(value) => formatCurrency(Number(value || 0))}
+              prefix={<DollarOutlined />}
+              styles={{ content: { color: "#389e0d", fontSize: 20 } }}
             />
           </Card>
         </Col>

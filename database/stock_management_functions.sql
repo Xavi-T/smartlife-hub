@@ -37,6 +37,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Grant permissions
-GRANT EXECUTE ON FUNCTION increment_product_stock TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION decrement_product_stock TO anon, authenticated;
+-- Chỉ server dùng service role mới được thay đổi tồn kho qua RPC.
+REVOKE ALL ON FUNCTION increment_product_stock(UUID, INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION increment_product_stock(UUID, INTEGER) FROM anon;
+REVOKE ALL ON FUNCTION increment_product_stock(UUID, INTEGER) FROM authenticated;
+GRANT EXECUTE ON FUNCTION increment_product_stock(UUID, INTEGER) TO service_role;
+
+REVOKE ALL ON FUNCTION decrement_product_stock(UUID, INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION decrement_product_stock(UUID, INTEGER) FROM anon;
+REVOKE ALL ON FUNCTION decrement_product_stock(UUID, INTEGER) FROM authenticated;
+GRANT EXECUTE ON FUNCTION decrement_product_stock(UUID, INTEGER) TO service_role;

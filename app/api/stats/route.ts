@@ -16,7 +16,7 @@ export async function GET() {
       total_profit: number;
     }>;
 
-    // Tính tổng doanh thu và lợi nhuận từ các đơn đã giao
+    // View chỉ tổng hợp doanh thu/lợi nhuận từ đơn đã hoàn thành
     const totalRevenue = salesRows.reduce(
       (sum, item) => sum + (item.total_revenue || 0),
       0,

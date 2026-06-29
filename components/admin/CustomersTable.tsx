@@ -119,7 +119,7 @@ export function CustomersTable({
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {customer.deliveredOrders} đã giao
+                    {customer.deliveredOrders} đã hoàn thành
                   </div>
                 </td>
 

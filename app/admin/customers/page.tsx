@@ -135,8 +135,9 @@ export default function CustomersPage() {
   const statusTag = (status: string) => {
     const config = {
       pending: { color: "gold", label: "Chờ xác nhận" },
-      processing: { color: "processing", label: "Đang giao" },
-      delivered: { color: "success", label: "Đã giao" },
+      confirmed: { color: "blue", label: "Đã xác nhận" },
+      shipping: { color: "processing", label: "Đang vận chuyển" },
+      completed: { color: "success", label: "Đã hoàn thành" },
       cancelled: { color: "error", label: "Đã hủy" },
     } as const;
 
@@ -186,7 +187,7 @@ export default function CustomersPage() {
           <Typography.Text strong>{record.totalOrders}</Typography.Text>
           <br />
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {record.deliveredOrders} đã giao
+            {record.deliveredOrders} đã hoàn thành
           </Typography.Text>
         </div>
       ),
@@ -445,7 +446,7 @@ export default function CustomersPage() {
               <Col xs={12} md={6}>
                 <Card size="small">
                   <Statistic
-                    title="Đã giao"
+                    title="Đã hoàn thành"
                     value={customerDetail.stats?.deliveredOrders || 0}
                   />
                 </Card>

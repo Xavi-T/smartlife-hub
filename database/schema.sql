@@ -39,7 +39,13 @@ CREATE INDEX idx_products_name ON products(name);
 -- ===========================================
 -- Bảng ORDERS - Quản lý đơn hàng
 -- ===========================================
-CREATE TYPE order_status AS ENUM ('pending', 'processing', 'delivered', 'cancelled');
+CREATE TYPE order_status AS ENUM (
+  'pending',
+  'confirmed',
+  'shipping',
+  'completed',
+  'cancelled'
+);
 
 CREATE TABLE orders (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -48,6 +54,8 @@ CREATE TABLE orders (
   customer_address TEXT NOT NULL,
   total_amount DECIMAL(12, 2) NOT NULL CHECK (total_amount >= 0),
   status order_status DEFAULT 'pending',
+  order_type VARCHAR(20) NOT NULL DEFAULT 'online'
+    CHECK (order_type IN ('online', 'counter')),
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -83,6 +91,18 @@ CREATE TABLE order_items (
 -- Index cho hiệu suất
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
+
+CREATE TABLE order_status_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  status order_status NOT NULL,
+  note TEXT,
+  created_by TEXT,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_order_status_history_order
+ON order_status_history(order_id, created_at);
 
 -- ===========================================
 -- TRIGGERS - Tự động cập nhật updated_at
@@ -188,6 +208,7 @@ CREATE TRIGGER trigger_update_stock_on_order_item
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_status_history ENABLE ROW LEVEL SECURITY;
 
 -- Policy cho PRODUCTS
 -- Cho phép mọi người xem sản phẩm đang hoạt động
@@ -232,6 +253,10 @@ CREATE POLICY "Admin cập nhật chi tiết đơn hàng"
 
 CREATE POLICY "Admin xóa chi tiết đơn hàng"
   ON order_items FOR DELETE
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated read order status history"
+  ON order_status_history FOR SELECT
   USING (auth.role() = 'authenticated');
 
 -- ===========================================
@@ -304,7 +329,10 @@ SELECT
   COALESCE(SUM(oi.subtotal) - SUM(oi.quantity * p.cost_price), 0) as total_profit
 FROM products p
 LEFT JOIN order_items oi ON p.id = oi.product_id
-LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'cancelled'
+  AND EXISTS (
+    SELECT 1 FROM orders o
+    WHERE o.id = oi.order_id AND o.status = 'completed'
+  )
 GROUP BY p.id, p.name, p.category, p.price, p.cost_price;
 
 -- View thống kê đơn hàng
@@ -313,9 +341,9 @@ WITH (security_invoker = true) AS
 SELECT 
   DATE(o.created_at) as order_date,
   COUNT(DISTINCT o.id) as total_orders,
-  COUNT(DISTINCT CASE WHEN o.status = 'delivered' THEN o.id END) as delivered_orders,
+  COUNT(DISTINCT CASE WHEN o.status = 'completed' THEN o.id END) as delivered_orders,
   COUNT(DISTINCT CASE WHEN o.status = 'cancelled' THEN o.id END) as cancelled_orders,
-  COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total_amount END), 0) as total_revenue
+  COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_amount END), 0) as total_revenue
 FROM orders o
 GROUP BY DATE(o.created_at)
 ORDER BY order_date DESC;
@@ -326,6 +354,7 @@ ORDER BY order_date DESC;
 COMMENT ON TABLE products IS 'Bảng lưu trữ thông tin sản phẩm';
 COMMENT ON TABLE orders IS 'Bảng lưu trữ thông tin đơn hàng';
 COMMENT ON TABLE order_items IS 'Bảng lưu trữ chi tiết sản phẩm trong đơn hàng';
+COMMENT ON TABLE order_status_history IS 'Lịch sử trạng thái và ghi chú đơn hàng';
 
 COMMENT ON COLUMN products.cost_price IS 'Giá vốn - dùng để tính lợi nhuận';
 COMMENT ON COLUMN products.stock_quantity IS 'Số lượng tồn kho hiện tại';

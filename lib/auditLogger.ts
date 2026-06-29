@@ -170,8 +170,9 @@ export const AuditLogger = {
   ) => {
     const statusLabels: Record<string, string> = {
       pending: "Chờ xác nhận",
-      processing: "Đang giao",
-      delivered: "Đã giao",
+      confirmed: "Đã xác nhận",
+      shipping: "Đang vận chuyển",
+      completed: "Đã hoàn thành",
       cancelled: "Đã hủy",
     };
 

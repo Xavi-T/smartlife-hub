@@ -50,11 +50,11 @@ export async function GET() {
     const firstDayThisMonthISO = firstDayThisMonth.toISOString();
     const firstDayLastMonthISO = firstDayLastMonth.toISOString();
 
-    // 1. Tổng doanh thu từ đơn hàng "delivered"
+    // 1. Tổng doanh thu chỉ từ đơn hàng đã hoàn thành
     const { data: revenueData, error: revenueError } = await sb
       .from("orders")
       .select("total_amount")
-      .eq("status", "delivered");
+      .eq("status", "completed");
 
     if (revenueError) throw revenueError;
 
@@ -83,7 +83,7 @@ export async function GET() {
 
     const totalProfit =
       profitData
-        ?.filter((item: any) => item.orders.status === "delivered")
+        ?.filter((item: any) => item.orders.status === "completed")
         .reduce((sum, item: any) => {
           const profit =
             (Number(item.unit_price) - Number(item.products.cost_price)) *
@@ -95,7 +95,7 @@ export async function GET() {
     const { data: thisMonthData, error: thisMonthError } = await sb
       .from("orders")
       .select("total_amount")
-      .eq("status", "delivered")
+      .eq("status", "completed")
       .gte("created_at", firstDayThisMonthISO);
 
     if (thisMonthError) throw thisMonthError;
@@ -113,7 +113,7 @@ export async function GET() {
     const { data: lastMonthData, error: lastMonthError } = await sb
       .from("orders")
       .select("total_amount")
-      .eq("status", "delivered")
+      .eq("status", "completed")
       .gte("created_at", firstDayLastMonthISO)
       .lt("created_at", firstDayThisMonthISO);
 

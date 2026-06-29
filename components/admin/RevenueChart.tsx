@@ -29,7 +29,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
           Doanh thu 7 ngày gần nhất
         </h3>
         <p className="text-sm text-gray-500">
-          Biểu đồ theo dõi doanh thu từ đơn hàng đã giao
+          Biểu đồ doanh thu chỉ từ đơn hàng đã hoàn thành
         </p>
       </div>
 

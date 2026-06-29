@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   Badge,
   Button,
@@ -39,8 +40,8 @@ const { TextArea } = Input;
 const { Text, Title } = Typography;
 
 interface QuickSalesForm {
-  customerName: string;
-  customerPhone: string;
+  customerName?: string;
+  customerPhone?: string;
   customerAddress?: string;
   notes?: string;
   discountEnabled?: boolean;
@@ -299,8 +300,8 @@ export default function QuickSalesPage() {
 
       const result = await createOrder({
         customer: {
-          name: values.customerName.trim(),
-          phone: values.customerPhone.trim(),
+          name: values.customerName?.trim() || "",
+          phone: values.customerPhone?.trim() || "",
           address: values.customerAddress?.trim() || "Mua tại quầy",
           notes: values.notes?.trim() || undefined,
         },
@@ -415,8 +416,8 @@ export default function QuickSalesPage() {
               Bán hàng nhanh tại quầy
             </Title>
             <Text type="secondary">
-              Nhân viên chọn sản phẩm, nhập thông tin khách và tạo đơn ngay tại
-              cửa hàng.
+              Nhân viên chọn sản phẩm và tạo đơn ngay tại cửa hàng. Thông tin
+              khách có thể để trống.
             </Text>
           </Space>
         </Card>
@@ -476,21 +477,70 @@ export default function QuickSalesPage() {
                       }}
                       onClick={() => addToCart(product)}
                     >
-                      <div>
-                        <Space size={8} wrap>
-                          <Text strong>{product.name}</Text>
-                          {effectiveDiscountPercent > 0 && (
-                            <Tag color="red">-{effectiveDiscountPercent}%</Tag>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: "relative",
+                            width: 56,
+                            height: 56,
+                            flexShrink: 0,
+                            overflow: "hidden",
+                            borderRadius: 8,
+                            border: "1px solid #f0f0f0",
+                            background: "#fafafa",
+                          }}
+                        >
+                          {product.image_url ? (
+                            <Image
+                              src={product.image_url}
+                              alt={product.name}
+                              fill
+                              sizes="56px"
+                              style={{ objectFit: "cover" }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                display: "grid",
+                                placeItems: "center",
+                                color: "#bfbfbf",
+                                fontSize: 22,
+                              }}
+                              aria-label="Sản phẩm chưa có ảnh"
+                            >
+                              📦
+                            </div>
                           )}
-                        </Space>
-                        <Space size={8} wrap>
-                          <Text type="secondary">{product.category}</Text>
-                          <Text type="secondary">
-                            Còn {product.stock_quantity}
-                          </Text>
-                        </Space>
+                        </div>
+
+                        <div style={{ minWidth: 0 }}>
+                          <Space size={8} wrap>
+                            <Text strong>{product.name}</Text>
+                            {effectiveDiscountPercent > 0 && (
+                              <Tag color="red">
+                                -{effectiveDiscountPercent}%
+                              </Tag>
+                            )}
+                          </Space>
+                          <Space size={8} wrap>
+                            <Text type="secondary">{product.category}</Text>
+                            <Text type="secondary">
+                              Còn {product.stock_quantity}
+                            </Text>
+                          </Space>
+                        </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
                         <div style={{ color: "#cf1322", fontWeight: 600 }}>
                           {formatCurrency(salePrice)}
                         </div>
@@ -619,17 +669,15 @@ export default function QuickSalesPage() {
             >
               <Form.Item
                 name="customerName"
-                label="Tên khách hàng"
-                rules={[{ required: true, message: "Vui lòng nhập tên khách" }]}
+                label="Tên khách hàng (không bắt buộc)"
               >
                 <Input placeholder="Ví dụ: Khách lẻ" />
               </Form.Item>
 
               <Form.Item
                 name="customerPhone"
-                label="Số điện thoại"
+                label="Số điện thoại (không bắt buộc)"
                 rules={[
-                  { required: true, message: "Vui lòng nhập số điện thoại" },
                   {
                     pattern: /^[0-9\s()+-]{10,20}$/,
                     message: "Số điện thoại không hợp lệ",

@@ -1,4 +1,10 @@
-export type OrderStatus = "pending" | "processing" | "delivered" | "cancelled";
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "shipping"
+  | "completed"
+  | "cancelled";
+export type OrderType = "online" | "counter";
 export type NutritionArticleStatus = "draft" | "published" | "archived";
 export type NutritionGender = "male" | "female" | "other";
 export type NutritionActivityLevel =
@@ -74,6 +80,7 @@ export interface Order {
   customer_address: string;
   total_amount: number;
   status: OrderStatus;
+  order_type?: OrderType;
   checkout_method?: "cod" | "bank_transfer";
   payment_method?: "cod" | "bank_transfer";
   payment_confirmed?: boolean;
@@ -82,6 +89,15 @@ export interface Order {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface OrderStatusHistory {
+  id: string;
+  order_id: string;
+  status: OrderStatus;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface OrderItem {
@@ -253,6 +269,12 @@ export interface Database {
         Row: OrderItem;
         Insert: Omit<OrderItem, "id" | "created_at">;
         Update: Partial<Omit<OrderItem, "id" | "created_at">>;
+        Relationships: [];
+      };
+      order_status_history: {
+        Row: OrderStatusHistory;
+        Insert: Omit<OrderStatusHistory, "id" | "created_at">;
+        Update: Partial<Omit<OrderStatusHistory, "id" | "created_at">>;
         Relationships: [];
       };
       categories: {

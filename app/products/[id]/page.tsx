@@ -420,7 +420,25 @@ export default function ProductDetailPage() {
                     {displayMediaItems.map((media) => (
                       <div
                         key={media.id}
-                        className="relative w-full aspect-square"
+                        className={`relative w-full aspect-square ${
+                          media.media_type === "image" ? "cursor-zoom-in" : ""
+                        }`}
+                        role={media.media_type === "image" ? "button" : undefined}
+                        tabIndex={media.media_type === "image" ? 0 : undefined}
+                        aria-label={
+                          media.media_type === "image"
+                            ? `Xem ảnh lớn của ${product.name}`
+                            : undefined
+                        }
+                        onKeyDown={(event) => {
+                          if (
+                            media.media_type === "image" &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            openImagePreview(media.image_url);
+                          }
+                        }}
                       >
                         {media.media_type === "video" ? (
                           <video
@@ -436,7 +454,6 @@ export default function ProductDetailPage() {
                             sizes="(max-width: 1024px) 100vw, 50vw"
                             className="w-full h-full object-cover"
                             onClick={() => openImagePreview(media.image_url)}
-                            style={{ cursor: "zoom-in" }}
                           />
                         )}
                       </div>
@@ -450,26 +467,36 @@ export default function ProductDetailPage() {
                       controls
                     />
                   ) : (
+                    <button
+                      type="button"
+                      onClick={() => openImagePreview(activeMedia.image_url)}
+                      className="relative block w-full h-full cursor-zoom-in"
+                      aria-label={`Xem ảnh lớn của ${product.name}`}
+                    >
+                      <Image
+                        src={activeMedia.image_url}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  )
+                ) : fallbackMediaUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => openImagePreview(fallbackMediaUrl)}
+                    className="relative block w-full h-full cursor-zoom-in"
+                    aria-label={`Xem ảnh lớn của ${product.name}`}
+                  >
                     <Image
-                      src={activeMedia.image_url}
+                      src={fallbackMediaUrl}
                       alt={product.name}
                       fill
                       sizes="(max-width: 1024px) 100vw, 50vw"
                       className="w-full h-full object-cover"
-                      onClick={() => openImagePreview(activeMedia.image_url)}
-                      style={{ cursor: "zoom-in" }}
                     />
-                  )
-                ) : fallbackMediaUrl ? (
-                  <Image
-                    src={fallbackMediaUrl}
-                    alt={product.name}
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                    className="w-full h-full object-cover"
-                    onClick={() => openImagePreview(fallbackMediaUrl)}
-                    style={{ cursor: "zoom-in" }}
-                  />
+                  </button>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-5xl text-gray-400">
                     📦

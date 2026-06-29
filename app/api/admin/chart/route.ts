@@ -48,7 +48,7 @@ export async function GET() {
     const { data: ordersData, error } = await sb
       .from("orders")
       .select("created_at, total_amount, status")
-      .eq("status", "delivered")
+      .eq("status", "completed")
       .gte("created_at", startDate)
       .order("created_at", { ascending: true });
 

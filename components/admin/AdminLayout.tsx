@@ -325,6 +325,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   // Handle menu click
   const handleMenuClick: MenuProps["onClick"] = (e) => {
+    setMobileDrawerOpen(false);
     router.push(e.key);
   };
 

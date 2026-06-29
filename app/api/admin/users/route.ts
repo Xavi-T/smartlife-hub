@@ -83,8 +83,8 @@ export async function GET() {
     const rows = data?.users || [];
     rows.forEach((row) => {
       const role =
-        normalizeRole(row.user_metadata?.role) ||
         normalizeRole(row.app_metadata?.role) ||
+        normalizeRole(row.user_metadata?.role) ||
         "employee";
 
       users.push({
@@ -148,8 +148,8 @@ export async function POST(request: Request) {
     email_confirm: true,
     user_metadata: {
       fullName,
-      role,
     },
+    app_metadata: { role },
   });
 
   if (error) {
@@ -196,8 +196,8 @@ export async function PATCH(request: Request) {
   const { error } = await serviceClient.auth.admin.updateUserById(userId, {
     user_metadata: {
       fullName,
-      role,
     },
+    app_metadata: { role },
   });
 
   if (error) {

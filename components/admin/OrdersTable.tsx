@@ -24,7 +24,12 @@ interface Order {
   customer_phone: string;
   customer_address: string;
   total_amount: number;
-  status: "pending" | "processing" | "delivered" | "cancelled";
+  status:
+    | "pending"
+    | "confirmed"
+    | "shipping"
+    | "completed"
+    | "cancelled";
   notes: string | null;
   created_at: string;
   order_items: OrderItem[];
@@ -45,15 +50,17 @@ export function OrdersTable({
 
   const statusColors = {
     pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    processing: "bg-blue-100 text-blue-800 border-blue-200",
-    delivered: "bg-green-100 text-green-800 border-green-200",
+    confirmed: "bg-blue-100 text-blue-800 border-blue-200",
+    shipping: "bg-cyan-100 text-cyan-800 border-cyan-200",
+    completed: "bg-green-100 text-green-800 border-green-200",
     cancelled: "bg-red-100 text-red-800 border-red-200",
   };
 
   const statusLabels = {
     pending: "Chờ xác nhận",
-    processing: "Đang giao",
-    delivered: "Đã giao",
+    confirmed: "Đã xác nhận",
+    shipping: "Đang vận chuyển",
+    completed: "Đã hoàn thành",
     cancelled: "Đã hủy",
   };
 
@@ -61,8 +68,9 @@ export function OrdersTable({
     if (newStatus === order.status) return;
 
     const confirmMessages = {
-      processing: "Xác nhận đơn hàng này? Hàng sẽ được trừ khỏi kho.",
-      delivered: "Đánh dấu đơn hàng này đã giao?",
+      confirmed: "Xác nhận đơn hàng này?",
+      shipping: "Đánh dấu đơn hàng đang được vận chuyển?",
+      completed: "Đánh dấu đơn hàng đã hoàn thành?",
       cancelled: "Hủy đơn hàng này? Hàng sẽ được hoàn về kho.",
     };
 
@@ -78,7 +86,6 @@ export function OrdersTable({
         body: JSON.stringify({
           orderId: order.id,
           newStatus,
-          currentStatus: order.status,
         }),
       });
 
@@ -90,8 +97,12 @@ export function OrdersTable({
 
       toast.success(data.message || "Đã cập nhật trạng thái đơn hàng");
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.message || "Đã xảy ra lỗi khi cập nhật");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Đã xảy ra lỗi khi cập nhật",
+      );
     } finally {
       setUpdatingOrderId(null);
     }
@@ -193,24 +204,27 @@ export function OrdersTable({
                           handleStatusChange(order, e.target.value)
                         }
                         disabled={
-                          order.status === "delivered" ||
+                          order.status === "completed" ||
                           order.status === "cancelled"
                         }
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
                           statusColors[order.status]
                         } ${
-                          order.status === "delivered" ||
+                          order.status === "completed" ||
                           order.status === "cancelled"
                             ? "cursor-not-allowed opacity-75"
                             : "cursor-pointer hover:opacity-80"
                         }`}
                       >
                         <option value="pending">{statusLabels.pending}</option>
-                        <option value="processing">
-                          {statusLabels.processing}
+                        <option value="confirmed">
+                          {statusLabels.confirmed}
                         </option>
-                        <option value="delivered">
-                          {statusLabels.delivered}
+                        <option value="shipping">
+                          {statusLabels.shipping}
+                        </option>
+                        <option value="completed">
+                          {statusLabels.completed}
                         </option>
                         <option value="cancelled">
                           {statusLabels.cancelled}
