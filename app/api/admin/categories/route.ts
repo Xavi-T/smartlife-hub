@@ -1,31 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { isAdminAuthFailure, requireAdminRole } from "@/lib/adminAuth";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase-admin";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "Đã xảy ra lỗi";
-}
-
-async function createApiSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    },
-  );
 }
 
 function slugify(value: string): string {
@@ -33,25 +12,75 @@ function slugify(value: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/đ/g, "d")
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
+function getAdminClient() {
+  const client = createServiceRoleSupabaseClient();
+  if (!client) {
+    throw new Error("Thiếu cấu hình SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return client;
+}
+
+function migrationErrorResponse(error: { code?: string; message?: string }) {
+  if (
+    error.code === "PGRST202" ||
+    error.message?.includes("Could not find the function")
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Chưa cài đặt chức năng quản lý danh mục. Hãy chạy file database/category_management_schema.sql trên Supabase.",
+      },
+      { status: 503 },
+    );
+  }
+
+  return null;
+}
+
+function parseName(body: Record<string, unknown>): {
+  name: string;
+  slugBase: string;
+} {
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+
+  if (!name) {
+    throw new Error("Tên danh mục là bắt buộc");
+  }
+
+  if (name.length > 100) {
+    throw new Error("Tên danh mục tối đa 100 ký tự");
+  }
+
+  const slugBase = slugify(name);
+  if (!slugBase) {
+    throw new Error("Tên danh mục không hợp lệ");
+  }
+
+  return { name, slugBase };
+}
+
 export async function GET() {
   try {
-    const supabase = await createApiSupabaseClient();
-    const { data: categories, error } = await supabase
-      .from("categories")
-      .select("id, name, slug, is_active, created_at, updated_at")
-      .order("name", { ascending: true });
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
+
+    const supabase = getAdminClient();
+    const [{ data: categories, error }, { data: links, error: linkError }] =
+      await Promise.all([
+        supabase
+          .from("categories")
+          .select("id, name, slug, is_active, created_at, updated_at")
+          .order("name", { ascending: true }),
+        supabase.from("product_categories").select("category_id"),
+      ]);
 
     if (error) throw error;
-
-    const { data: links, error: linkError } = await supabase
-      .from("product_categories")
-      .select("category_id");
-
     if (linkError) throw linkError;
 
     const productCountMap = (links || []).reduce<Record<string, number>>(
@@ -63,9 +92,9 @@ export async function GET() {
     );
 
     return NextResponse.json({
-      categories: (categories || []).map((cat) => ({
-        ...cat,
-        product_count: productCountMap[cat.id] || 0,
+      categories: (categories || []).map((category) => ({
+        ...category,
+        product_count: productCountMap[category.id] || 0,
       })),
     });
   } catch (error: unknown) {
@@ -79,108 +108,154 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createApiSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Bạn chưa đăng nhập" },
-        { status: 401 },
-      );
+    const body = (await request.json()) as Record<string, unknown>;
+    const { name, slugBase } = parseName(body);
+    const supabase = getAdminClient();
+    const { data, error } = await supabase.rpc("save_product_category", {
+      p_category_id: null,
+      p_name: name,
+      p_slug_base: slugBase,
+    });
+
+    if (error) {
+      const migrationResponse = migrationErrorResponse(error);
+      if (migrationResponse) return migrationResponse;
+      throw error;
     }
 
-    const body = await request.json();
-    const rawName = typeof body.name === "string" ? body.name.trim() : "";
-
-    if (!rawName) {
-      return NextResponse.json(
-        { error: "Tên danh mục là bắt buộc" },
-        { status: 400 },
-      );
-    }
-
-    const slug = slugify(rawName);
-    if (!slug) {
-      return NextResponse.json(
-        { error: "Tên danh mục không hợp lệ" },
-        { status: 400 },
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("categories")
-      .upsert(
-        {
-          name: rawName,
-          slug,
-          is_active: true,
-        },
-        { onConflict: "slug" },
-      )
-      .select("id, name, slug, is_active, created_at, updated_at")
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, category: data });
+    return NextResponse.json({
+      success: true,
+      category: data?.category,
+    });
   } catch (error: unknown) {
     console.error("Error creating category:", error);
     return NextResponse.json(
       { error: getErrorMessage(error) || "Không thể tạo danh mục" },
-      { status: 500 },
+      { status: 400 },
     );
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createApiSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Bạn chưa đăng nhập" },
-        { status: 401 },
-      );
+    const body = (await request.json()) as Record<string, unknown>;
+    const action = body.action === "merge" ? "merge" : "update";
+    const { name, slugBase } = parseName(body);
+    const supabase = getAdminClient();
+
+    if (action === "merge") {
+      const categoryIds = Array.isArray(body.ids)
+        ? body.ids.filter(
+            (value): value is string =>
+              typeof value === "string" && value.length > 0,
+          )
+        : [];
+
+      if (new Set(categoryIds).size < 2) {
+        return NextResponse.json(
+          { error: "Cần chọn ít nhất 2 danh mục để gộp" },
+          { status: 400 },
+        );
+      }
+
+      const { data, error } = await supabase.rpc("merge_product_categories", {
+        p_category_ids: categoryIds,
+        p_name: name,
+        p_slug_base: slugBase,
+      });
+
+      if (error) {
+        const migrationResponse = migrationErrorResponse(error);
+        if (migrationResponse) return migrationResponse;
+        throw error;
+      }
+
+      return NextResponse.json({ success: true, ...data });
     }
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
+    const categoryId =
+      typeof body.id === "string" ? body.id.trim() : "";
+    if (!categoryId) {
       return NextResponse.json(
         { error: "Category ID là bắt buộc" },
         { status: 400 },
       );
     }
 
-    const { count, error: countError } = await supabase
-      .from("product_categories")
-      .select("id", { count: "exact", head: true })
-      .eq("category_id", id);
+    const { data, error } = await supabase.rpc("save_product_category", {
+      p_category_id: categoryId,
+      p_name: name,
+      p_slug_base: slugBase,
+    });
 
-    if (countError) throw countError;
+    if (error) {
+      const migrationResponse = migrationErrorResponse(error);
+      if (migrationResponse) return migrationResponse;
+      throw error;
+    }
 
-    if ((count || 0) > 0) {
+    return NextResponse.json({ success: true, ...data });
+  } catch (error: unknown) {
+    console.error("Error updating categories:", error);
+    return NextResponse.json(
+      { error: getErrorMessage(error) || "Không thể cập nhật danh mục" },
+      { status: 400 },
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requireAdminRole();
+    if (isAdminAuthFailure(auth)) return auth.response;
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      // Keep compatibility with the old single-delete query parameter.
+    }
+
+    const queryId = new URL(request.url).searchParams.get("id");
+    const categoryIds = Array.isArray(body.ids)
+      ? body.ids.filter(
+          (value): value is string =>
+            typeof value === "string" && value.length > 0,
+        )
+      : queryId
+        ? [queryId]
+        : [];
+
+    if (categoryIds.length === 0) {
       return NextResponse.json(
-        { error: "Danh mục đang được sử dụng bởi sản phẩm" },
+        { error: "Chưa chọn danh mục cần xóa" },
         { status: 400 },
       );
     }
 
-    const { error } = await supabase.from("categories").delete().eq("id", id);
-    if (error) throw error;
+    const supabase = getAdminClient();
+    const { data, error } = await supabase.rpc("delete_product_categories", {
+      p_category_ids: categoryIds,
+    });
 
-    return NextResponse.json({ success: true });
+    if (error) {
+      const migrationResponse = migrationErrorResponse(error);
+      if (migrationResponse) return migrationResponse;
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, ...data });
   } catch (error: unknown) {
-    console.error("Error deleting category:", error);
+    console.error("Error deleting categories:", error);
     return NextResponse.json(
       { error: getErrorMessage(error) || "Không thể xóa danh mục" },
-      { status: 500 },
+      { status: 400 },
     );
   }
 }
