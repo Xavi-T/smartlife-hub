@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Badge,
@@ -76,6 +76,10 @@ interface RecentOrder {
   order_items: RecentOrderItem[];
 }
 
+interface ProductSearchResponse {
+  items: Product[];
+}
+
 export default function QuickSalesPage() {
   const [form] = Form.useForm<QuickSalesForm>();
   const [messageApi, contextHolder] = message.useMessage();
@@ -95,10 +99,14 @@ export default function QuickSalesPage() {
       | "order_total"
       | "product_items"
       | undefined) || "order_total";
-  const discountProductPercentsWatch =
-    (Form.useWatch("discountProductPercents", form) as
-      | Record<string, number | undefined>
-      | undefined) || {};
+  const watchedDiscountProductPercents = Form.useWatch(
+    "discountProductPercents",
+    form,
+  ) as Record<string, number | undefined> | undefined;
+  const discountProductPercentsWatch = useMemo(
+    () => watchedDiscountProductPercents || {},
+    [watchedDiscountProductPercents],
+  );
   const appliedDiscountPercent = discountEnabledWatch
     ? Math.min(100, Math.max(0, discountPercentWatch))
     : 0;
@@ -137,29 +145,61 @@ export default function QuickSalesPage() {
     }
   }, [cart, discountProductPercentsWatch, form]);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
+  const fetchProducts = useCallback(
+    async (query: string, signal?: AbortSignal) => {
+      setIsLoadingProducts(true);
       try {
-        const res = await fetch(
-          `/api/products?activeOnly=true&noCache=1&t=${Date.now()}`,
-          { cache: "no-store" },
-        );
+        const params = new URLSearchParams({
+          paginated: "1",
+          view: "quick",
+          activeOnly: "true",
+          inStock: "true",
+          noCache: "1",
+          page: "1",
+          pageSize: "30",
+          sort: "popular",
+        });
+        if (query.trim()) {
+          params.set("search", query.trim());
+        }
+
+        const res = await fetch(`/api/products?${params.toString()}`, {
+          cache: "no-store",
+          signal,
+        });
         if (!res.ok) throw new Error("Không thể tải sản phẩm");
-        const data = (await res.json()) as Product[];
-        setProducts(data.filter((product) => product.stock_quantity > 0));
+        const data = (await res.json()) as ProductSearchResponse;
+        if (!signal?.aborted) {
+          setProducts(Array.isArray(data.items) ? data.items : []);
+        }
       } catch (error) {
+        if (signal?.aborted) return;
         const errorMessage =
           error instanceof Error ? error.message : "Không thể tải sản phẩm";
         messageApi.error(errorMessage);
       } finally {
-        setIsLoadingProducts(false);
+        if (!signal?.aborted) {
+          setIsLoadingProducts(false);
+        }
       }
+    },
+    [messageApi],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => fetchProducts(searchQuery, controller.signal),
+      searchQuery.trim() ? 250 : 0,
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
+  }, [fetchProducts, searchQuery]);
 
-    fetchProducts();
-  }, [messageApi]);
-
-  const fetchRecentOrders = async () => {
+  const fetchRecentOrders = useCallback(async () => {
     try {
       setIsLoadingRecentOrders(true);
       const res = await fetch("/api/admin/orders");
@@ -173,22 +213,13 @@ export default function QuickSalesPage() {
     } finally {
       setIsLoadingRecentOrders(false);
     }
-  };
+  }, [messageApi]);
 
   useEffect(() => {
     fetchRecentOrders();
-  }, []);
+  }, [fetchRecentOrders]);
 
-  const filteredProducts = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
-    if (!keyword) return products;
-
-    return products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(keyword) ||
-        product.category.toLowerCase().includes(keyword),
-    );
-  }, [products, searchQuery]);
+  const filteredProducts = products;
 
   const addToCart = (product: Product) => {
     setCart((prev) => {
@@ -332,16 +363,7 @@ export default function QuickSalesPage() {
       setCart([]);
       setSearchQuery("");
 
-      const productsRes = await fetch(
-        `/api/products?activeOnly=true&noCache=1&t=${Date.now()}`,
-        { cache: "no-store" },
-      );
-      if (productsRes.ok) {
-        const latestProducts = (await productsRes.json()) as Product[];
-        setProducts(
-          latestProducts.filter((product) => product.stock_quantity > 0),
-        );
-      }
+      await fetchProducts("");
 
       await fetchRecentOrders();
     } catch (error) {

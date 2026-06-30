@@ -44,6 +44,15 @@ type ProductWithRelations = Database["public"]["Tables"]["products"]["Row"] & {
   product_categories?: ProductCategoryRelation[];
   product_images?: ProductImageRelation[];
 };
+
+type ProductListView = "public" | "admin" | "quick";
+type ProductListSort =
+  | "popular"
+  | "newest"
+  | "bestseller"
+  | "price_asc"
+  | "price_desc";
+
 interface ProductImageStorageRow {
   id: string;
   storage_path: string | null;
@@ -111,6 +120,34 @@ function parseOptionalTimestamp(value: unknown): {
   }
 
   return { value: parsed.toISOString(), invalid: false };
+}
+
+function parsePositiveInteger(
+  value: string | null,
+  fallback: number,
+  maximum: number,
+): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, maximum);
+}
+
+function normalizeSearchTerm(value: string | null): string {
+  return String(value || "")
+    .trim()
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
+function getCategoryList(product: ProductWithRelations): CategoryRow[] {
+  return (product.product_categories || [])
+    .map((relation) => relation.categories)
+    .filter((category): category is CategoryRow => Boolean(category))
+    .filter(
+      (category, index, list) =>
+        list.findIndex((item) => item.id === category.id) === index,
+    );
 }
 
 async function createApiSupabaseClient() {
@@ -468,13 +505,260 @@ async function syncProductVariants(
 // GET: Lấy danh sách sản phẩm
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createPublicSupabaseClient();
-    scheduleExpiredDiscountCleanup();
     const { searchParams } = new URL(request.url);
+    const usePagination =
+      searchParams.get("paginated") === "1" ||
+      searchParams.get("paginated") === "true";
+    const view = (["public", "admin", "quick"].includes(
+      searchParams.get("view") || "",
+    )
+      ? searchParams.get("view")
+      : "public") as ProductListView;
+
+    if (usePagination && view === "admin") {
+      const auth = await requireAdminRole();
+      if (isAdminAuthFailure(auth)) return auth.response;
+    }
+
+    const supabase = usePagination
+      ? await createApiSupabaseClient()
+      : createPublicSupabaseClient();
+    scheduleExpiredDiscountCleanup();
     const activeOnly = searchParams.get("activeOnly") === "true";
     const noCache =
       searchParams.get("noCache") === "1" ||
       searchParams.get("noCache") === "true";
+
+    if (usePagination) {
+      const page = parsePositiveInteger(searchParams.get("page"), 1, 100000);
+      const defaultPageSize = view === "quick" ? 30 : 24;
+      const pageSize = parsePositiveInteger(
+        searchParams.get("pageSize"),
+        defaultPageSize,
+        100,
+      );
+      const search = normalizeSearchTerm(searchParams.get("search"));
+      const category = String(searchParams.get("category") || "").trim();
+      const status = String(searchParams.get("status") || "all");
+      const inStock = searchParams.get("inStock") === "true";
+      const discounted = searchParams.get("discounted") === "true";
+      const includeFacets = searchParams.get("includeFacets") === "true";
+      const includeStats = view === "admin" &&
+        searchParams.get("includeStats") === "true";
+      const requestedSort = String(
+        searchParams.get("sort") || "popular",
+      ) as ProductListSort;
+      const sort: ProductListSort = [
+        "popular",
+        "newest",
+        "bestseller",
+        "price_asc",
+        "price_desc",
+      ].includes(requestedSort)
+        ? requestedSort
+        : "popular";
+
+      let categoryProductIds: string[] | null = null;
+      if (category && category !== "all") {
+        const { data: categoryRows, error: categoryError } = await supabase
+          .from("categories")
+          .select("id")
+          .eq("name", category);
+        if (categoryError) throw categoryError;
+
+        const categoryIds = (categoryRows || []).map((item) => item.id);
+        if (categoryIds.length === 0) {
+          categoryProductIds = [];
+        } else {
+          const { data: categoryLinks, error: categoryLinksError } =
+            await supabase
+              .from("product_categories")
+              .select("product_id")
+              .in("category_id", categoryIds);
+          if (categoryLinksError) throw categoryLinksError;
+          categoryProductIds = Array.from(
+            new Set((categoryLinks || []).map((item) => item.product_id)),
+          );
+        }
+      }
+
+      const managementFields =
+        view === "admin" ? "description, cost_price," : "";
+      const listSelect = `
+        id,
+        name,
+        price,
+        ${managementFields}
+        stock_quantity,
+        category,
+        image_url,
+        discount_percent,
+        discount_start_at,
+        discount_end_at,
+        price_on_request,
+        is_active,
+        created_at,
+        updated_at,
+        product_categories(
+          category_id,
+          categories(
+            id,
+            name,
+            slug
+          )
+        )
+      `;
+
+      let query = supabase
+        .from("products")
+        .select(listSelect, { count: "exact" });
+
+      if (activeOnly || view !== "admin" || status === "active") {
+        query = query.eq("is_active", true);
+      } else if (status === "inactive") {
+        query = query.eq("is_active", false);
+      }
+
+      if (status === "low-stock") {
+        query = query.eq("is_active", true).lt("stock_quantity", 10);
+      }
+      if (inStock) {
+        query = query.gt("stock_quantity", 0);
+      }
+      if (discounted) {
+        const now = new Date().toISOString();
+        query = query
+          .gt("discount_percent", 0)
+          .lte("discount_start_at", now)
+          .gte("discount_end_at", now);
+      }
+      if (search) {
+        query = query.or(
+          `name.ilike.%${search}%,description.ilike.%${search}%,category.ilike.%${search}%`,
+        );
+      }
+      if (categoryProductIds) {
+        if (categoryProductIds.length === 0) {
+          query = query.eq(
+            "id",
+            "00000000-0000-0000-0000-000000000000",
+          );
+        } else {
+          query = query.in("id", categoryProductIds);
+        }
+      }
+
+      if (sort === "price_asc" || sort === "price_desc") {
+        query = query.order("price", {
+          ascending: sort === "price_asc",
+        });
+      } else if (sort === "newest") {
+        query = query.order("created_at", { ascending: false });
+      } else if (sort === "bestseller") {
+        query = query
+          .order("stock_quantity", { ascending: true })
+          .order("discount_percent", { ascending: false });
+      } else {
+        query = query.order("updated_at", { ascending: false });
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const { data: rows, error, count } = await query
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+
+      const items = ((rows || []) as unknown as ProductWithRelations[]).map(
+        (product) => ({
+          ...product,
+          categories: getCategoryList(product),
+        }),
+      );
+
+      let categoryFacets: Array<{ name: string; count: number }> = [];
+      if (includeFacets) {
+        let facetQuery = supabase
+          .from("products")
+          .select("category")
+          .not("category", "is", null);
+        if (view !== "admin" || activeOnly) {
+          facetQuery = facetQuery.eq("is_active", true);
+        }
+
+        const { data: facetRows, error: facetError } = await facetQuery;
+        if (facetError) throw facetError;
+
+        const categoryCounts = new Map<string, number>();
+        (facetRows || []).forEach((item) => {
+          const name = String(item.category || "").trim();
+          if (!name) return;
+          categoryCounts.set(name, (categoryCounts.get(name) || 0) + 1);
+        });
+        categoryFacets = Array.from(categoryCounts.entries())
+          .sort((first, second) => first[0].localeCompare(second[0], "vi"))
+          .map(([name, categoryCount]) => ({
+            name,
+            count: categoryCount,
+          }));
+      }
+
+      let stats:
+        | {
+            total: number;
+            active: number;
+            lowStock: number;
+            totalValue: number;
+            categoryCount: number;
+          }
+        | undefined;
+      if (includeStats) {
+        const { data: statRows, error: statError } = await supabase
+          .from("products")
+          .select("price, stock_quantity, is_active, category");
+        if (statError) throw statError;
+
+        const allProducts = statRows || [];
+        stats = {
+          total: allProducts.length,
+          active: allProducts.filter((item) => item.is_active).length,
+          lowStock: allProducts.filter(
+            (item) => item.is_active && item.stock_quantity < 10,
+          ).length,
+          totalValue: allProducts.reduce(
+            (sum, item) =>
+              sum + Number(item.price || 0) * Number(item.stock_quantity || 0),
+            0,
+          ),
+          categoryCount: new Set(
+            allProducts
+              .map((item) => String(item.category || "").trim())
+              .filter(Boolean),
+          ).size,
+        };
+      }
+
+      const total = count || 0;
+      return NextResponse.json(
+        {
+          items,
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+          facets: { categories: categoryFacets },
+          stats,
+        },
+        {
+          headers: {
+            "Cache-Control":
+              view === "public" && !noCache
+                ? "public, max-age=60, stale-while-revalidate=300"
+                : "no-store",
+          },
+        },
+      );
+    }
 
     let query = supabase.from("products").select(
       `
@@ -530,13 +814,7 @@ export async function GET(request: NextRequest) {
     });
 
     const mappedProducts = productList.map((product) => {
-      const categories = (product.product_categories || [])
-        .map((relation) => relation.categories)
-        .filter((category): category is CategoryRow => Boolean(category))
-        .filter(
-          (category, index, list) =>
-            list.findIndex((item) => item.id === category.id) === index,
-        );
+      const categories = getCategoryList(product);
 
       return {
         ...product,

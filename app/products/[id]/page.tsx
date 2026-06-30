@@ -95,29 +95,25 @@ export default function ProductDetailPage() {
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const [productsRes, mediaRes] = await Promise.all([
-          fetch("/api/products?activeOnly=true"),
-          fetch(`/api/products/${productId}/media`),
-        ]);
-
-        if (!productsRes.ok) {
+        const response = await fetch(`/api/products/${productId}`);
+        if (!response.ok) {
           throw new Error("Không thể tải sản phẩm");
         }
 
-        const products = (await productsRes.json()) as Product[];
-        const foundProduct =
-          products.find((item) => item.id === productId) || null;
+        const result = (await response.json()) as {
+          product: Product | null;
+          relatedProducts?: Product[];
+          media?: ProductMedia[];
+        };
+        const foundProduct = result.product || null;
         setProduct(foundProduct);
 
         if (foundProduct) {
-          const related = products
-            .filter(
-              (item) =>
-                item.id !== foundProduct.id &&
-                item.category === foundProduct.category,
-            )
-            .slice(0, 4);
-          setRelatedProducts(related);
+          setRelatedProducts(
+            Array.isArray(result.relatedProducts)
+              ? result.relatedProducts
+              : [],
+          );
           setQuantity(1);
           const variants = Array.isArray(foundProduct.variants)
             ? (foundProduct.variants as ProductVariant[])
@@ -131,13 +127,8 @@ export default function ProductDetailPage() {
           setSelectedVariantId(null);
         }
 
-        if (mediaRes.ok) {
-          const media = (await mediaRes.json()) as ProductMedia[];
-          setMediaItems(media);
-          setActiveMediaIndex(0);
-        } else {
-          setMediaItems([]);
-        }
+        setMediaItems(Array.isArray(result.media) ? result.media : []);
+        setActiveMediaIndex(0);
       } catch (error) {
         const errorMessage =
           error instanceof Error

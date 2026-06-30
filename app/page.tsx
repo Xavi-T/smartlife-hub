@@ -48,6 +48,17 @@ type CarouselItem = {
   type: "image" | "video";
 };
 
+interface ProductPageResponse {
+  items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  facets?: {
+    categories?: Array<{ name: string; count: number }>;
+  };
+}
+
 const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
   {
     image: "/banners/banner-nutrition-consulting.svg",
@@ -71,22 +82,9 @@ const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
   },
 ];
 const CLIENT_CACHE_TTL_MS = 2 * 60 * 1000;
-const MOBILE_PRODUCTS_STEP = 8;
-const DESKTOP_PRODUCTS_STEP = 12;
-const MOBILE_MEDIA_QUERY = "(max-width: 767px)";
+const PRODUCT_PAGE_SIZE = 24;
 const DEPRECATED_BANNER_PATH = "/banners/banner-default-smartlife.svg";
 
-const normalizeText = (value: string | null | undefined) =>
-  (value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase()
-    .trim();
-
-let cachedProducts: Product[] | null = null;
-let cachedProductsAt = 0;
 let cachedCarouselItems: CarouselItem[] | null = null;
 let cachedCarouselAt = 0;
 
@@ -159,13 +157,18 @@ function HomeContent() {
     undefined,
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [categoryFacets, setCategoryFacets] = useState<
+    Array<{ name: string; count: number }>
+  >([]);
   const [carouselItems, setCarouselItems] = useState<CarouselItem[]>(
     DEFAULT_CAROUSEL_ITEMS,
   );
-  const [isMobileView, setIsMobileView] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(DESKTOP_PRODUCTS_STEP);
 
   const {
     cart,
@@ -177,32 +180,82 @@ function HomeContent() {
     isLoaded,
   } = useCart();
 
-  const fetchProducts = useCallback(async (signal?: AbortSignal) => {
-    if (cachedProducts && isCacheFresh(cachedProductsAt)) {
-      setProducts(cachedProducts);
-      setIsLoading(false);
-      return;
-    }
+  const fetchProducts = useCallback(
+    async (page: number, reset: boolean, signal?: AbortSignal) => {
+      if (reset) {
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
 
-    try {
-      const res = await fetch("/api/products?activeOnly=true", { signal });
-      if (!res.ok) throw new Error("Failed to fetch products");
-      const data = await res.json();
-      if (signal?.aborted) return;
-      const activeProducts = data.filter((p: Product) => p.is_active);
-      cachedProducts = activeProducts;
-      cachedProductsAt = Date.now();
-      setProducts(activeProducts);
-    } catch (error) {
-      if (!signal?.aborted) {
-        console.error("Error fetching products:", error);
+      try {
+        const params = new URLSearchParams({
+          paginated: "1",
+          view: "public",
+          activeOnly: "true",
+          page: String(page),
+          pageSize: String(PRODUCT_PAGE_SIZE),
+          includeFacets: reset ? "true" : "false",
+          sort: priceSort
+            ? priceSort === "asc"
+              ? "price_asc"
+              : "price_desc"
+            : sortType,
+        });
+
+        if (debouncedSearchQuery.trim()) {
+          params.set("search", debouncedSearchQuery.trim());
+        }
+        if (selectedCategory) {
+          params.set("category", selectedCategory);
+        }
+        if (onlyDiscounted) {
+          params.set("discounted", "true");
+        }
+
+        const response = await fetch(`/api/products?${params.toString()}`, {
+          signal,
+        });
+        if (!response.ok) throw new Error("Failed to fetch products");
+
+        const result = (await response.json()) as ProductPageResponse;
+        if (signal?.aborted) return;
+
+        setProducts((currentProducts) => {
+          if (reset) return result.items || [];
+
+          const merged = [...currentProducts, ...(result.items || [])];
+          return merged.filter(
+            (product, index, list) =>
+              list.findIndex((item) => item.id === product.id) === index,
+          );
+        });
+        setCurrentPage(result.page || page);
+        setTotalProducts(result.total || 0);
+        if (reset && Array.isArray(result.facets?.categories)) {
+          setCategoryFacets(result.facets.categories);
+        }
+      } catch (error) {
+        if (!signal?.aborted) {
+          console.error("Error fetching products:", error);
+          messageApi.error("Không thể tải danh sách sản phẩm");
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        }
       }
-    } finally {
-      if (!signal?.aborted) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
+    },
+    [
+      debouncedSearchQuery,
+      messageApi,
+      onlyDiscounted,
+      priceSort,
+      selectedCategory,
+      sortType,
+    ],
+  );
 
   const fetchHomepageBanners = useCallback(async (signal?: AbortSignal) => {
     if (cachedCarouselItems && isCacheFresh(cachedCarouselAt)) {
@@ -240,28 +293,23 @@ function HomeContent() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetchProducts(controller.signal);
-    fetchHomepageBanners(controller.signal);
-
-    return () => {
-      controller.abort();
-    };
-  }, [fetchHomepageBanners, fetchProducts]);
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
-    const updateMobileState = () => {
-      setIsMobileView(mediaQuery.matches);
-    };
+    const controller = new AbortController();
+    fetchProducts(1, true, controller.signal);
+    return () => controller.abort();
+  }, [fetchProducts]);
 
-    updateMobileState();
-    mediaQuery.addEventListener("change", updateMobileState);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateMobileState);
-    };
-  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchHomepageBanners(controller.signal);
+    return () => controller.abort();
+  }, [fetchHomepageBanners]);
 
   const handleAddToCart = (product: Product) => {
     if (isPriceOnRequestProduct(product)) {
@@ -285,111 +333,13 @@ function HomeContent() {
   };
 
   const categoryOptions = useMemo(() => {
-    const grouped = new Map<string, number>();
-    products.forEach((item) => {
-      grouped.set(item.category, (grouped.get(item.category) || 0) + 1);
-    });
+    return categoryFacets.map((category) => ({
+      label: `${category.name} (${category.count})`,
+      value: category.name,
+    }));
+  }, [categoryFacets]);
 
-    return Array.from(grouped.entries())
-      .sort((first, second) => first[0].localeCompare(second[0], "vi"))
-      .map(([category, count]) => ({
-        label: `${category} (${count})`,
-        value: category,
-      }));
-  }, [products]);
-
-  const searchableProducts = useMemo(
-    () =>
-      products.map((item) => ({
-        product: item,
-        searchIndex: normalizeText(
-          `${item.name} ${item.category} ${item.description || ""}`,
-        ),
-      })),
-    [products],
-  );
-
-  const filteredProducts = useMemo(() => {
-    const normalizedQuery = normalizeText(searchQuery);
-
-    return searchableProducts
-      .filter(({ product, searchIndex }) => {
-        const item = product;
-
-        if (selectedCategory && item.category !== selectedCategory) {
-          return false;
-        }
-
-        if (onlyDiscounted && Number(item.discount_percent || 0) <= 0) {
-          return false;
-        }
-
-        if (normalizedQuery) {
-          if (!searchIndex.includes(normalizedQuery)) {
-            return false;
-          }
-        }
-
-        return true;
-      })
-      .map(({ product }) => product);
-  }, [onlyDiscounted, searchQuery, searchableProducts, selectedCategory]);
-
-  const visibleProducts = useMemo(() => {
-    const getFinalPrice = (item: Product) =>
-      item.price * (1 - (item.discount_percent || 0) / 100);
-
-    const cloned = [...filteredProducts];
-
-    if (priceSort) {
-      return cloned.sort((a, b) => {
-        const aPrice = getFinalPrice(a);
-        const bPrice = getFinalPrice(b);
-        return priceSort === "asc" ? aPrice - bPrice : bPrice - aPrice;
-      });
-    }
-
-    if (sortType === "newest") {
-      return cloned.sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-    }
-
-    if (sortType === "bestseller") {
-      return cloned.sort((a, b) => {
-        const stockDiff = a.stock_quantity - b.stock_quantity;
-        if (stockDiff !== 0) return stockDiff;
-        return (b.discount_percent || 0) - (a.discount_percent || 0);
-      });
-    }
-
-    return cloned.sort(
-      (a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-    );
-  }, [filteredProducts, priceSort, sortType]);
-
-  const productsStep = isMobileView
-    ? MOBILE_PRODUCTS_STEP
-    : DESKTOP_PRODUCTS_STEP;
-
-  const hasMoreProducts = visibleProducts.length > visibleCount;
-
-  useEffect(() => {
-    setVisibleCount(productsStep);
-  }, [
-    productsStep,
-    selectedCategory,
-    searchQuery,
-    onlyDiscounted,
-    sortType,
-    priceSort,
-  ]);
-
-  const displayedProducts = useMemo(() => {
-    return visibleProducts.slice(0, visibleCount);
-  }, [visibleCount, visibleProducts]);
+  const hasMoreProducts = products.length < totalProducts;
 
   const resetFilters = () => {
     setSelectedCategory(undefined);
@@ -673,12 +623,12 @@ function HomeContent() {
                 Sản phẩm dinh dưỡng & chăm sóc sức khỏe
               </Typography.Title>
               <Typography.Text type="secondary">
-                {visibleProducts.length} sản phẩm phù hợp
+                {totalProducts} sản phẩm phù hợp
               </Typography.Text>
             </div>
           </div>
           <ProductGrid
-            products={displayedProducts}
+            products={products}
             onAddToCart={handleAddToCart}
             onViewDetail={handleViewDetail}
           />
@@ -688,11 +638,8 @@ function HomeContent() {
           <div className="mt-4 flex justify-center py-1 md:py-2">
             <Button
               type="primary"
-              onClick={() =>
-                setVisibleCount((prev) =>
-                  Math.min(prev + productsStep, visibleProducts.length),
-                )
-              }
+              loading={isLoadingMore}
+              onClick={() => fetchProducts(currentPage + 1, false)}
             >
               Hiển thị thêm
             </Button>
@@ -700,7 +647,7 @@ function HomeContent() {
         )}
 
         {/* Empty State */}
-        {visibleProducts.length === 0 && (
+        {products.length === 0 && (
           <Card style={{ marginTop: 16 }}>
             <Empty
               description="Không có sản phẩm phù hợp bộ lọc"

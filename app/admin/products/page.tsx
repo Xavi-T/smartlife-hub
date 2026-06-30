@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -47,6 +47,25 @@ function stripHtmlTags(value: string): string {
     .trim();
 }
 
+interface ProductAdminStats {
+  total: number;
+  active: number;
+  lowStock: number;
+  totalValue: number;
+  categoryCount: number;
+}
+
+interface ProductAdminPageResponse {
+  items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  facets?: {
+    categories?: Array<{ name: string; count: number }>;
+  };
+  stats?: ProductAdminStats;
+}
+
 export default function ProductsPage() {
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
@@ -54,18 +73,59 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [stats, setStats] = useState<ProductAdminStats>({
+    total: 0,
+    active: 0,
+    lowStock: 0,
+    totalValue: 0,
+    categoryCount: 0,
+  });
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch(`/api/products?activeOnly=false&t=${Date.now()}`, {
+      const params = new URLSearchParams({
+        paginated: "1",
+        view: "admin",
+        activeOnly: "false",
+        noCache: "1",
+        page: String(page),
+        pageSize: String(pageSize),
+        status: statusFilter,
+        includeFacets: "true",
+        includeStats: "true",
+        sort: "popular",
+      });
+      if (debouncedSearchQuery.trim()) {
+        params.set("search", debouncedSearchQuery.trim());
+      }
+      if (selectedCategory !== "all") {
+        params.set("category", selectedCategory);
+      }
+
+      const res = await fetch(`/api/products?${params.toString()}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("Failed to fetch products");
-      const data = await res.json();
-      setProducts(data);
+      const data = (await res.json()) as ProductAdminPageResponse;
+      setProducts(Array.isArray(data.items) ? data.items : []);
+      setTotalProducts(data.total || 0);
+      setCategories(
+        Array.isArray(data.facets?.categories)
+          ? data.facets.categories.map((category) => category.name)
+          : [],
+      );
+      if (data.stats) {
+        setStats(data.stats);
+      }
     } catch (error) {
       console.error("Error fetching products:", error);
       messageApi.error("Không thể tải danh sách sản phẩm");
@@ -73,55 +133,26 @@ export default function ProductsPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [messageApi]);
+  }, [
+    debouncedSearchQuery,
+    messageApi,
+    page,
+    pageSize,
+    selectedCategory,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Get unique categories
-  const categories = useMemo(() => {
-    const cats = new Set(products.flatMap((p) => getProductCategoryNames(p)));
-    return Array.from(cats).sort();
-  }, [products]);
-
-  // Filter products
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesSearch =
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesCategory =
-        selectedCategory === "all" ||
-        getProductCategoryNames(product).includes(selectedCategory);
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && product.is_active) ||
-        (statusFilter === "inactive" && !product.is_active) ||
-        (statusFilter === "low-stock" &&
-          product.stock_quantity < 10 &&
-          product.is_active);
-
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
-  }, [products, searchQuery, selectedCategory, statusFilter]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const activeCount = products.filter((p) => p.is_active).length;
-    const totalValue = products.reduce(
-      (sum, p) => sum + p.price * p.stock_quantity,
-      0,
+  useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery),
+      300,
     );
-    const lowStockCount = products.filter(
-      (p) => p.stock_quantity < 10 && p.is_active,
-    ).length;
-    const categoryCount = new Set(products.map((p) => p.category)).size;
-
-    return { activeCount, totalValue, lowStockCount, categoryCount };
-  }, [products]);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -391,9 +422,9 @@ export default function ProductsPage() {
           <Card>
             <Statistic
               title="Tổng sản phẩm"
-              value={stats.activeCount}
+              value={stats.active}
               prefix={<AppstoreOutlined style={{ color: "#1890ff" }} />}
-              suffix={`/ ${products.length}`}
+              suffix={`/ ${stats.total}`}
             />
           </Card>
         </Col>
@@ -412,10 +443,10 @@ export default function ProductsPage() {
           <Card>
             <Statistic
               title="Sắp hết hàng"
-              value={stats.lowStockCount}
+              value={stats.lowStock}
               prefix={<AlertOutlined style={{ color: "#ff4d4f" }} />}
               style={{
-                color: stats.lowStockCount > 0 ? "#ff4d4f" : undefined,
+                color: stats.lowStock > 0 ? "#ff4d4f" : undefined,
               }}
             />
           </Card>
@@ -439,7 +470,10 @@ export default function ProductsPage() {
               placeholder="Tìm kiếm sản phẩm..."
               prefix={<SearchOutlined />}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
               allowClear
             />
           </Col>
@@ -448,7 +482,10 @@ export default function ProductsPage() {
               style={{ width: "100%" }}
               placeholder="Danh mục"
               value={selectedCategory}
-              onChange={setSelectedCategory}
+              onChange={(value) => {
+                setSelectedCategory(value);
+                setPage(1);
+              }}
               options={[
                 { label: "Tất cả danh mục", value: "all" },
                 ...categories.map((cat) => ({ label: cat, value: cat })),
@@ -460,7 +497,10 @@ export default function ProductsPage() {
               style={{ width: "100%" }}
               placeholder="Trạng thái"
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
               options={[
                 { label: "Tất cả", value: "all" },
                 { label: "Đang hiển thị", value: "active" },
@@ -476,13 +516,19 @@ export default function ProductsPage() {
       <Card>
         <Table
           columns={columns}
-          dataSource={filteredProducts}
+          dataSource={products}
           rowKey="id"
           loading={isLoading}
           pagination={{
-            pageSize: 20,
+            current: page,
+            pageSize,
+            total: totalProducts,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} sản phẩm`,
+          }}
+          onChange={(pagination) => {
+            setPage(pagination.current || 1);
+            setPageSize(pagination.pageSize || 20);
           }}
           scroll={{ x: 1200 }}
         />
