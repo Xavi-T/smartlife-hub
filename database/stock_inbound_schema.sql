@@ -28,7 +28,7 @@ CREATE POLICY "Allow insert to stock_inbound" ON stock_inbound
   FOR INSERT WITH CHECK (true);
 
 -- ===========================================
--- Function: Tính Giá Vốn Bình Quân Gia Quyền
+-- Function: Tính Giá Vốn Bình quân giá
 -- ===========================================
 -- Công thức: (Số lượng cũ × Giá cũ + Số lượng mới × Giá mới) / (Số lượng cũ + Số lượng mới)
 
@@ -54,7 +54,7 @@ BEGIN
     RETURN p_new_cost;
   END IF;
 
-  -- Tính giá vốn bình quân gia quyền
+  -- Tính giá vốn Bình quân giá
   v_weighted_avg_cost := (
     (v_current_quantity * v_current_cost) + (p_new_quantity * p_new_cost)
   ) / (v_current_quantity + p_new_quantity);
@@ -85,7 +85,7 @@ DECLARE
   v_inbound_id UUID;
   v_result JSON;
 BEGIN
-  -- Tính giá vốn bình quân gia quyền mới
+  -- Tính giá vốn Bình quân giá mới
   v_new_avg_cost := calculate_weighted_average_cost(
     p_product_id,
     p_quantity_added,

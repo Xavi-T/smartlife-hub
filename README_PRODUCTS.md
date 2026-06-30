@@ -62,9 +62,9 @@ Trang quản lý tồn kho và nhập hàng:
 
 - Click vào sản phẩm → Modal đầy đủ
 - Nhập đầy đủ: số lượng, giá vốn, nhà cung cấp, ghi chú
-- Preview giá vốn bình quân gia quyền
+- Preview giá vốn Bình quân giá
 
-#### 💰 Tính Giá Vốn Bình Quân Gia Quyền
+#### 💰 Tính Giá Vốn Bình quân giá
 
 Công thức:
 

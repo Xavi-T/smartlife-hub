@@ -324,7 +324,7 @@ export function StockInboundModal({
             initialValue="weighted_average"
           >
             <Radio.Group>
-              <Radio value="weighted_average">Bình quân gia quyền</Radio>
+              <Radio value="weighted_average">Bình quân giá</Radio>
               <Radio value="latest_cost" style={{ marginLeft: 16 }}>
                 Lấy giá nhập mới nhất
               </Radio>

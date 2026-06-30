@@ -167,7 +167,7 @@ export function QuickStockForm({
                 message: "Giá vốn phải lớn hơn hoặc bằng 0",
               },
             ]}
-            tooltip="Giá vốn của lô hàng đang nhập. Hệ thống sẽ tính giá vốn bình quân gia quyền."
+            tooltip="Giá vốn của lô hàng đang nhập. Hệ thống sẽ tính giá vốn Bình quân giá."
           >
             <InputNumber<number>
               placeholder="Nhập giá vốn..."
