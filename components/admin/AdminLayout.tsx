@@ -34,6 +34,7 @@ import {
   MenuUnfoldOutlined,
   HistoryOutlined,
   AuditOutlined,
+  FilePdfOutlined,
   DownOutlined,
 } from "@ant-design/icons";
 import { Toaster } from "sonner";
@@ -164,6 +165,19 @@ const menuItems: MenuProps["items"] = [
     key: "/admin/nutrition/clinical-calculator",
     icon: <CalculatorOutlined />,
     label: "Phối khẩu phần",
+  },
+  {
+    type: "divider",
+  },
+  {
+    key: "tax-reporting",
+    label: "Báo cáo & thuế",
+    type: "group",
+  },
+  {
+    key: "/admin/tax-reports/s1a-hkd",
+    icon: <FilePdfOutlined />,
+    label: "Sổ S1a-HKD",
   },
   {
     type: "divider",
@@ -393,6 +407,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       "stock-inbound": "Nhập kho",
       "stock-history": "Lịch sử kho",
       "audit-logs": "Nhật ký hoạt động",
+      "tax-reports": "Báo cáo & thuế",
+      "s1a-hkd": "Sổ S1a-HKD",
       users: "Quản lý users",
     };
 
