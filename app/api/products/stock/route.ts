@@ -2,19 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthFailure, requireAdminRole } from "@/lib/adminAuth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase-admin";
 
-interface StockRpcClient {
-  rpc(
-    functionName: "increment_product_stock" | "decrement_product_stock",
-    args: {
-      product_uuid: string;
-      quantity_to_add?: number;
-      quantity_to_subtract?: number;
-    },
-  ): PromiseLike<{
-    error: { message?: string } | null;
-  }>;
-}
-
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await requireAdminRole();
@@ -28,7 +15,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { productId, quantity } = await request.json();
+    const { productId, quantity, reason } = await request.json();
     const normalizedQuantity = Number(quantity);
 
     if (
@@ -42,18 +29,32 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const stockRpcClient = sb as unknown as StockRpcClient;
-    const { error: updateError } =
-      normalizedQuantity > 0
-        ? await stockRpcClient.rpc("increment_product_stock", {
-            product_uuid: productId,
-            quantity_to_add: normalizedQuantity,
-          })
-        : await stockRpcClient.rpc("decrement_product_stock", {
-            product_uuid: productId,
-            quantity_to_subtract: Math.abs(normalizedQuantity),
-          });
-    if (updateError) throw updateError;
+    const normalizedReason =
+      String(reason || "").trim() || "Điều chỉnh tồn kho thủ công";
+    const { error: updateError } = await sb.rpc(
+      "adjust_product_stock_with_history",
+      {
+        p_product_id: productId,
+        p_quantity_delta: normalizedQuantity,
+        p_reason: normalizedReason,
+        p_changed_by: auth.user.email || auth.user.id,
+      },
+    );
+    if (updateError) {
+      if (
+        updateError.code === "PGRST202" ||
+        updateError.message?.includes("adjust_product_stock_with_history")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Chưa cài đặt lịch sử điều chỉnh kho. Hãy chạy database/tax_readiness_schema.sql trên Supabase.",
+          },
+          { status: 503 },
+        );
+      }
+      throw updateError;
+    }
 
     const { data, error: fetchError } = await sb
       .from("products")

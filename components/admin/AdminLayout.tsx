@@ -35,6 +35,8 @@ import {
   HistoryOutlined,
   AuditOutlined,
   FilePdfOutlined,
+  ProfileOutlined,
+  WalletOutlined,
   DownOutlined,
 } from "@ant-design/icons";
 import { Toaster } from "sonner";
@@ -175,9 +177,24 @@ const menuItems: MenuProps["items"] = [
     type: "group",
   },
   {
+    key: "/admin/tax-reports",
+    icon: <DashboardOutlined />,
+    label: "Tổng quan thuế",
+  },
+  {
     key: "/admin/tax-reports/s1a-hkd",
     icon: <FilePdfOutlined />,
     label: "Sổ S1a-HKD",
+  },
+  {
+    key: "/admin/tax-reports/transactions",
+    icon: <WalletOutlined />,
+    label: "Sổ thu–chi",
+  },
+  {
+    key: "/admin/tax-reports/product-tax-profiles",
+    icon: <ProfileOutlined />,
+    label: "Hồ sơ thuế SP",
   },
   {
     type: "divider",
@@ -409,6 +426,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       "audit-logs": "Nhật ký hoạt động",
       "tax-reports": "Báo cáo & thuế",
       "s1a-hkd": "Sổ S1a-HKD",
+      transactions: "Sổ thu–chi",
+      "product-tax-profiles": "Hồ sơ thuế sản phẩm",
       users: "Quản lý users",
     };
 
