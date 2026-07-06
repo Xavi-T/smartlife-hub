@@ -27,6 +27,32 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value:
+              "private, no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "private, no-store, max-age=0",
+          },
+          {
+            key: "Vercel-CDN-Cache-Control",
+            value: "private, no-store, max-age=0",
+          },
+          {
+            key: "Pragma",
+            value: "no-cache",
+          },
+          {
+            key: "Expires",
+            value: "0",
+          },
+        ],
+      },
+      {
         source:
           "/:all*(svg|jpg|jpeg|png|webp|avif|gif|ico|woff|woff2|ttf|otf)",
         headers: [

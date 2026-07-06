@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -88,6 +88,7 @@ export default function MediaManagerPage() {
   const [purposeFilter, setPurposeFilter] = useState<string>("all");
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+  const mediaRequestRef = useRef<AbortController | null>(null);
   const selectedUploadPurpose = Form.useWatch("purpose", uploadForm);
 
   const handlePasteToDragger = (
@@ -125,6 +126,9 @@ export default function MediaManagerPage() {
   };
 
   const fetchMedia = async (params?: { q?: string; purpose?: string }) => {
+    mediaRequestRef.current?.abort();
+    const controller = new AbortController();
+    mediaRequestRef.current = controller;
     const q = params?.q ?? search;
     const purpose = params?.purpose ?? purposeFilter;
 
@@ -134,28 +138,35 @@ export default function MediaManagerPage() {
       if (q.trim()) query.set("q", q.trim());
       if (purpose !== "all") query.set("purpose", purpose);
 
-      const response = await fetch(`/api/admin/media?${query.toString()}`);
+      const response = await fetch(`/api/admin/media?${query.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.error || "Không thể tải danh sách media");
       }
 
-      setItems(Array.isArray(result.media) ? result.media : []);
+      if (!controller.signal.aborted) {
+        setItems(Array.isArray(result.media) ? result.media : []);
+      }
     } catch (error: unknown) {
+      if (controller.signal.aborted) return;
       messageApi.error(
         error instanceof Error
           ? error.message
           : "Không thể tải danh sách media",
       );
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
     uploadForm.setFieldsValue({ purpose: "site_logo", displayOrder: 1 });
     fetchMedia({ q: "", purpose: "all" });
+    return () => mediaRequestRef.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -89,7 +89,7 @@ export default function ProductsPage() {
   });
 
   // Fetch products
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -113,9 +113,11 @@ export default function ProductsPage() {
 
       const res = await fetch(`/api/products?${params.toString()}`, {
         cache: "no-store",
+        signal,
       });
       if (!res.ok) throw new Error("Failed to fetch products");
       const data = (await res.json()) as ProductAdminPageResponse;
+      if (signal?.aborted) return;
       setProducts(Array.isArray(data.items) ? data.items : []);
       setTotalProducts(data.total || 0);
       setCategories(
@@ -127,11 +129,14 @@ export default function ProductsPage() {
         setStats(data.stats);
       }
     } catch (error) {
+      if (signal?.aborted) return;
       console.error("Error fetching products:", error);
       messageApi.error("Không thể tải danh sách sản phẩm");
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, [
     debouncedSearchQuery,
@@ -143,7 +148,9 @@ export default function ProductsPage() {
   ]);
 
   useEffect(() => {
-    fetchProducts();
+    const controller = new AbortController();
+    fetchProducts(controller.signal);
+    return () => controller.abort();
   }, [fetchProducts]);
 
   useEffect(() => {

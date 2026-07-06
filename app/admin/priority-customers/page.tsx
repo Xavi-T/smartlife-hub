@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Button,
@@ -79,6 +79,7 @@ function PriorityCustomersContent() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [activeFilter, setActiveFilter] = useState<string>("all");
 
@@ -96,6 +97,7 @@ function PriorityCustomersContent() {
   }>();
 
   const [segmentDrafts, setSegmentDrafts] = useState<SegmentSetting[]>([]);
+  const latestCustomerRequestRef = useRef(0);
 
   const examplePhone = useMemo(
     () => APP_CONFIG.shopPhone.replace(/\D/g, "") || "0901234567",
@@ -110,7 +112,9 @@ function PriorityCustomersContent() {
   }, [searchParams]);
 
   const fetchSegments = async () => {
-    const response = await fetch("/api/admin/priority-customers/segments");
+    const response = await fetch("/api/admin/priority-customers/segments", {
+      cache: "no-store",
+    });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
       throw new Error(result.error || "Không thể tải phân loại khách hàng");
@@ -123,19 +127,29 @@ function PriorityCustomersContent() {
     setSegmentDrafts(loadedSegments);
   };
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (signal?: AbortSignal) => {
+    const requestId = ++latestCustomerRequestRef.current;
     const params = new URLSearchParams();
-    if (query.trim()) params.set("search", query.trim());
+    if (debouncedQuery) params.set("search", debouncedQuery);
     if (segmentFilter !== "all") params.set("segment", segmentFilter);
     if (activeFilter !== "all") params.set("active", activeFilter);
 
-    const response = await fetch(`/api/admin/priority-customers?${params}`);
+    const response = await fetch(`/api/admin/priority-customers?${params}`, {
+      cache: "no-store",
+      signal,
+    });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
       throw new Error(result.error || "Không thể tải khách hàng ưu tiên");
     }
 
     const result = await response.json();
+    if (
+      signal?.aborted ||
+      requestId !== latestCustomerRequestRef.current
+    ) {
+      return;
+    }
     setCustomers(Array.isArray(result.customers) ? result.customers : []);
   };
 
@@ -154,15 +168,29 @@ function PriorityCustomersContent() {
 
   useEffect(() => {
     fetchAll();
+    // Initial load only; filtered searches are handled by the abortable effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchCustomers().catch((error: unknown) => {
+    const timeoutId = window.setTimeout(
+      () => setDebouncedQuery(query.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [query]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCustomers(controller.signal).catch((error: unknown) => {
+      if (controller.signal.aborted) return;
       messageApi.error(
         error instanceof Error ? error.message : "Không thể tải dữ liệu",
       );
     });
-  }, [query, segmentFilter, activeFilter]);
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, segmentFilter, activeFilter]);
 
   const stats = useMemo(() => {
     const total = customers.length;

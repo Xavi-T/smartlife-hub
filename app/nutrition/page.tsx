@@ -73,6 +73,7 @@ function NutritionContent() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
+      setIsLoading(true);
       setDebouncedSearch(searchInput);
     }, SEARCH_DEBOUNCE_MS);
 
@@ -88,8 +89,8 @@ function NutritionContent() {
     const query = new URLSearchParams();
     if (debouncedSearch.trim()) query.set("search", debouncedSearch.trim());
     if (category) query.set("category", category);
-
     fetch(`/api/nutrition/articles?${query.toString()}`, {
+      cache: "no-store",
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -207,10 +208,7 @@ function NutritionContent() {
               allowClear
               placeholder="Tìm bài viết theo tiêu đề"
               value={searchInput}
-              onChange={(event) => {
-                setIsLoading(true);
-                setSearchInput(event.target.value);
-              }}
+              onChange={(event) => setSearchInput(event.target.value)}
               onSearch={(value) => {
                 setIsLoading(true);
                 setSearchInput(value);
@@ -240,17 +238,14 @@ function NutritionContent() {
           />
         ) : null}
 
-        {isLoading ? (
-          <div style={{ padding: 40, textAlign: "center" }}>
-            <Spin size="large" />
-          </div>
-        ) : articles.length === 0 ? (
-          <Card>
-            <Empty description="Chưa có bài viết phù hợp" />
-          </Card>
-        ) : (
-          <div className="sl-animate-in sl-animate-delay-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {articles.map((article) => (
+        <Spin spinning={isLoading} tip="Đang cập nhật kết quả...">
+          {articles.length === 0 ? (
+            <Card>
+              <Empty description="Chưa có bài viết phù hợp" />
+            </Card>
+          ) : (
+            <div className="sl-animate-in sl-animate-delay-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {articles.map((article) => (
               <Link
                 key={article.id}
                 href={`/nutrition/${article.slug}`}
@@ -319,9 +314,10 @@ function NutritionContent() {
                   </Space>
                 </Card>
               </Link>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </Spin>
       </main>
 
       <CartModal

@@ -174,6 +174,7 @@ export default function PublicNutritionCalculatorPage() {
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/products?activeOnly=true", {
+      cache: "no-store",
       signal: controller.signal,
     })
       .then(async (response) => {

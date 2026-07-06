@@ -3,11 +3,9 @@ import { useState, useEffect, useRef } from "react";
 import {
   Menu,
   Search,
-  Plus,
   ShoppingCart,
   Package,
   X,
-  Phone,
   User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -24,6 +22,27 @@ interface SearchResult {
   title: string;
   subtitle: string;
   href: string;
+}
+
+interface ProductSearchItem {
+  id: string;
+  name: string;
+  category: string;
+  stock_quantity: number;
+}
+
+interface CustomerSearchItem {
+  phone: string;
+  name: string;
+  totalOrders: number;
+}
+
+interface PriorityCustomerSearchItem {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_segment: string;
+  discount_percent: number;
 }
 
 export function AdminHeader({
@@ -46,24 +65,50 @@ export function AdminHeader({
       return;
     }
 
+    const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       setIsSearching(true);
       try {
         const results: SearchResult[] = [];
+        const search = searchQuery.trim();
+        const productParams = new URLSearchParams({
+          paginated: "1",
+          view: "admin",
+          activeOnly: "false",
+          page: "1",
+          pageSize: "3",
+          search,
+        });
+        const customerParams = new URLSearchParams({ search });
+        const priorityParams = new URLSearchParams({
+          search,
+          active: "active",
+        });
 
-        // Search products
-        const productsRes = await fetch(
-          `/api/products?noCache=1&t=${Date.now()}`,
-          { cache: "no-store" },
-        );
+        const [productsRes, customersRes, priorityCustomersRes] =
+          await Promise.all([
+            fetch(`/api/products?${productParams}`, {
+              cache: "no-store",
+              signal: controller.signal,
+            }),
+            fetch(`/api/admin/customers?${customerParams}`, {
+              cache: "no-store",
+              signal: controller.signal,
+            }),
+            fetch(`/api/admin/priority-customers?${priorityParams}`, {
+              cache: "no-store",
+              signal: controller.signal,
+            }),
+          ]);
+
         if (productsRes.ok) {
-          const products = await productsRes.json();
-          const matchedProducts = products
-            .filter((p: any) =>
-              p.name.toLowerCase().includes(searchQuery.toLowerCase()),
-            )
+          const productResult = await productsRes.json();
+          const products = Array.isArray(productResult.items)
+            ? productResult.items
+            : [];
+          const matchedProducts = (products as ProductSearchItem[])
             .slice(0, 3)
-            .map((p: any) => ({
+            .map((p) => ({
               type: "product" as const,
               id: p.id,
               title: p.name,
@@ -73,31 +118,31 @@ export function AdminHeader({
           results.push(...matchedProducts);
         }
 
-        // Search customers by phone
-        const customersRes = await fetch(
-          `/api/admin/customers?search=${searchQuery}`,
-        );
         if (customersRes.ok) {
           const { customers } = await customersRes.json();
-          const matchedCustomers = customers.slice(0, 3).map((c: any) => ({
-            type: "customer" as const,
-            id: c.phone,
-            title: c.name,
-            subtitle: `${c.phone} - ${c.totalOrders} đơn hàng`,
-            href: `/admin/customers?search=${c.phone}`,
-          }));
+          const matchedCustomers = (
+            (Array.isArray(customers) ? customers : []) as CustomerSearchItem[]
+          )
+            .slice(0, 3)
+            .map((c) => ({
+              type: "customer" as const,
+              id: c.phone,
+              title: c.name,
+              subtitle: `${c.phone} - ${c.totalOrders} đơn hàng`,
+              href: `/admin/customers?search=${c.phone}`,
+            }));
           results.push(...matchedCustomers);
         }
 
-        // Search priority customers
-        const priorityCustomersRes = await fetch(
-          `/api/admin/priority-customers?search=${searchQuery}&active=active`,
-        );
         if (priorityCustomersRes.ok) {
           const { customers } = await priorityCustomersRes.json();
-          const matchedPriorityCustomers = (customers || [])
+          const matchedPriorityCustomers = (
+            (Array.isArray(customers)
+              ? customers
+              : []) as PriorityCustomerSearchItem[]
+          )
             .slice(0, 3)
-            .map((c: any) => ({
+            .map((c) => ({
               type: "priority_customer" as const,
               id: c.id,
               title: c.customer_name,
@@ -107,16 +152,22 @@ export function AdminHeader({
           results.push(...matchedPriorityCustomers);
         }
 
-        setSearchResults(results);
-        setShowResults(true);
+        if (!controller.signal.aborted) {
+          setSearchResults(results);
+          setShowResults(true);
+        }
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error("Search error:", error);
       } finally {
-        setIsSearching(false);
+        if (!controller.signal.aborted) setIsSearching(false);
       }
     }, 300);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   // Close search results when clicking outside

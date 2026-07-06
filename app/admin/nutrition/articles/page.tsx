@@ -77,35 +77,42 @@ export default function NutritionArticlesAdminPage() {
   const [editingArticle, setEditingArticle] = useState<ArticleRow | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const editorContent = Form.useWatch("content", form) || "";
 
-  const fetchArticles = useCallback(async () => {
+  const fetchArticles = useCallback(async (signal?: AbortSignal) => {
+    setIsRefreshing(true);
     try {
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.set("status", statusFilter);
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch) params.set("search", debouncedSearch);
       const response = await fetch(
         `/api/admin/nutrition/articles?${params.toString()}`,
+        { cache: "no-store", signal },
       );
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Không thể tải bài viết");
       }
+      if (signal?.aborted) return;
       setArticles(Array.isArray(result.articles) ? result.articles : []);
     } catch (error: unknown) {
+      if (signal?.aborted) return;
       messageApi.error(
         error instanceof Error ? error.message : "Không thể tải bài viết",
       );
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [messageApi, search, statusFilter]);
+  }, [debouncedSearch, messageApi, statusFilter]);
 
   const fetchSupportingData = useCallback(async () => {
     try {
       const [categoriesRes, productsRes] = await Promise.all([
-        fetch("/api/admin/nutrition/categories"),
+        fetch("/api/admin/nutrition/categories", { cache: "no-store" }),
         fetch(`/api/products?activeOnly=true&noCache=1&t=${Date.now()}`, {
           cache: "no-store",
         }),
@@ -130,7 +137,17 @@ export default function NutritionArticlesAdminPage() {
   }, []);
 
   useEffect(() => {
-    fetchArticles();
+    const timeoutId = window.setTimeout(
+      () => setDebouncedSearch(search.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchArticles(controller.signal);
+    return () => controller.abort();
   }, [fetchArticles]);
 
   useEffect(() => {
@@ -455,7 +472,7 @@ export default function NutritionArticlesAdminPage() {
 
         <Table
           rowKey="id"
-          loading={isLoading}
+          loading={isLoading || isRefreshing}
           dataSource={articles}
           columns={columns}
           pagination={{ pageSize: 10 }}

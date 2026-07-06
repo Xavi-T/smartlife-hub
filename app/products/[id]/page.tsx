@@ -93,9 +93,13 @@ export default function ProductDetailPage() {
   const productId = String(params.id || "");
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchDetail = async () => {
       try {
-        const response = await fetch(`/api/products/${productId}`);
+        const response = await fetch(`/api/products/${productId}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!response.ok) {
           throw new Error("Không thể tải sản phẩm");
         }
@@ -130,19 +134,21 @@ export default function ProductDetailPage() {
         setMediaItems(Array.isArray(result.media) ? result.media : []);
         setActiveMediaIndex(0);
       } catch (error) {
+        if (controller.signal.aborted) return;
         const errorMessage =
           error instanceof Error
             ? error.message
             : "Không thể tải chi tiết sản phẩm";
         messageApi.error(errorMessage);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     if (productId) {
       fetchDetail();
     }
+    return () => controller.abort();
   }, [productId, messageApi]);
 
   useEffect(() => {

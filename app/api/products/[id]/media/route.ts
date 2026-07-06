@@ -61,7 +61,7 @@ export async function GET(
 
     return NextResponse.json(mapped, {
       headers: {
-        "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+        "Cache-Control": "private, no-store, no-cache, max-age=0",
       },
     });
   } catch (error) {

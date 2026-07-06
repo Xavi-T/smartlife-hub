@@ -243,6 +243,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       try {
         setIsPrioritySearching(true);
@@ -254,8 +255,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
         const response = await fetch(
           `/api/admin/priority-customers?${params.toString()}`,
+          { cache: "no-store", signal: controller.signal },
         );
 
+        if (controller.signal.aborted) return;
         if (!response.ok) {
           setPriorityCustomers([]);
           return;
@@ -265,14 +268,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         const rows = Array.isArray(result.customers) ? result.customers : [];
         setPriorityCustomers(rows.slice(0, 8));
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error("Error searching priority customers:", error);
         setPriorityCustomers([]);
       } finally {
-        setIsPrioritySearching(false);
+        if (!controller.signal.aborted) setIsPrioritySearching(false);
       }
     }, 300);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [prioritySearch]);
 
   const filteredMenuItems = useMemo(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -53,6 +53,29 @@ interface CustomerStats {
   averageLTV: number;
 }
 
+interface CustomerOrder {
+  id: string;
+  created_at: string;
+  status: "pending" | "confirmed" | "shipping" | "completed" | "cancelled";
+  total_amount: number;
+}
+
+interface CustomerDetail {
+  customer?: {
+    name: string;
+    phone: string;
+    address: string;
+    customerType: string;
+  };
+  stats?: {
+    totalOrders: number;
+    deliveredOrders: number;
+    totalSpent: number;
+    averageOrderValue: number;
+  };
+  orders?: CustomerOrder[];
+}
+
 export default function CustomersPage() {
   const [messageApi, contextHolder] = message.useMessage();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -60,32 +83,40 @@ export default function CustomersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [customerTypeFilter, setCustomerTypeFilter] = useState("all");
 
   // Detail modal state
-  const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
-  const [customerDetail, setCustomerDetail] = useState<any>(null);
+  const [customerDetail, setCustomerDetail] =
+    useState<CustomerDetail | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
-  const fetchCustomers = async () => {
-    if (!isLoading) setIsRefreshing(true);
+  const fetchCustomers = useCallback(async (signal?: AbortSignal) => {
+    setIsRefreshing(true);
     try {
       const params = new URLSearchParams();
-      if (searchQuery) params.append("search", searchQuery);
+      if (debouncedSearchQuery) {
+        params.append("search", debouncedSearchQuery);
+      }
       if (customerTypeFilter !== "all")
         params.append("type", customerTypeFilter);
 
-      const res = await fetch(`/api/admin/customers?${params}`);
+      const res = await fetch(`/api/admin/customers?${params}`, {
+        cache: "no-store",
+        signal,
+      });
       if (!res.ok) {
         const errorResult = await res.json().catch(() => ({}));
         throw new Error(errorResult.error || "Failed to fetch");
       }
 
       const data = await res.json();
+      if (signal?.aborted) return;
       setCustomers(data.customers);
       setStats(data.stats);
     } catch (error: unknown) {
+      if (signal?.aborted) return;
       console.error("Error fetching customers:", error);
       messageApi.error(
         error instanceof Error
@@ -93,14 +124,26 @@ export default function CustomersPage() {
           : "Không thể tải danh sách khách hàng",
       );
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  };
+  }, [customerTypeFilter, debouncedSearchQuery, messageApi]);
 
   useEffect(() => {
-    fetchCustomers();
-  }, [searchQuery, customerTypeFilter]);
+    const timeoutId = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCustomers(controller.signal);
+    return () => controller.abort();
+  }, [fetchCustomers]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -108,13 +151,13 @@ export default function CustomersPage() {
   };
 
   const handleCustomerClick = async (phone: string) => {
-    setSelectedPhone(phone);
     setIsDetailModalOpen(true);
     setIsLoadingDetail(true);
 
     try {
       const res = await fetch(
         `/api/admin/customers/${encodeURIComponent(phone)}`,
+        { cache: "no-store" },
       );
       if (!res.ok) {
         const errorResult = await res.json().catch(() => ({}));
@@ -235,11 +278,11 @@ export default function CustomersPage() {
     },
   ];
 
-  const orderHistoryColumns: ColumnsType<any> = [
+  const orderHistoryColumns: ColumnsType<CustomerOrder> = [
     {
       title: "Mã đơn",
       key: "id",
-      render: (_: unknown, order: any) => (
+      render: (_: unknown, order) => (
         <Typography.Text strong>
           #{order.id.slice(0, 8).toUpperCase()}
         </Typography.Text>
@@ -249,21 +292,21 @@ export default function CustomersPage() {
     {
       title: "Ngày đặt",
       key: "created_at",
-      render: (_: unknown, order: any) =>
+      render: (_: unknown, order) =>
         new Date(order.created_at).toLocaleString("vi-VN"),
       width: 220,
     },
     {
       title: "Trạng thái",
       key: "status",
-      render: (_: unknown, order: any) => statusTag(order.status),
+      render: (_: unknown, order) => statusTag(order.status),
       width: 150,
     },
     {
       title: "Tổng tiền",
       key: "total_amount",
       align: "right",
-      render: (_: unknown, order: any) => (
+      render: (_: unknown, order) => (
         <Typography.Text strong style={{ color: "#1677ff" }}>
           {formatCurrency(order.total_amount)}
         </Typography.Text>

@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       { media: data || [] },
       {
         headers: {
-          "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+          "Cache-Control": "private, no-store, no-cache, max-age=0",
         },
       },
     );

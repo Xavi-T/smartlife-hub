@@ -525,9 +525,6 @@ export async function GET(request: NextRequest) {
       : createPublicSupabaseClient();
     scheduleExpiredDiscountCleanup();
     const activeOnly = searchParams.get("activeOnly") === "true";
-    const noCache =
-      searchParams.get("noCache") === "1" ||
-      searchParams.get("noCache") === "true";
 
     if (usePagination) {
       const page = parsePositiveInteger(searchParams.get("page"), 1, 100000);
@@ -751,10 +748,7 @@ export async function GET(request: NextRequest) {
         },
         {
           headers: {
-            "Cache-Control":
-              view === "public" && !noCache
-                ? "public, max-age=60, stale-while-revalidate=300"
-                : "no-store",
+            "Cache-Control": "private, no-store, no-cache, max-age=0",
           },
         },
       );
@@ -828,9 +822,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(mappedProducts, {
       headers: {
-        "Cache-Control": noCache
-          ? "no-store"
-          : "public, max-age=60, stale-while-revalidate=300",
+        "Cache-Control": "private, no-store, no-cache, max-age=0",
       },
     });
   } catch (error) {

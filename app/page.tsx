@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/home/Header";
@@ -81,16 +88,8 @@ const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
     type: "image",
   },
 ];
-const CLIENT_CACHE_TTL_MS = 2 * 60 * 1000;
 const PRODUCT_PAGE_SIZE = 24;
 const DEPRECATED_BANNER_PATH = "/banners/banner-default-smartlife.svg";
-
-let cachedCarouselItems: CarouselItem[] | null = null;
-let cachedCarouselAt = 0;
-
-function isCacheFresh(timestamp: number) {
-  return Date.now() - timestamp < CLIENT_CACHE_TTL_MS;
-}
 
 function getBannerImageKey(image: string) {
   try {
@@ -146,6 +145,7 @@ function HomeContent() {
   const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshingProducts, setIsRefreshingProducts] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [sortType, setSortType] = useState<"popular" | "newest" | "bestseller">(
     "popular",
@@ -169,6 +169,7 @@ function HomeContent() {
     DEFAULT_CAROUSEL_ITEMS,
   );
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const hasLoadedProductsRef = useRef(false);
 
   const {
     cart,
@@ -183,7 +184,11 @@ function HomeContent() {
   const fetchProducts = useCallback(
     async (page: number, reset: boolean, signal?: AbortSignal) => {
       if (reset) {
-        setIsLoading(true);
+        if (hasLoadedProductsRef.current) {
+          setIsRefreshingProducts(true);
+        } else {
+          setIsLoading(true);
+        }
       } else {
         setIsLoadingMore(true);
       }
@@ -214,6 +219,7 @@ function HomeContent() {
         }
 
         const response = await fetch(`/api/products?${params.toString()}`, {
+          cache: "no-store",
           signal,
         });
         if (!response.ok) throw new Error("Failed to fetch products");
@@ -242,7 +248,9 @@ function HomeContent() {
         }
       } finally {
         if (!signal?.aborted) {
+          hasLoadedProductsRef.current = true;
           setIsLoading(false);
+          setIsRefreshingProducts(false);
           setIsLoadingMore(false);
         }
       }
@@ -258,13 +266,9 @@ function HomeContent() {
   );
 
   const fetchHomepageBanners = useCallback(async (signal?: AbortSignal) => {
-    if (cachedCarouselItems && isCacheFresh(cachedCarouselAt)) {
-      setCarouselItems(cachedCarouselItems);
-      return;
-    }
-
     try {
       const response = await fetch("/api/media?purpose=homepage_banner", {
+        cache: "no-store",
         signal,
       });
 
@@ -281,8 +285,6 @@ function HomeContent() {
       const mapped = toCarouselItems(banners);
       if (mapped.length > 0) {
         const nextCarouselItems = mergeCarouselItems(mapped);
-        cachedCarouselItems = nextCarouselItems;
-        cachedCarouselAt = Date.now();
         setCarouselItems(nextCarouselItems);
       }
     } catch (error) {
@@ -627,11 +629,13 @@ function HomeContent() {
               </Typography.Text>
             </div>
           </div>
-          <ProductGrid
-            products={products}
-            onAddToCart={handleAddToCart}
-            onViewDetail={handleViewDetail}
-          />
+          <Spin spinning={isRefreshingProducts} tip="Đang cập nhật kết quả...">
+            <ProductGrid
+              products={products}
+              onAddToCart={handleAddToCart}
+              onViewDetail={handleViewDetail}
+            />
+          </Spin>
         </section>
 
         {hasMoreProducts && (

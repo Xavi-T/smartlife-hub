@@ -280,7 +280,7 @@ export async function GET(
       { product, relatedProducts, media },
       {
         headers: {
-          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+          "Cache-Control": "private, no-store, no-cache, max-age=0",
         },
       },
     );

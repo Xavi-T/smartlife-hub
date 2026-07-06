@@ -109,20 +109,24 @@ export default function NutritionClientsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const fetchClients = useCallback(async () => {
+  const fetchClients = useCallback(async (signal?: AbortSignal) => {
+    setIsRefreshing(true);
     try {
       const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (statusFilter !== "all") params.set("status", statusFilter);
       const response = await fetch(
         `/api/admin/nutrition/clients?${params.toString()}`,
+        { cache: "no-store", signal },
       );
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Không thể tải hồ sơ");
       }
+      if (signal?.aborted) return;
       setClients(Array.isArray(result.clients) ? result.clients : []);
       setStats(
         result.stats || {
@@ -134,17 +138,30 @@ export default function NutritionClientsPage() {
         },
       );
     } catch (error: unknown) {
+      if (signal?.aborted) return;
       messageApi.error(
         error instanceof Error ? error.message : "Không thể tải hồ sơ",
       );
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [messageApi, search, statusFilter]);
+  }, [debouncedSearch, messageApi, statusFilter]);
 
   useEffect(() => {
-    fetchClients();
+    const timeoutId = window.setTimeout(
+      () => setDebouncedSearch(search.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchClients(controller.signal);
+    return () => controller.abort();
   }, [fetchClients]);
 
   const openCreateModal = () => {
@@ -436,7 +453,7 @@ export default function NutritionClientsPage() {
 
           <Table
             rowKey="id"
-            loading={isLoading}
+            loading={isLoading || isRefreshing}
             dataSource={clients}
             columns={columns}
             pagination={{ pageSize: 10 }}
