@@ -23,6 +23,7 @@ import {
   CalculatorOutlined,
 } from "@ant-design/icons";
 import { formatCurrency } from "@/lib/utils";
+import { matchesSearchText } from "@/lib/searchText";
 import type { Product } from "@/types/database";
 
 const { TextArea } = Input;
@@ -36,18 +37,29 @@ interface StockInboundModalProps {
 
 type CostingMethod = "weighted_average" | "latest_cost";
 
+interface StockInboundFormValues {
+  productId?: string;
+  quantityAdded: number;
+  costPriceAtTime: number;
+  costingMethod?: CostingMethod;
+  supplier?: string;
+  notes?: string;
+}
+
 export function StockInboundModal({
   isOpen,
   onClose,
   product: initialProduct,
   onSuccess,
 }: StockInboundModalProps) {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<StockInboundFormValues>();
   const [messageApi, contextHolder] = message.useMessage();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(
     initialProduct || null,
   );
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [productLoadError, setProductLoadError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Watch form values for preview calculation
@@ -59,7 +71,9 @@ export function StockInboundModal({
 
   useEffect(() => {
     if (isOpen && !initialProduct) {
-      fetchProducts();
+      const controller = new AbortController();
+      fetchProducts(controller.signal);
+      return () => controller.abort();
     }
   }, [isOpen, initialProduct]);
 
@@ -73,17 +87,27 @@ export function StockInboundModal({
     }
   }, [initialProduct, form]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (signal?: AbortSignal) => {
+    setIsLoadingProducts(true);
+    setProductLoadError("");
     try {
       const res = await fetch(`/api/products?noCache=1&t=${Date.now()}`, {
         cache: "no-store",
+        signal,
       });
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data);
+      if (!res.ok) {
+        throw new Error("Không thể tải danh sách sản phẩm");
       }
+      const data = await res.json();
+      if (signal?.aborted) return;
+      setProducts(Array.isArray(data) ? data : []);
     } catch (error) {
+      if (signal?.aborted) return;
       console.error("Error fetching products:", error);
+      setProducts([]);
+      setProductLoadError("Không thể tải sản phẩm. Vui lòng thử lại.");
+    } finally {
+      if (!signal?.aborted) setIsLoadingProducts(false);
     }
   };
 
@@ -96,7 +120,7 @@ export function StockInboundModal({
     }
   };
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: StockInboundFormValues) => {
     if (!selectedProduct) {
       messageApi.error("Vui lòng chọn sản phẩm");
       return;
@@ -134,8 +158,10 @@ export function StockInboundModal({
 
       if (onSuccess) onSuccess();
       onClose();
-    } catch (error: any) {
-      messageApi.error(error.message || "Đã xảy ra lỗi khi nhập hàng");
+    } catch (error: unknown) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Đã xảy ra lỗi khi nhập hàng",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -255,13 +281,28 @@ export function StockInboundModal({
               rules={[{ required: true, message: "Vui lòng chọn sản phẩm" }]}
             >
               <Select
-                placeholder="-- Chọn sản phẩm --"
+                placeholder={
+                  isLoadingProducts
+                    ? "Đang tải sản phẩm..."
+                    : "-- Chọn sản phẩm --"
+                }
                 showSearch
-                optionFilterProp="children"
+                allowClear
+                loading={isLoadingProducts}
+                optionFilterProp="label"
+                filterOption={(input, option) =>
+                  matchesSearchText(option?.searchText || option?.label, input)
+                }
+                notFoundContent={
+                  isLoadingProducts
+                    ? "Đang tải sản phẩm..."
+                    : productLoadError || "Không tìm thấy sản phẩm phù hợp"
+                }
                 onChange={handleProductChange}
                 options={products.map((p) => ({
                   value: p.id,
-                  label: `${p.name} (Tồn: ${p.stock_quantity})`,
+                  label: `${p.name} · ${p.category} (Tồn: ${p.stock_quantity})`,
+                  searchText: `${p.name} ${p.category}`,
                 }))}
               />
             </Form.Item>

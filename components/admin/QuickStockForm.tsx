@@ -5,6 +5,7 @@ import { Card, Form, Select, InputNumber, Button, message, Alert } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import type { Product } from "@/types/database";
 import { formatCurrency } from "@/lib/utils";
+import { matchesSearchText } from "@/lib/searchText";
 
 interface QuickStockFormProps {
   products: Product[];
@@ -112,17 +113,16 @@ export function QuickStockForm({
             <Select
               placeholder="-- Chọn sản phẩm --"
               showSearch
-              optionFilterProp="children"
+              optionFilterProp="label"
               filterOption={(input, option) =>
-                (option?.label ?? "")
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
+                matchesSearchText(option?.searchText || option?.label, input)
               }
               options={products
                 .filter((p) => p.is_active)
                 .map((product) => ({
                   value: product.id,
                   label: `${product.name} (Tồn: ${product.stock_quantity})`,
+                  searchText: `${product.name} ${product.category}`,
                 }))}
             />
           </Form.Item>
