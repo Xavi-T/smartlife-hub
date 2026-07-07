@@ -1,8 +1,8 @@
 import type { User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "manager" | "doctor" | "employee";
+export type AppRole = "admin" | "manager" | "employee";
 
-const VALID_ROLES: AppRole[] = ["admin", "manager", "doctor", "employee"];
+const VALID_ROLES: AppRole[] = ["admin", "manager", "employee"];
 
 const RECOVERY_ADMIN_EMAILS = ["admin@smartlife.com"];
 
@@ -11,17 +11,7 @@ export const EMPLOYEE_ALLOWED_ADMIN_PATHS = [
   "/admin/orders",
 ];
 
-export const DOCTOR_ALLOWED_ADMIN_PATHS = [
-  "/admin/nutrition",
-  "/admin/media",
-];
-
 export const EMPLOYEE_ALLOWED_ADMIN_API_PATHS = ["/api/admin/orders"];
-
-export const DOCTOR_ALLOWED_ADMIN_API_PATHS = [
-  "/api/admin/nutrition",
-  "/api/admin/media",
-];
 
 function pathnameMatchesAny(pathname: string, allowedPaths: string[]): boolean {
   return allowedPaths.some(
@@ -33,6 +23,12 @@ function pathnameMatchesAny(pathname: string, allowedPaths: string[]): boolean {
 export function normalizeRole(value: unknown): AppRole | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
+  // Legacy production accounts may still have role="doctor" in Supabase
+  // metadata. Treat them as admin so deployment does not lock anyone out.
+  if (normalized === "doctor") {
+    return "admin";
+  }
+
   return VALID_ROLES.includes(normalized as AppRole)
     ? (normalized as AppRole)
     : null;
@@ -67,10 +63,6 @@ export function canAccessAdminPath(role: AppRole, pathname: string): boolean {
     return isEmployeeAllowedAdminPath(pathname);
   }
 
-  if (role === "doctor") {
-    return pathnameMatchesAny(pathname, DOCTOR_ALLOWED_ADMIN_PATHS);
-  }
-
   if (pathname.startsWith("/admin/users")) {
     return canManageAccounts(role);
   }
@@ -86,20 +78,12 @@ export function canAccessAdminApiPath(
     return pathnameMatchesAny(pathname, EMPLOYEE_ALLOWED_ADMIN_API_PATHS);
   }
 
-  if (role === "doctor") {
-    return pathnameMatchesAny(pathname, DOCTOR_ALLOWED_ADMIN_API_PATHS);
-  }
-
   return role === "admin" || role === "manager";
 }
 
 export function getAdminHomePath(role: AppRole): string {
   if (role === "employee") {
     return "/admin/quick-sales";
-  }
-
-  if (role === "doctor") {
-    return "/admin/nutrition/articles";
   }
 
   return "/admin";

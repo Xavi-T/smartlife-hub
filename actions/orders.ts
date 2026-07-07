@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabase";
 import { AuditLogger } from "@/lib/auditLogger";
 import { sendOrderNotificationEmail } from "@/lib/emailNotifications";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { getRoleFromUser } from "@/lib/rbac";
 import {
   createGuestCustomerPhone,
   GUEST_CUSTOMER_NAME,
@@ -389,14 +388,6 @@ export async function createOrder(
         return {
           success: false,
           message: "Bạn cần đăng nhập để tạo đơn bán tại quầy",
-        };
-      }
-
-      const role = getRoleFromUser(user);
-      if (role === "doctor") {
-        return {
-          success: false,
-          message: "Tài khoản này không có quyền tạo đơn bán tại quầy",
         };
       }
     }

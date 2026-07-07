@@ -4,7 +4,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase-admin";
 import { slugifyVietnamese } from "@/lib/nutrition";
 import type { NutritionArticleStatus } from "@/types/database";
 
-const NUTRITION_ROLES = ["admin", "manager", "doctor"] as const;
+const NUTRITION_ROLES = ["admin", "manager"] as const;
 const VALID_STATUSES: NutritionArticleStatus[] = [
   "draft",
   "published",

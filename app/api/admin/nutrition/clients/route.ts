@@ -9,7 +9,7 @@ import {
 } from "@/lib/nutrition";
 import type { NutritionClientStatus } from "@/types/database";
 
-const NUTRITION_ROLES = ["admin", "manager", "doctor"] as const;
+const NUTRITION_ROLES = ["admin", "manager"] as const;
 const VALID_GENDERS: NutritionGender[] = ["male", "female", "other"];
 const VALID_ACTIVITY_LEVELS: NutritionActivityLevel[] = [
   "sedentary",

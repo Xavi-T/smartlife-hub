@@ -1,7 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { canManageAccounts, getRoleFromUser, normalizeRole } from "@/lib/rbac";
+import {
+  canManageAccounts,
+  getRoleFromUser,
+  normalizeRole,
+  type AppRole,
+} from "@/lib/rbac";
 
 function createServiceRoleClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -56,7 +61,7 @@ export async function GET() {
   const users: Array<{
     id: string;
     email: string;
-    role: "admin" | "manager" | "doctor" | "employee";
+    role: AppRole;
     fullName: string;
     createdAt: string;
     lastSignInAt: string | null;

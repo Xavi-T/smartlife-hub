@@ -25,7 +25,7 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 
-type AppRole = "admin" | "manager" | "doctor" | "employee";
+type AppRole = "admin" | "manager" | "employee";
 
 interface UserRow {
   id: string;
@@ -53,14 +53,12 @@ interface UpdateUserForm {
 const roleColorMap: Record<AppRole, string> = {
   admin: "red",
   manager: "gold",
-  doctor: "green",
   employee: "blue",
 };
 
 const roleLabelMap: Record<AppRole, string> = {
   admin: "Admin",
   manager: "Manager",
-  doctor: "Bác sĩ dinh dưỡng",
   employee: "Employee",
 };
 
@@ -451,7 +449,6 @@ export default function AdminUsersPage() {
               options={[
                 { label: "Admin", value: "admin" },
                 { label: "Manager", value: "manager" },
-                { label: "Bác sĩ dinh dưỡng", value: "doctor" },
                 { label: "Employee", value: "employee" },
               ]}
             />
@@ -497,7 +494,6 @@ export default function AdminUsersPage() {
               options={[
                 { label: "Admin", value: "admin" },
                 { label: "Manager", value: "manager" },
-                { label: "Bác sĩ dinh dưỡng", value: "doctor" },
                 { label: "Employee", value: "employee" },
               ]}
             />

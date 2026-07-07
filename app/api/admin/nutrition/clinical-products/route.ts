@@ -3,7 +3,7 @@ import { isAdminAuthFailure, requireAdminRole } from "@/lib/adminAuth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase-admin";
 import type { ClinicalNutritionProductUnit } from "@/types/database";
 
-const NUTRITION_ROLES = ["admin", "manager", "doctor"] as const;
+const NUTRITION_ROLES = ["admin", "manager"] as const;
 const VALID_UNITS: ClinicalNutritionProductUnit[] = ["ml", "g"];
 
 function getErrorMessage(error: unknown): string {

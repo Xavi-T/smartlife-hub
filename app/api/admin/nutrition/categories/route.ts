@@ -3,7 +3,7 @@ import { isAdminAuthFailure, requireAdminRole } from "@/lib/adminAuth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase-admin";
 import { slugifyVietnamese } from "@/lib/nutrition";
 
-const NUTRITION_ROLES = ["admin", "manager", "doctor"] as const;
+const NUTRITION_ROLES = ["admin", "manager"] as const;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;

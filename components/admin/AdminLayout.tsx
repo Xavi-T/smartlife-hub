@@ -50,7 +50,6 @@ const { useBreakpoint } = Grid;
 const roleLabelMap: Record<AppRole, string> = {
   admin: "Admin",
   manager: "Manager",
-  doctor: "Bác sĩ dinh dưỡng",
   employee: "Employee",
 };
 
@@ -290,49 +289,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const filteredMenuItems = useMemo(() => {
     if (currentUserRole !== "employee") {
-      if (currentUserRole === "doctor") {
-        return [
-          {
-            key: "nutrition",
-            label: "Dinh dưỡng",
-            type: "group",
-          },
-          {
-            key: "/admin/nutrition/articles",
-            icon: <ReadOutlined />,
-            label: "Bài viết",
-          },
-          {
-            key: "/admin/nutrition/clients",
-            icon: <MedicineBoxOutlined />,
-            label: "Hồ sơ tư vấn",
-          },
-          {
-            key: "/admin/nutrition/consultation-notes",
-            icon: <FileTextOutlined />,
-            label: "Note tư vấn",
-          },
-          {
-            key: "/admin/nutrition/calculator",
-            icon: <CalculatorOutlined />,
-            label: "Tính dinh dưỡng",
-          },
-          {
-            key: "/admin/nutrition/clinical-calculator",
-            icon: <CalculatorOutlined />,
-            label: "Phối khẩu phần",
-          },
-          {
-            type: "divider",
-          },
-          {
-            key: "/admin/media",
-            icon: <PictureOutlined />,
-            label: "Quản lý media",
-          },
-        ] as MenuProps["items"];
-      }
-
       return menuItems;
     }
 

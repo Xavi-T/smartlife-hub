@@ -6,7 +6,7 @@ import {
 } from "@/lib/nutrition";
 import type { NutritionConsultationNoteStatus } from "@/types/database";
 
-export const NUTRITION_ROLES = ["admin", "manager", "doctor"] as const;
+export const NUTRITION_ROLES = ["admin", "manager"] as const;
 
 export const VALID_NOTE_STATUSES: NutritionConsultationNoteStatus[] = [
   "draft",
