@@ -11,18 +11,24 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { AlertOutlined, InboxOutlined } from "@ant-design/icons";
+import {
+  AlertOutlined,
+  EditOutlined,
+  InboxOutlined,
+} from "@ant-design/icons";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
 interface InventoryTableProps {
   products: Product[];
   onProductClick: (product: Product) => void;
+  onStockAdjustClick: (product: Product) => void;
 }
 
 export function InventoryTable({
   products,
   onProductClick,
+  onStockAdjustClick,
 }: InventoryTableProps) {
   const columns: ColumnsType<Product> = [
     {
@@ -125,20 +131,32 @@ export function InventoryTable({
     {
       title: "Hành động",
       key: "action",
-      width: 140,
+      width: 220,
       align: "center",
       render: (_: unknown, product) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<InboxOutlined />}
-          onClick={(event) => {
-            event.stopPropagation();
-            onProductClick(product);
-          }}
-        >
-          Nhập hàng
-        </Button>
+        <Space size={8}>
+          <Button
+            type="primary"
+            size="small"
+            icon={<InboxOutlined />}
+            onClick={(event) => {
+              event.stopPropagation();
+              onProductClick(product);
+            }}
+          >
+            Nhập hàng
+          </Button>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={(event) => {
+              event.stopPropagation();
+              onStockAdjustClick(product);
+            }}
+          >
+            Sửa tồn
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -152,7 +170,7 @@ export function InventoryTable({
         rowKey="id"
         columns={columns}
         dataSource={products}
-        scroll={{ x: 980 }}
+        scroll={{ x: 1060 }}
         pagination={{
           pageSize: 20,
           showSizeChanger: true,

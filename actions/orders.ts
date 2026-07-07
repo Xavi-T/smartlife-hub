@@ -5,6 +5,12 @@ import { AuditLogger } from "@/lib/auditLogger";
 import { sendOrderNotificationEmail } from "@/lib/emailNotifications";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getRoleFromUser } from "@/lib/rbac";
+import {
+  createGuestCustomerPhone,
+  GUEST_CUSTOMER_NAME,
+  isGuestPhone,
+  normalizePhone,
+} from "@/lib/customerIdentity";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type {
@@ -17,6 +23,40 @@ import type {
 } from "@/types/order";
 
 type SupabaseAdminClient = ReturnType<typeof createClient<Database>>;
+type SupabaseMutationError = { code?: string; message?: string };
+type OrdersMutationTable = {
+  insert(payload: unknown): {
+    select(columns: string): {
+      single(): PromiseLike<{
+        data: { id: string; total_amount?: number } | null;
+        error: SupabaseMutationError | null;
+      }>;
+    };
+  };
+  delete(): {
+    eq(
+      column: string,
+      value: string,
+    ): PromiseLike<{ error: SupabaseMutationError | null }>;
+  };
+  select(columns: string): {
+    eq(column: string, value: string): {
+      single(): PromiseLike<{
+        data: { id: string; total_amount: number } | null;
+        error: SupabaseMutationError | null;
+      }>;
+    };
+  };
+};
+type OrderItemsMutationTable = {
+  insert(payload: unknown): PromiseLike<{
+    error: SupabaseMutationError | null;
+  }>;
+};
+type OrderMutationClient = {
+  from(table: "orders"): OrdersMutationTable;
+  from(table: "order_items"): OrderItemsMutationTable;
+};
 
 interface ProductForOrder {
   id: string;
@@ -34,10 +74,6 @@ interface ProductVariantForOrder {
   variant_name: string;
   price: number;
   is_active: boolean;
-}
-
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
 }
 
 function createOrderWriteClient() {
@@ -200,10 +236,11 @@ async function createOrderDirectly(params: {
 
   let orderId: string | null = null;
   let orderInsertError: { code?: string; message?: string } | null = null;
+  const mutationDb = db as unknown as OrderMutationClient;
 
-  const { data: createdWithPayment, error: createWithPaymentError } = await (
-    db.from("orders") as any
-  )
+  const { data: createdWithPayment, error: createWithPaymentError } =
+    await mutationDb
+    .from("orders")
     .insert(orderInsertWithPayment)
     .select("id")
     .single();
@@ -216,9 +253,8 @@ async function createOrderDirectly(params: {
       message?: string;
     };
 
-    const { data: createdBase, error: createBaseError } = await (
-      db.from("orders") as any
-    )
+    const { data: createdBase, error: createBaseError } = await mutationDb
+      .from("orders")
       .insert(baseOrderInsert)
       .select("id")
       .single();
@@ -281,21 +317,20 @@ async function createOrderDirectly(params: {
     };
   });
 
-  const { error: orderItemsError } = await (
-    db.from("order_items") as any
-  ).insert(orderItemsPayload);
+  const { error: orderItemsError } = await mutationDb
+    .from("order_items")
+    .insert(orderItemsPayload);
 
   if (orderItemsError) {
-    await (db.from("orders") as any).delete().eq("id", orderId);
+    await mutationDb.from("orders").delete().eq("id", orderId);
     return {
       success: false,
       message: `Không thể tạo chi tiết đơn hàng: ${orderItemsError.message}`,
     };
   }
 
-  const { data: finalOrder, error: finalOrderError } = await (
-    db.from("orders") as any
-  )
+  const { data: finalOrder, error: finalOrderError } = await mutationDb
+    .from("orders")
     .select("id, total_amount")
     .eq("id", orderId)
     .single();
@@ -366,12 +401,17 @@ export async function createOrder(
       }
     }
 
-    const customerName =
-      request.customer.name?.trim() || (isCounterSale ? "Khách lẻ" : "");
+    const submittedName = request.customer.name?.trim() || "";
     const submittedPhone = request.customer.phone?.trim() || "";
     const normalizedPhone = normalizePhone(submittedPhone);
-    const customerPhone =
-      normalizedPhone || (isCounterSale ? "0000000000" : "");
+    const isCounterGuestCustomer =
+      isCounterSale && (!normalizedPhone || isGuestPhone(normalizedPhone));
+
+    const customerName =
+      submittedName || (isCounterSale ? GUEST_CUSTOMER_NAME : "");
+    const customerPhone = isCounterGuestCustomer
+      ? createGuestCustomerPhone()
+      : normalizedPhone;
     const manualDiscountPercent = Math.min(
       100,
       Math.max(0, Number(request.manualDiscountPercent || 0)),
@@ -418,7 +458,18 @@ export async function createOrder(
       };
     }
 
-    if (submittedPhone && normalizedPhone.length < 10) {
+    if (!isCounterSale && isGuestPhone(customerPhone)) {
+      return {
+        success: false,
+        message: "Vui lòng nhập số điện thoại hợp lệ",
+      };
+    }
+
+    if (
+      submittedPhone &&
+      !isCounterGuestCustomer &&
+      normalizedPhone.length < 10
+    ) {
       return {
         success: false,
         message: "Số điện thoại không hợp lệ",

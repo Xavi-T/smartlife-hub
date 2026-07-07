@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Eye, Calendar, DollarSign, User, Loader2 } from "lucide-react";
+import {
+  getDisplayCustomerName,
+  getDisplayCustomerPhone,
+} from "@/lib/customerIdentity";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -159,10 +163,14 @@ export function OrdersTable({
                     <User className="w-4 h-4 text-gray-400 mt-1" />
                     <div>
                       <div className="font-medium text-gray-900">
-                        {order.customer_name}
+                        {getDisplayCustomerName({
+                          name: order.customer_name,
+                          phone: order.customer_phone,
+                        })}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {order.customer_phone}
+                        {getDisplayCustomerPhone(order.customer_phone) ||
+                          "Không có SĐT"}
                       </div>
                     </div>
                   </div>

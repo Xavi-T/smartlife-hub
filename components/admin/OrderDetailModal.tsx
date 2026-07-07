@@ -15,6 +15,10 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import {
+  getDisplayCustomerName,
+  getDisplayCustomerPhone,
+} from "@/lib/customerIdentity";
 import { formatCurrency } from "@/lib/utils";
 
 interface OrderItem {
@@ -173,10 +177,14 @@ export function OrderDetailModal({
             <Card title="Thông tin khách hàng" size="small">
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="Tên khách hàng">
-                  {order.customer_name}
+                  {getDisplayCustomerName({
+                    name: order.customer_name,
+                    phone: order.customer_phone,
+                  })}
                 </Descriptions.Item>
                 <Descriptions.Item label="Số điện thoại">
-                  {order.customer_phone}
+                  {getDisplayCustomerPhone(order.customer_phone) ||
+                    "Không có SĐT"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Địa chỉ giao hàng">
                   {order.customer_address}

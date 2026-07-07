@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import {
+  getDisplayCustomerName,
+  getDisplayCustomerPhone,
+  isGuestPhone,
+  normalizePhone,
+} from "@/lib/customerIdentity";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -36,11 +42,13 @@ export async function GET(
 
     const { phone: rawPhone } = await params;
     const phone = decodeURIComponent(rawPhone);
-    const normalizedPhone = phone.replace(/\D/g, "");
+    const isOrderLookup = phone.startsWith("order:");
+    const orderId = isOrderLookup ? phone.slice("order:".length) : "";
+    const normalizedPhone = normalizePhone(phone);
     const adminCustomersClient = createAdminCustomersClient();
 
     // Lấy tất cả đơn hàng của khách hàng này
-    const { data: orders, error } = await adminCustomersClient
+    let ordersQuery = adminCustomersClient
       .from("orders")
       .select(
         `
@@ -59,8 +67,13 @@ export async function GET(
         )
       `,
       )
-      .or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.${phone}`)
       .order("created_at", { ascending: false });
+
+    ordersQuery = isOrderLookup
+      ? ordersQuery.eq("id", orderId)
+      : ordersQuery.or(`customer_phone.eq.${normalizedPhone},customer_phone.eq.${phone}`);
+
+    const { data: orders, error } = await ordersQuery;
 
     if (error) throw error;
 
@@ -120,21 +133,35 @@ export async function GET(
       typeColor = "blue";
     }
 
+    const firstOrder = orderRows[0];
+    const displayPhone = getDisplayCustomerPhone(
+      firstOrder?.customer_phone || phone,
+    );
+
     return NextResponse.json({
       customer: {
-        name: orderRows[0]?.customer_name || "N/A",
-        phone: phone,
-        address: orderRows[0]?.customer_address || "N/A",
+        name: getDisplayCustomerName({
+          name: firstOrder?.customer_name,
+          phone: firstOrder?.customer_phone || phone,
+        }),
+        phone: displayPhone || "Không có SĐT",
+        address: firstOrder?.customer_address || "N/A",
         customerType,
         typeColor,
+        isGuest: isGuestPhone(firstOrder?.customer_phone || phone),
       },
       stats,
       orders: orderRows,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching customer detail:", error);
     return NextResponse.json(
-      { error: error.message || "Không thể tải thông tin khách hàng" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Không thể tải thông tin khách hàng",
+      },
       { status: 500 },
     );
   }

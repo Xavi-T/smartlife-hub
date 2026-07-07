@@ -13,6 +13,7 @@ import {
   Modal,
   Select,
   Space,
+  Spin,
   Switch,
   Tag,
   Typography,
@@ -33,6 +34,10 @@ import {
   formatCurrency,
   getEffectiveDiscountPercent,
 } from "@/lib/utils";
+import {
+  getDisplayCustomerName,
+  getDisplayCustomerPhone,
+} from "@/lib/customerIdentity";
 import { buildInvoiceHtml, printInvoiceHtml } from "@/lib/invoice";
 import type { Product } from "@/types/database";
 
@@ -404,8 +409,12 @@ export default function QuickSalesPage() {
           {
             orderId: order.id,
             orderDate: new Date(order.created_at).toLocaleString("vi-VN"),
-            customerName: order.customer_name,
-            customerPhone: order.customer_phone,
+            customerName: getDisplayCustomerName({
+              name: order.customer_name,
+              phone: order.customer_phone,
+            }),
+            customerPhone:
+              getDisplayCustomerPhone(order.customer_phone) || "Không có SĐT",
             customerAddress: order.customer_address,
             notes: order.notes,
             totalAmount: order.total_amount,
@@ -452,12 +461,13 @@ export default function QuickSalesPage() {
             alignItems: "start",
           }}
         >
-          <Card title="Chọn sản phẩm" loading={isLoadingProducts}>
+          <Card title="Chọn sản phẩm">
             <Input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Tìm theo tên hoặc danh mục"
               prefix={<SearchOutlined />}
+              suffix={isLoadingProducts ? <ReloadOutlined spin /> : null}
               style={{ marginBottom: 12 }}
             />
 
@@ -469,116 +479,143 @@ export default function QuickSalesPage() {
                 borderRadius: 8,
               }}
             >
-              {filteredProducts.length === 0 ? (
+              {isLoadingProducts && filteredProducts.length === 0 ? (
+                <div
+                  style={{
+                    padding: 24,
+                    display: "flex",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Spin tip="Đang tải sản phẩm..." />
+                </div>
+              ) : filteredProducts.length === 0 ? (
                 <div style={{ padding: 16 }}>
                   <Text type="secondary">Không tìm thấy sản phẩm khả dụng</Text>
                 </div>
               ) : (
-                filteredProducts.map((product) => {
-                  const effectiveDiscountPercent = getEffectiveDiscountPercent({
-                    discountPercent: product.discount_percent,
-                    discountStartAt: product.discount_start_at,
-                    discountEndAt: product.discount_end_at,
-                  });
-                  const salePrice = calculateDiscountedPrice(
-                    product.price,
-                    effectiveDiscountPercent,
-                  );
-
-                  return (
+                <>
+                  {isLoadingProducts && (
                     <div
-                      key={product.id}
                       style={{
-                        padding: "10px 12px",
-                        cursor: "pointer",
+                        padding: "6px 12px",
                         borderBottom: "1px solid #f0f0f0",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 12,
+                        background: "#fafafa",
                       }}
-                      onClick={() => addToCart(product)}
                     >
+                      <Space size={8}>
+                        <Spin size="small" />
+                        <Text type="secondary">Đang cập nhật kết quả...</Text>
+                      </Space>
+                    </div>
+                  )}
+                  {filteredProducts.map((product) => {
+                    const effectiveDiscountPercent =
+                      getEffectiveDiscountPercent({
+                        discountPercent: product.discount_percent,
+                        discountStartAt: product.discount_start_at,
+                        discountEndAt: product.discount_end_at,
+                      });
+                    const salePrice = calculateDiscountedPrice(
+                      product.price,
+                      effectiveDiscountPercent,
+                    );
+
+                    return (
                       <div
+                        key={product.id}
                         style={{
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid #f0f0f0",
                           display: "flex",
                           alignItems: "center",
-                          gap: 10,
-                          minWidth: 0,
-                          flex: 1,
+                          justifyContent: "space-between",
+                          gap: 12,
                         }}
+                        onClick={() => addToCart(product)}
                       >
                         <div
                           style={{
-                            position: "relative",
-                            width: 56,
-                            height: 56,
-                            flexShrink: 0,
-                            overflow: "hidden",
-                            borderRadius: 8,
-                            border: "1px solid #f0f0f0",
-                            background: "#fafafa",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            minWidth: 0,
+                            flex: 1,
                           }}
                         >
-                          {product.image_url ? (
-                            <Image
-                              src={product.image_url}
-                              alt={product.name}
-                              fill
-                              sizes="56px"
-                              style={{ objectFit: "cover" }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                display: "grid",
-                                placeItems: "center",
-                                color: "#bfbfbf",
-                                fontSize: 22,
-                              }}
-                              aria-label="Sản phẩm chưa có ảnh"
+                          <div
+                            style={{
+                              position: "relative",
+                              width: 56,
+                              height: 56,
+                              flexShrink: 0,
+                              overflow: "hidden",
+                              borderRadius: 8,
+                              border: "1px solid #f0f0f0",
+                              background: "#fafafa",
+                            }}
+                          >
+                            {product.image_url ? (
+                              <Image
+                                src={product.image_url}
+                                alt={product.name}
+                                fill
+                                sizes="56px"
+                                style={{ objectFit: "cover" }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  display: "grid",
+                                  placeItems: "center",
+                                  color: "#bfbfbf",
+                                  fontSize: 22,
+                                }}
+                                aria-label="Sản phẩm chưa có ảnh"
+                              >
+                                📦
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ minWidth: 0 }}>
+                            <Space size={8} wrap>
+                              <Text strong>{product.name}</Text>
+                              {effectiveDiscountPercent > 0 && (
+                                <Tag color="red">
+                                  -{effectiveDiscountPercent}%
+                                </Tag>
+                              )}
+                            </Space>
+                            <Space size={8} wrap>
+                              <Text type="secondary">{product.category}</Text>
+                              <Text type="secondary">
+                                Còn {product.stock_quantity}
+                              </Text>
+                            </Space>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ color: "#cf1322", fontWeight: 600 }}>
+                            {formatCurrency(salePrice)}
+                          </div>
+                          {effectiveDiscountPercent > 0 && (
+                            <Text
+                              delete
+                              type="secondary"
+                              style={{ fontSize: 12 }}
                             >
-                              📦
-                            </div>
+                              {formatCurrency(product.price)}
+                            </Text>
                           )}
                         </div>
-
-                        <div style={{ minWidth: 0 }}>
-                          <Space size={8} wrap>
-                            <Text strong>{product.name}</Text>
-                            {effectiveDiscountPercent > 0 && (
-                              <Tag color="red">
-                                -{effectiveDiscountPercent}%
-                              </Tag>
-                            )}
-                          </Space>
-                          <Space size={8} wrap>
-                            <Text type="secondary">{product.category}</Text>
-                            <Text type="secondary">
-                              Còn {product.stock_quantity}
-                            </Text>
-                          </Space>
-                        </div>
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ color: "#cf1322", fontWeight: 600 }}>
-                          {formatCurrency(salePrice)}
-                        </div>
-                        {effectiveDiscountPercent > 0 && (
-                          <Text
-                            delete
-                            type="secondary"
-                            style={{ fontSize: 12 }}
-                          >
-                            {formatCurrency(product.price)}
-                          </Text>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </>
               )}
             </div>
           </Card>
@@ -940,7 +977,13 @@ export default function QuickSalesPage() {
                         </Tag>
                       </Space>
                       <Text type="secondary">
-                        {order.customer_name} • {order.customer_phone}
+                        {getDisplayCustomerName({
+                          name: order.customer_name,
+                          phone: order.customer_phone,
+                        })}{" "}
+                        •{" "}
+                        {getDisplayCustomerPhone(order.customer_phone) ||
+                          "Không có SĐT"}
                       </Text>
                       <Text strong style={{ color: "#1677ff" }}>
                         {formatCurrency(order.total_amount)}

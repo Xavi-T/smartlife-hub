@@ -19,6 +19,10 @@ export type NutritionGoal =
   | "gain_weight"
   | "improve_health";
 export type NutritionClientStatus = "new" | "active" | "paused" | "completed";
+export type NutritionConsultationNoteStatus =
+  | "draft"
+  | "converted"
+  | "archived";
 export type ClinicalNutritionProductUnit = "ml" | "g";
 
 export interface ProductRow {
@@ -227,6 +231,30 @@ export interface NutritionAssessment {
   created_at: string;
 }
 
+export interface NutritionConsultationNote {
+  id: string;
+  client_id: string | null;
+  full_name: string | null;
+  phone: string | null;
+  gender: NutritionGender | null;
+  birth_date: string | null;
+  age_years: number | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  activity_level: NutritionActivityLevel | null;
+  goal: NutritionGoal | null;
+  medical_notes: string | null;
+  allergies: string | null;
+  current_diet: string | null;
+  quick_note: string;
+  recommendation: string | null;
+  status: NutritionConsultationNoteStatus;
+  created_by: string | null;
+  converted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ClinicalNutritionProductRow {
   id: string;
   name: string;
@@ -342,6 +370,17 @@ export interface Database {
         Row: NutritionAssessment;
         Insert: Omit<NutritionAssessment, "id" | "created_at">;
         Update: Partial<Omit<NutritionAssessment, "id" | "created_at">>;
+        Relationships: [];
+      };
+      nutrition_consultation_notes: {
+        Row: NutritionConsultationNote;
+        Insert: Omit<
+          NutritionConsultationNote,
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<
+          Omit<NutritionConsultationNote, "id" | "created_at" | "updated_at">
+        >;
         Relationships: [];
       };
       clinical_nutrition_products: {

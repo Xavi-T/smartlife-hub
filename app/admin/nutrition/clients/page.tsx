@@ -40,9 +40,11 @@ import {
   type NutritionGender,
   type NutritionGoal,
 } from "@/lib/nutrition";
+import { getDisplayNutritionPhone } from "@/lib/nutritionConsultationNotes";
 import type {
   NutritionAssessment,
   NutritionClient,
+  NutritionConsultationNote,
   NutritionClientStatus,
 } from "@/types/database";
 import { formatNumber } from "@/lib/utils";
@@ -102,6 +104,9 @@ export default function NutritionClientsPage() {
     null,
   );
   const [assessments, setAssessments] = useState<NutritionAssessment[]>([]);
+  const [consultationNotes, setConsultationNotes] = useState<
+    NutritionConsultationNote[]
+  >([]);
   const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -202,6 +207,7 @@ export default function NutritionClientsPage() {
       setIsDetailOpen(true);
       setSelectedClient(client);
       setAssessments([]);
+      setConsultationNotes([]);
       const response = await fetch(`/api/admin/nutrition/clients/${client.id}`);
       const result = await response.json();
       if (!response.ok) {
@@ -210,6 +216,11 @@ export default function NutritionClientsPage() {
       setSelectedClient(result.client || client);
       setAssessments(
         Array.isArray(result.assessments) ? result.assessments : [],
+      );
+      setConsultationNotes(
+        Array.isArray(result.consultationNotes)
+          ? result.consultationNotes
+          : [],
       );
     } catch (error: unknown) {
       messageApi.error(
@@ -275,7 +286,9 @@ export default function NutritionClientsPage() {
         <div>
           <Typography.Text strong>{record.full_name}</Typography.Text>
           <br />
-          <Typography.Text type="secondary">{record.phone}</Typography.Text>
+          <Typography.Text type="secondary">
+            {getDisplayNutritionPhone(record.phone)}
+          </Typography.Text>
         </div>
       ),
     },
@@ -386,6 +399,42 @@ export default function NutritionClientsPage() {
     },
   ];
 
+  const consultationNoteColumns: ColumnsType<NutritionConsultationNote> = [
+    {
+      title: "Thời gian",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 180,
+      render: (value: string) => new Date(value).toLocaleString("vi-VN"),
+    },
+    {
+      title: "Note nhanh",
+      dataIndex: "quick_note",
+      key: "quick_note",
+      render: (value: string) => value || "-",
+    },
+    {
+      title: "Hướng xử lý",
+      dataIndex: "recommendation",
+      key: "recommendation",
+      render: (value: string | null) => value || "-",
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 130,
+      render: (value: NutritionConsultationNote["status"]) =>
+        value === "converted" ? (
+          <Tag color="green">Đã tạo hồ sơ</Tag>
+        ) : value === "archived" ? (
+          <Tag>Đã lưu trữ</Tag>
+        ) : (
+          <Tag color="gold">Note nháp</Tag>
+        ),
+    },
+  ];
+
   const statusFilterOptions = useMemo(
     () => [{ label: "Tất cả trạng thái", value: "all" }, ...statusOptions],
     [],
@@ -431,6 +480,11 @@ export default function NutritionClientsPage() {
                 onClick={openCreateModal}
               >
                 Tạo hồ sơ
+              </Button>
+              <Button
+                onClick={() => router.push("/admin/nutrition/consultation-notes")}
+              >
+                Note tư vấn
               </Button>
             </Space>
           }
@@ -571,7 +625,7 @@ export default function NutritionClientsPage() {
                 {selectedClient.full_name}
               </Descriptions.Item>
               <Descriptions.Item label="SĐT">
-                {selectedClient.phone}
+                {getDisplayNutritionPhone(selectedClient.phone)}
               </Descriptions.Item>
               <Descriptions.Item label="Giới tính">
                 {getGenderLabel(selectedClient.gender)}
@@ -611,6 +665,15 @@ export default function NutritionClientsPage() {
                 rowKey="id"
                 dataSource={assessments}
                 columns={assessmentColumns}
+                pagination={{ pageSize: 5 }}
+              />
+            </Card>
+
+            <Card title={`Note tư vấn (${consultationNotes.length})`}>
+              <Table
+                rowKey="id"
+                dataSource={consultationNotes}
+                columns={consultationNoteColumns}
                 pagination={{ pageSize: 5 }}
               />
             </Card>

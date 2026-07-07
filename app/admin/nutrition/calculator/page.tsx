@@ -36,6 +36,7 @@ import {
   type NutritionGender,
   type NutritionGoal,
 } from "@/lib/nutrition";
+import { getDisplayNutritionPhone } from "@/lib/nutritionConsultationNotes";
 import type {
   NutritionAssessment,
   NutritionClient,
@@ -104,7 +105,7 @@ function printConsultationReport(params: {
             <div class="box">
               <div class="title">Khách hàng</div>
               <div><strong>${escapeHtml(client.full_name)}</strong></div>
-              <div>SĐT: ${escapeHtml(client.phone)}</div>
+              <div>SĐT: ${escapeHtml(getDisplayNutritionPhone(client.phone))}</div>
               <div>Mục tiêu: ${escapeHtml(getNutritionGoalLabel(values.goal))}</div>
               <div>Vận động: ${escapeHtml(getActivityLevelLabel(values.activityLevel))}</div>
             </div>
@@ -287,7 +288,7 @@ export default function NutritionCalculatorPage() {
   const clientOptions = useMemo(
     () =>
       clients.map((item) => ({
-        label: `${item.full_name} - ${item.phone}`,
+        label: `${item.full_name} - ${getDisplayNutritionPhone(item.phone)}`,
         value: item.id,
       })),
     [clients],

@@ -21,6 +21,7 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 import { createOrder } from "@/actions/orders";
+import { matchesSearchText } from "@/lib/searchText";
 import { formatCurrency } from "@/lib/utils";
 
 const { TextArea } = Input;
@@ -45,9 +46,9 @@ interface QuickOrderModalProps {
 }
 
 interface QuickOrderFormValues {
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
   notes?: string;
 }
 
@@ -80,7 +81,7 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
   };
 
   const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    matchesSearchText(`${p.name} ${p.category}`, searchQuery),
   );
 
   const addToCart = (product: Product) => {
@@ -141,11 +142,14 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
     try {
       const result = await createOrder({
         customer: {
-          name: values.customerName,
-          phone: values.customerPhone,
-          address: values.customerAddress,
+          name: values.customerName?.trim() || "",
+          phone: values.customerPhone?.trim() || "",
+          address: values.customerAddress?.trim() || "Mua tại quầy",
           notes: values.notes || undefined,
         },
+        isCounterSale: true,
+        checkoutMethod: "cod",
+        paymentMethod: "cod",
         items: cart.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -192,7 +196,7 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
               <div
                 style={{ fontSize: 12, fontWeight: "normal", color: "#8c8c8c" }}
               >
-                Thêm sản phẩm và thông tin khách hàng
+                Thêm sản phẩm và bán nhanh tại quầy
               </div>
             </div>
           </div>
@@ -346,35 +350,31 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
           <div>
             <Title level={5}>Thông tin khách hàng</Title>
 
-            <Form form={form} layout="vertical" onFinish={handleSubmit}>
-              <Form.Item
-                name="customerName"
-                label="Họ tên"
-                rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
-              >
-                <Input placeholder="Nhập họ tên khách hàng" />
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleSubmit}
+              initialValues={{ customerAddress: "Mua tại quầy" }}
+            >
+              <Form.Item name="customerName" label="Họ tên (không bắt buộc)">
+                <Input placeholder="Để trống nếu là khách lẻ" />
               </Form.Item>
 
               <Form.Item
                 name="customerPhone"
-                label="Số điện thoại"
+                label="Số điện thoại (không bắt buộc)"
                 rules={[
-                  { required: true, message: "Vui lòng nhập số điện thoại" },
                   {
-                    pattern: /^[0-9]{10,11}$/,
+                    pattern: /^[0-9\s()+-]{10,20}$/,
                     message: "Số điện thoại không hợp lệ",
                   },
                 ]}
               >
-                <Input placeholder="Nhập số điện thoại" />
+                <Input placeholder="Nhập nếu khách muốn lưu thông tin" />
               </Form.Item>
 
-              <Form.Item
-                name="customerAddress"
-                label="Địa chỉ"
-                rules={[{ required: true, message: "Vui lòng nhập địa chỉ" }]}
-              >
-                <TextArea rows={3} placeholder="Nhập địa chỉ giao hàng" />
+              <Form.Item name="customerAddress" label="Địa chỉ">
+                <TextArea rows={3} placeholder="Mua tại quầy" />
               </Form.Item>
 
               <Form.Item name="notes" label="Ghi chú">

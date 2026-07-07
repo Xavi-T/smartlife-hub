@@ -32,7 +32,11 @@ import {
 import { formatCurrency } from "@/lib/utils";
 
 interface Customer {
+  key: string;
+  lookupKey: string;
+  identityType: "phone" | "guest";
   phone: string;
+  rawPhone?: string;
   name: string;
   totalOrders: number;
   totalSpent: number;
@@ -211,7 +215,14 @@ export default function CustomersPage() {
         <div>
           <Typography.Text strong>{record.name}</Typography.Text>
           <br />
-          <Typography.Text type="secondary">{record.phone}</Typography.Text>
+          <Space size={6} wrap>
+            <Typography.Text type="secondary">
+              {record.phone || "Không có SĐT"}
+            </Typography.Text>
+            {record.identityType === "guest" && (
+              <Tag color="default">Khách lẻ</Tag>
+            )}
+          </Space>
         </div>
       ),
     },
@@ -270,7 +281,7 @@ export default function CustomersPage() {
         <Button
           type="link"
           icon={<EyeOutlined />}
-          onClick={() => handleCustomerClick(record.phone)}
+          onClick={() => handleCustomerClick(record.lookupKey || record.phone)}
         >
           Chi tiết
         </Button>
@@ -424,7 +435,7 @@ export default function CustomersPage() {
 
         <Card>
           <Table
-            rowKey="phone"
+            rowKey="key"
             columns={columns}
             dataSource={customers}
             loading={isRefreshing}

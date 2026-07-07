@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import {
+  getDisplayCustomerPhone,
+  GUEST_CUSTOMER_NAME,
+  isGuestPhone,
+  normalizePhone,
+} from "@/lib/customerIdentity";
+import { matchesSearchText } from "@/lib/searchText";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -19,6 +26,16 @@ function createAdminCustomersClient() {
     },
   });
 }
+
+type CustomerOrderRow = {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  total_amount: number;
+  status: "pending" | "confirmed" | "shipping" | "completed" | "cancelled";
+  created_at: string;
+  [key: string]: unknown;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,41 +61,38 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const orderRows = (orders || []) as Array<{
-      id: string;
-      customer_name: string;
-      customer_phone: string;
-      total_amount: number;
-      status:
-        | "pending"
-        | "confirmed"
-        | "shipping"
-        | "completed"
-        | "cancelled";
-      created_at: string;
-      [key: string]: unknown;
-    }>;
+    const orderRows = (orders || []) as CustomerOrderRow[];
 
-    // Gom nhóm theo số điện thoại
+    // Gom nhóm theo SĐT thật. Khách không có SĐT dùng key theo từng đơn để
+    // tránh gom nhầm vào một hồ sơ do số placeholder 000000...
     const customerMap = new Map<
       string,
       {
+        key: string;
+        lookupKey: string;
+        identityType: "phone" | "guest";
         phone: string;
+        rawPhone: string;
         name: string;
         totalOrders: number;
         totalSpent: number;
         deliveredOrders: number;
         lastOrderDate: string;
         firstOrderDate: string;
-        orders: any[];
+        orders: CustomerOrderRow[];
       }
     >();
 
     orderRows.forEach((order) => {
-      const phone = order.customer_phone;
+      const normalizedPhone = normalizePhone(order.customer_phone);
+      const isGuest = isGuestPhone(normalizedPhone);
+      const displayPhone = getDisplayCustomerPhone(order.customer_phone);
+      const name = order.customer_name?.trim() || GUEST_CUSTOMER_NAME;
+      const key = isGuest ? `order:${order.id}` : `phone:${normalizedPhone}`;
+      const lookupKey = isGuest ? `order:${order.id}` : normalizedPhone;
 
-      if (customerMap.has(phone)) {
-        const customer = customerMap.get(phone)!;
+      if (customerMap.has(key)) {
+        const customer = customerMap.get(key)!;
         customer.totalOrders += 1;
         customer.orders.push(order);
 
@@ -98,9 +112,13 @@ export async function GET(request: NextRequest) {
           customer.firstOrderDate = order.created_at;
         }
       } else {
-        customerMap.set(phone, {
-          phone,
-          name: order.customer_name,
+        customerMap.set(key, {
+          key,
+          lookupKey,
+          identityType: isGuest ? "guest" : "phone",
+          phone: displayPhone,
+          rawPhone: order.customer_phone,
+          name,
           totalOrders: 1,
           totalSpent: order.status === "completed" ? order.total_amount : 0,
           deliveredOrders: order.status === "completed" ? 1 : 0,
@@ -138,9 +156,11 @@ export async function GET(request: NextRequest) {
 
     // Lọc theo search
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      customers = customers.filter(
-        (c) => c.name.toLowerCase().includes(query) || c.phone.includes(query),
+      customers = customers.filter((customer) =>
+        matchesSearchText(
+          `${customer.name} ${customer.phone} ${customer.identityType === "guest" ? "khach le không có sdt" : ""}`,
+          searchQuery,
+        ),
       );
     }
 
@@ -165,15 +185,15 @@ export async function GET(request: NextRequest) {
 
     // Thống kê tổng quan
     const stats = {
-      totalCustomers: customerMap.size,
+      totalCustomers: customers.length,
       newCustomers: customers.filter((c) => c.totalOrders === 1).length,
       regularCustomers: customers.filter((c) => c.totalOrders === 2).length,
       loyalCustomers: customers.filter((c) => c.totalOrders >= 3).length,
       totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
       averageLTV:
-        customerMap.size > 0
+        customers.length > 0
           ? customers.reduce((sum, c) => sum + c.totalSpent, 0) /
-            customerMap.size
+            customers.length
           : 0,
     };
 
@@ -181,10 +201,15 @@ export async function GET(request: NextRequest) {
       customers,
       stats,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching customers:", error);
     return NextResponse.json(
-      { error: error.message || "Không thể tải danh sách khách hàng" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách khách hàng",
+      },
       { status: 500 },
     );
   }

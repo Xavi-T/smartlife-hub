@@ -30,6 +30,7 @@ import {
   ReadOutlined,
   CalculatorOutlined,
   MedicineBoxOutlined,
+  FileTextOutlined,
   LogoutOutlined,
   MenuUnfoldOutlined,
   HistoryOutlined,
@@ -155,6 +156,11 @@ const menuItems: MenuProps["items"] = [
     key: "/admin/nutrition/clients",
     icon: <MedicineBoxOutlined />,
     label: "Hồ sơ tư vấn",
+  },
+  {
+    key: "/admin/nutrition/consultation-notes",
+    icon: <FileTextOutlined />,
+    label: "Note tư vấn",
   },
   {
     key: "/admin/nutrition/calculator",
@@ -302,6 +308,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             label: "Hồ sơ tư vấn",
           },
           {
+            key: "/admin/nutrition/consultation-notes",
+            icon: <FileTextOutlined />,
+            label: "Note tư vấn",
+          },
+          {
             key: "/admin/nutrition/calculator",
             icon: <CalculatorOutlined />,
             label: "Tính dinh dưỡng",
@@ -407,6 +418,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       nutrition: "Dinh dưỡng",
       articles: "Bài viết",
       clients: "Hồ sơ tư vấn",
+      "consultation-notes": "Note tư vấn",
       calculator: "Tính dinh dưỡng",
       "clinical-calculator": "Phối khẩu phần",
       "quick-sales": "Bán hàng nhanh",

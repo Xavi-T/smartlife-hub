@@ -24,7 +24,9 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 import { InventoryTable } from "@/components/admin/InventoryTable";
+import { StockAdjustmentModal } from "@/components/admin/StockAdjustmentModal";
 import { StockInboundModal } from "@/components/admin/StockInboundModal";
+import { matchesSearchText } from "@/lib/searchText";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "@/types/database";
 
@@ -37,6 +39,7 @@ export default function InventoryPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isInboundModalOpen, setIsInboundModalOpen] = useState(false);
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
 
   // Fetch products
   const fetchProducts = async () => {
@@ -68,9 +71,10 @@ export default function InventoryPage() {
   // Filter products
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const matchesSearch = product.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+      const matchesSearch = matchesSearchText(
+        `${product.name} ${product.category}`,
+        searchQuery,
+      );
       const matchesCategory =
         selectedCategory === "all" || product.category === selectedCategory;
       return matchesSearch && matchesCategory;
@@ -101,7 +105,16 @@ export default function InventoryPage() {
     setIsInboundModalOpen(true);
   };
 
+  const handleStockAdjustClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsAdjustmentModalOpen(true);
+  };
+
   const handleInboundSuccess = () => {
+    fetchProducts();
+  };
+
+  const handleAdjustmentSuccess = () => {
     fetchProducts();
   };
 
@@ -230,6 +243,7 @@ export default function InventoryPage() {
         <InventoryTable
           products={filteredProducts}
           onProductClick={handleProductClick}
+          onStockAdjustClick={handleStockAdjustClick}
         />
       </Space>
 
@@ -239,6 +253,13 @@ export default function InventoryPage() {
         onClose={() => setIsInboundModalOpen(false)}
         product={selectedProduct}
         onSuccess={handleInboundSuccess}
+      />
+
+      <StockAdjustmentModal
+        isOpen={isAdjustmentModalOpen}
+        onClose={() => setIsAdjustmentModalOpen(false)}
+        product={selectedProduct}
+        onSuccess={handleAdjustmentSuccess}
       />
     </div>
   );

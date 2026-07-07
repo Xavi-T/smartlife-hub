@@ -67,13 +67,22 @@ export async function GET(
 
     const { id } = await context.params;
     const supabase = getAdminClient();
-    const [{ data: client, error }, { data: assessments }] = await Promise.all([
+    const [
+      { data: client, error },
+      { data: assessments },
+      { data: consultationNotes },
+    ] = await Promise.all([
       supabase.from("nutrition_clients").select("*").eq("id", id).single(),
       supabase
         .from("nutrition_assessments")
         .select("*")
         .eq("client_id", id)
         .order("assessed_at", { ascending: false }),
+      supabase
+        .from("nutrition_consultation_notes")
+        .select("*")
+        .eq("client_id", id)
+        .order("created_at", { ascending: false }),
     ]);
 
     if (error) throw error;
@@ -81,6 +90,7 @@ export async function GET(
     return NextResponse.json({
       client,
       assessments: assessments || [],
+      consultationNotes: consultationNotes || [],
     });
   } catch (error: unknown) {
     console.error("Error fetching nutrition client:", error);

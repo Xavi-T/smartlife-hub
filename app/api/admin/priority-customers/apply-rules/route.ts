@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import {
+  isGuestPhone,
+  normalizePhone,
+} from "@/lib/customerIdentity";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
@@ -43,6 +47,38 @@ type PriorityUpsertRow = {
   last_order_at: string;
 };
 
+type SupabaseQueryError = { message?: string };
+
+type PriorityAdminClient = {
+  from(table: "orders"): {
+    select(columns: string): {
+      order(
+        column: string,
+        options: { ascending: boolean },
+      ): PromiseLike<{ data: OrderRow[] | null; error: SupabaseQueryError | null }>;
+    };
+  };
+  from(table: "customer_segment_settings"): {
+    select(columns: string): {
+      eq(column: string, value: boolean): {
+        order(
+          column: string,
+          options: { ascending: boolean },
+        ): PromiseLike<{
+          data: SegmentRow[] | null;
+          error: SupabaseQueryError | null;
+        }>;
+      };
+    };
+  };
+  from(table: "priority_customers"): {
+    upsert(
+      rows: PriorityUpsertRow[],
+      options: { onConflict: string },
+    ): PromiseLike<{ error: SupabaseQueryError | null }>;
+  };
+};
+
 function createAdminPriorityCustomersClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -59,10 +95,6 @@ function createAdminPriorityCustomersClient() {
   });
 }
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
-
 export async function POST() {
   try {
     const authClient = await createServerSupabaseClient();
@@ -74,7 +106,8 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const adminClient = createAdminPriorityCustomersClient() as any;
+    const adminClient =
+      createAdminPriorityCustomersClient() as unknown as PriorityAdminClient;
 
     const [
       { data: orders, error: ordersError },
@@ -110,7 +143,7 @@ export async function POST() {
 
     orderRows.forEach((order) => {
       const phone = normalizePhone(order.customer_phone || "");
-      if (!phone) return;
+      if (!phone || isGuestPhone(phone)) return;
 
       const existing = aggregationMap.get(phone);
       if (!existing) {
@@ -185,12 +218,14 @@ export async function POST() {
       affected: upsertRows.length,
       message: `Đã đồng bộ ${upsertRows.length} khách hàng ưu tiên theo điều kiện`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error applying priority customer rules:", error);
     return NextResponse.json(
       {
         error:
-          error.message || "Không thể áp dụng điều kiện khách hàng ưu tiên",
+          error instanceof Error
+            ? error.message
+            : "Không thể áp dụng điều kiện khách hàng ưu tiên",
       },
       { status: 500 },
     );

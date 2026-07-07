@@ -30,6 +30,11 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import { OrderDetailModal } from "@/components/admin/OrderDetailModal";
+import {
+  getDisplayCustomerName,
+  getDisplayCustomerPhone,
+} from "@/lib/customerIdentity";
+import { matchesSearchText } from "@/lib/searchText";
 import { formatCurrency } from "@/lib/utils";
 import { buildInvoiceHtml, printInvoiceHtml } from "@/lib/invoice";
 
@@ -239,8 +244,12 @@ export default function OrdersPage() {
           {
             orderId: order.id,
             orderDate: new Date(order.created_at).toLocaleString("vi-VN"),
-            customerName: order.customer_name,
-            customerPhone: order.customer_phone,
+            customerName: getDisplayCustomerName({
+              name: order.customer_name,
+              phone: order.customer_phone,
+            }),
+            customerPhone:
+              getDisplayCustomerPhone(order.customer_phone) || "Không có SĐT",
             customerAddress: order.customer_address,
             notes: order.notes,
             totalAmount: order.total_amount,
@@ -285,22 +294,24 @@ export default function OrdersPage() {
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
+    const keyword = searchQuery.trim();
     if (!keyword) return orders;
 
     return orders.filter((order) => {
-      const orderCode = order.id.slice(0, 8).toLowerCase();
-      return (
-        order.id.toLowerCase().includes(keyword) ||
-        orderCode.includes(keyword) ||
-        order.customer_name.toLowerCase().includes(keyword) ||
-        order.customer_phone.toLowerCase().includes(keyword) ||
-        order.customer_address.toLowerCase().includes(keyword) ||
-        (order.order_status_history || []).some((history) =>
-          String(history.note || "")
-            .toLowerCase()
-            .includes(keyword),
-        )
+      const orderCode = order.id.slice(0, 8);
+      return matchesSearchText(
+        [
+          order.id,
+          orderCode,
+          getDisplayCustomerName({
+            name: order.customer_name,
+            phone: order.customer_phone,
+          }),
+          getDisplayCustomerPhone(order.customer_phone),
+          order.customer_address,
+          ...(order.order_status_history || []).map((history) => history.note),
+        ].join(" "),
+        keyword,
       );
     });
   }, [orders, searchQuery]);
@@ -374,14 +385,17 @@ export default function OrdersPage() {
         </div>
       ),
       onFilter: (value, record) =>
-        record.customer_name
-          .toLowerCase()
-          .includes((value as string).toLowerCase()),
+        matchesSearchText(record.customer_name, value),
       render: (name: string, record: Order) => (
         <div>
-          <div style={{ fontWeight: 500 }}>{name}</div>
+          <div style={{ fontWeight: 500 }}>
+            {getDisplayCustomerName({
+              name,
+              phone: record.customer_phone,
+            })}
+          </div>
           <div style={{ fontSize: 12, color: "#8c8c8c" }}>
-            {record.customer_phone}
+            {getDisplayCustomerPhone(record.customer_phone) || "Không có SĐT"}
           </div>
           <Tag
             color={record.order_type === "counter" ? "purple" : "blue"}
