@@ -15,9 +15,13 @@ export type CheckoutMethod = "cod" | "bank_transfer";
 
 export type PaymentMethod = "cod" | "bank_transfer";
 
+export type ManualDiscountValueType = "percent" | "amount";
+
 export interface ManualProductDiscount {
   productId: string;
-  percent: number;
+  valueType?: ManualDiscountValueType;
+  percent?: number;
+  amount?: number;
 }
 
 export interface CreateOrderRequest {
@@ -27,6 +31,8 @@ export interface CreateOrderRequest {
   paymentMethod?: PaymentMethod;
   isCounterSale?: boolean;
   manualDiscountPercent?: number;
+  manualDiscountValueType?: ManualDiscountValueType;
+  manualDiscountAmount?: number;
   manualDiscountMode?: "order_total" | "product_items";
   manualProductDiscounts?: ManualProductDiscount[];
 }

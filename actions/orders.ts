@@ -17,6 +17,7 @@ import type {
   CreateOrderResponse,
   CartItem,
   CheckoutMethod,
+  ManualDiscountValueType,
   ManualProductDiscount,
   PaymentMethod,
 } from "@/types/order";
@@ -75,6 +76,27 @@ interface ProductVariantForOrder {
   is_active: boolean;
 }
 
+interface PreparedOrderLine {
+  productId: string;
+  quantity: number;
+  baseUnitPrice: number;
+}
+
+interface OrderItemInsertPayload {
+  order_id: string | null;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+interface NormalizedManualProductDiscount {
+  productId: string;
+  valueType: ManualDiscountValueType;
+  percent: number;
+  amount: number;
+}
+
 function createOrderWriteClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -99,6 +121,174 @@ function calculateEffectivePrice(
   return Math.round(price * (1 - discount / 100));
 }
 
+function normalizePercent(value: unknown): number {
+  return Math.min(100, Math.max(0, Number(value || 0)));
+}
+
+function normalizeMoneyAmount(value: unknown): number {
+  return Math.max(0, Math.round(Number(value || 0)));
+}
+
+function normalizeManualDiscountValueType(
+  value: unknown,
+): ManualDiscountValueType {
+  return value === "amount" ? "amount" : "percent";
+}
+
+function allocateDiscountAcrossUnits(
+  requestedDiscountAmount: number,
+  unitPrices: number[],
+): number[] {
+  const totalBeforeDiscount = unitPrices.reduce((sum, price) => sum + price, 0);
+  const totalDiscount = Math.min(
+    normalizeMoneyAmount(requestedDiscountAmount),
+    totalBeforeDiscount,
+  );
+
+  if (totalDiscount <= 0 || totalBeforeDiscount <= 0) {
+    return unitPrices.map(() => 0);
+  }
+
+  const rawAllocations = unitPrices.map((price, index) => {
+    const rawAmount = (totalDiscount * price) / totalBeforeDiscount;
+    const amount = Math.min(price, Math.floor(rawAmount));
+
+    return {
+      index,
+      amount,
+      remainder: rawAmount - amount,
+      price,
+    };
+  });
+
+  let remaining =
+    totalDiscount -
+    rawAllocations.reduce((sum, item) => sum + item.amount, 0);
+  const sortedByRemainder = [...rawAllocations].sort((first, second) => {
+    if (second.remainder !== first.remainder) {
+      return second.remainder - first.remainder;
+    }
+
+    return second.price - first.price;
+  });
+
+  while (remaining > 0) {
+    let changed = false;
+
+    for (const item of sortedByRemainder) {
+      if (remaining <= 0) break;
+      if (item.amount >= item.price) continue;
+
+      item.amount += 1;
+      remaining -= 1;
+      changed = true;
+    }
+
+    if (!changed) break;
+  }
+
+  const allocations = unitPrices.map(() => 0);
+  sortedByRemainder.forEach((item) => {
+    allocations[item.index] = item.amount;
+  });
+
+  return allocations;
+}
+
+function buildAmountDiscountOrderItems(
+  orderId: string | null,
+  lines: PreparedOrderLine[],
+  discountAmount: number,
+): OrderItemInsertPayload[] {
+  const unitEntries = lines.flatMap((line) =>
+    Array.from({ length: line.quantity }, () => ({
+      productId: line.productId,
+      unitPrice: line.baseUnitPrice,
+    })),
+  );
+  const unitDiscounts = allocateDiscountAcrossUnits(
+    discountAmount,
+    unitEntries.map((entry) => entry.unitPrice),
+  );
+  const groupedItems = new Map<string, OrderItemInsertPayload>();
+
+  unitEntries.forEach((entry, index) => {
+    const finalUnitPrice = Math.max(
+      0,
+      entry.unitPrice - (unitDiscounts[index] || 0),
+    );
+    const groupKey = `${entry.productId}:${finalUnitPrice}`;
+    const existing = groupedItems.get(groupKey);
+
+    if (existing) {
+      existing.quantity += 1;
+      existing.subtotal = existing.unit_price * existing.quantity;
+      return;
+    }
+
+    groupedItems.set(groupKey, {
+      order_id: orderId,
+      product_id: entry.productId,
+      quantity: 1,
+      unit_price: finalUnitPrice,
+      subtotal: finalUnitPrice,
+    });
+  });
+
+  return Array.from(groupedItems.values());
+}
+
+function buildPercentDiscountOrderItem(
+  orderId: string | null,
+  line: PreparedOrderLine,
+  percent: number,
+): OrderItemInsertPayload {
+  const unitPrice = Math.round(line.baseUnitPrice * (1 - percent / 100));
+
+  return {
+    order_id: orderId,
+    product_id: line.productId,
+    quantity: line.quantity,
+    unit_price: unitPrice,
+    subtotal: unitPrice * line.quantity,
+  };
+}
+
+function buildProductDiscountOrderItems(
+  orderId: string | null,
+  lines: PreparedOrderLine[],
+  discounts: Map<string, NormalizedManualProductDiscount>,
+): OrderItemInsertPayload[] {
+  const percentDiscountItems: OrderItemInsertPayload[] = [];
+  const amountDiscountLines = new Map<string, PreparedOrderLine[]>();
+
+  lines.forEach((line) => {
+    const discount = discounts.get(line.productId);
+
+    if (discount?.valueType === "amount") {
+      const currentLines = amountDiscountLines.get(line.productId) || [];
+      currentLines.push(line);
+      amountDiscountLines.set(line.productId, currentLines);
+      return;
+    }
+
+    percentDiscountItems.push(
+      buildPercentDiscountOrderItem(orderId, line, discount?.percent || 0),
+    );
+  });
+
+  const amountDiscountItems = Array.from(amountDiscountLines.entries()).flatMap(
+    ([productId, productLines]) =>
+      buildAmountDiscountOrderItems(
+        orderId,
+        productLines,
+        discounts.get(productId)?.amount || 0,
+      ),
+  );
+
+  return [...percentDiscountItems, ...amountDiscountItems];
+}
+
 async function createOrderDirectly(params: {
   db: SupabaseAdminClient;
   customerName: string;
@@ -111,6 +301,8 @@ async function createOrderDirectly(params: {
   items: CartItem[];
   customerDiscountPercent?: number;
   manualDiscountPercent?: number;
+  manualDiscountValueType?: ManualDiscountValueType;
+  manualDiscountAmount?: number;
   manualDiscountMode?: "order_total" | "product_items";
   manualProductDiscounts?: ManualProductDiscount[];
 }): Promise<CreateOrderResponse> {
@@ -126,6 +318,8 @@ async function createOrderDirectly(params: {
     items,
     customerDiscountPercent = 0,
     manualDiscountPercent = 0,
+    manualDiscountValueType = "percent",
+    manualDiscountAmount = 0,
     manualDiscountMode = "order_total",
     manualProductDiscounts = [],
   } = params;
@@ -270,51 +464,68 @@ async function createOrderDirectly(params: {
     orderId = createdBase.id;
   }
 
-  const manualProductDiscountMap = new Map<string, number>(
-    (manualProductDiscounts || []).map((item) => [
-      item.productId,
-      Math.min(100, Math.max(0, Number(item.percent || 0))),
-    ]),
-  );
+  const manualProductDiscountMap = new Map<
+    string,
+    NormalizedManualProductDiscount
+  >(
+    (manualProductDiscounts || []).map((item) => {
+      const valueType = normalizeManualDiscountValueType(item.valueType);
 
-  const orderItemsPayload = items.map((item) => {
+      return [
+        item.productId,
+        {
+          productId: item.productId,
+          valueType,
+          percent: valueType === "percent" ? normalizePercent(item.percent) : 0,
+          amount:
+            valueType === "amount" ? normalizeMoneyAmount(item.amount) : 0,
+        },
+      ];
+    }),
+  );
+  const safeCustomerDiscount = normalizePercent(customerDiscountPercent);
+  const safeManualDiscount = normalizePercent(manualDiscountPercent);
+  const safeManualDiscountAmount = normalizeMoneyAmount(manualDiscountAmount);
+  const safeManualDiscountValueType =
+    normalizeManualDiscountValueType(manualDiscountValueType);
+  const preparedLines: PreparedOrderLine[] = items.map((item) => {
     const product = productMap.get(item.product_id)!;
     const selectedVariant = item.variant_id
       ? variantMap.get(item.variant_id)
       : null;
     const baseSourcePrice = Number(selectedVariant?.price || product.price);
-    const baseUnitPrice = calculateEffectivePrice(
+    const discountedUnitPrice = calculateEffectivePrice(
       baseSourcePrice,
       product.discount_percent,
     );
-    const safeCustomerDiscount = Math.min(
-      100,
-      Math.max(0, Number(customerDiscountPercent || 0)),
+    const baseUnitPrice = Math.round(
+      discountedUnitPrice * (1 - safeCustomerDiscount / 100),
     );
-    const safeManualDiscount = Math.min(
-      100,
-      Math.max(0, Number(manualDiscountPercent || 0)),
-    );
-    const manualDiscountForItem =
-      manualDiscountMode === "order_total"
-        ? safeManualDiscount
-        : Math.min(
-            100,
-            Math.max(0, manualProductDiscountMap.get(product.id) || 0),
-          );
-    const unitPrice = Math.round(
-      baseUnitPrice *
-        (1 - safeCustomerDiscount / 100) *
-        (1 - manualDiscountForItem / 100),
-    );
+
     return {
-      order_id: orderId,
-      product_id: item.product_id,
+      productId: item.product_id,
       quantity: item.quantity,
-      unit_price: unitPrice,
-      subtotal: unitPrice * item.quantity,
+      baseUnitPrice,
     };
   });
+
+  const orderItemsPayload =
+    manualDiscountMode === "order_total" &&
+    safeManualDiscountValueType === "amount"
+      ? buildAmountDiscountOrderItems(
+          orderId,
+          preparedLines,
+          safeManualDiscountAmount,
+        )
+      : manualDiscountMode === "product_items"
+        ? buildProductDiscountOrderItems(
+            orderId,
+            preparedLines,
+            manualProductDiscountMap,
+          )
+        : preparedLines.map((line) =>
+            buildPercentDiscountOrderItem(orderId, line, safeManualDiscount),
+          );
 
   const { error: orderItemsError } = await mutationDb
     .from("order_items")
@@ -403,21 +614,39 @@ export async function createOrder(
     const customerPhone = isCounterGuestCustomer
       ? createGuestCustomerPhone()
       : normalizedPhone;
-    const manualDiscountPercent = Math.min(
-      100,
-      Math.max(0, Number(request.manualDiscountPercent || 0)),
+    const manualDiscountPercent = normalizePercent(
+      request.manualDiscountPercent,
+    );
+    const manualDiscountValueType = normalizeManualDiscountValueType(
+      request.manualDiscountValueType,
+    );
+    const manualDiscountAmount = normalizeMoneyAmount(
+      request.manualDiscountAmount,
     );
     const manualDiscountMode = request.manualDiscountMode || "order_total";
     const manualProductDiscounts = Array.from(
       new Map(
         (request.manualProductDiscounts || [])
           .filter((item) => item.productId)
-          .map((item) => [
-            item.productId,
-            Math.min(100, Math.max(0, Number(item.percent || 0))),
-          ]),
+          .map((item) => {
+            const valueType = normalizeManualDiscountValueType(item.valueType);
+
+            return [
+              item.productId,
+              {
+                productId: item.productId,
+                valueType,
+                percent:
+                  valueType === "percent" ? normalizePercent(item.percent) : 0,
+                amount:
+                  valueType === "amount"
+                    ? normalizeMoneyAmount(item.amount)
+                    : 0,
+              },
+            ];
+          }),
       ),
-    ).map(([productId, percent]) => ({ productId, percent }));
+    ).map(([, discount]) => discount);
     if (manualDiscountMode === "product_items") {
       const orderItemIds = new Set(
         request.items.map((item) => item.product_id),
@@ -529,16 +758,31 @@ export async function createOrder(
     }
 
     const positiveProductDiscountCount = manualProductDiscounts.filter(
-      (item) => item.percent > 0,
+      (item) => item.percent > 0 || item.amount > 0,
     ).length;
+    const hasOrderPercentDiscount =
+      manualDiscountMode === "order_total" &&
+      manualDiscountValueType === "percent" &&
+      manualDiscountPercent > 0;
+    const hasOrderAmountDiscount =
+      manualDiscountMode === "order_total" &&
+      manualDiscountValueType === "amount" &&
+      manualDiscountAmount > 0;
     if (
-      (manualDiscountMode === "order_total" && manualDiscountPercent > 0) ||
+      hasOrderPercentDiscount ||
+      hasOrderAmountDiscount ||
       (manualDiscountMode === "product_items" &&
         positiveProductDiscountCount > 0)
     ) {
       if (manualDiscountMode === "product_items") {
         extraNotes.unshift(
           `Giảm giá theo từng sản phẩm (${positiveProductDiscountCount} sản phẩm)`,
+        );
+      } else if (manualDiscountValueType === "amount") {
+        extraNotes.unshift(
+          `Giảm giá theo tổng đơn: ${manualDiscountAmount.toLocaleString(
+            "vi-VN",
+          )}đ`,
         );
       } else {
         extraNotes.unshift(`Giảm giá theo tổng đơn: ${manualDiscountPercent}%`);
@@ -558,6 +802,8 @@ export async function createOrder(
       isCounterSale,
       items: request.items,
       manualDiscountPercent,
+      manualDiscountValueType,
+      manualDiscountAmount,
       manualDiscountMode,
       manualProductDiscounts,
     });

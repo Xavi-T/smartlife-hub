@@ -51,8 +51,15 @@ interface QuickSalesForm {
   notes?: string;
   discountEnabled?: boolean;
   discountPercent?: number;
+  discountValueType?: "percent" | "amount";
+  discountAmount?: number;
   discountMode?: "order_total" | "product_items";
+  discountProductValueTypes?: Record<
+    string,
+    "percent" | "amount" | undefined
+  >;
   discountProductPercents?: Record<string, number | undefined>;
+  discountProductAmounts?: Record<string, number | undefined>;
 }
 
 interface CartItem {
@@ -99,6 +106,12 @@ export default function QuickSalesPage() {
   const discountPercentWatch = Number(
     Form.useWatch("discountPercent", form) || 0,
   );
+  const discountAmountWatch = Number(Form.useWatch("discountAmount", form) || 0);
+  const discountValueTypeWatch =
+    (Form.useWatch("discountValueType", form) as
+      | "percent"
+      | "amount"
+      | undefined) || "percent";
   const discountModeWatch =
     (Form.useWatch("discountMode", form) as
       | "order_total"
@@ -108,12 +121,31 @@ export default function QuickSalesPage() {
     "discountProductPercents",
     form,
   ) as Record<string, number | undefined> | undefined;
+  const watchedDiscountProductValueTypes = Form.useWatch(
+    "discountProductValueTypes",
+    form,
+  ) as Record<string, "percent" | "amount" | undefined> | undefined;
+  const watchedDiscountProductAmounts = Form.useWatch(
+    "discountProductAmounts",
+    form,
+  ) as Record<string, number | undefined> | undefined;
   const discountProductPercentsWatch = useMemo(
     () => watchedDiscountProductPercents || {},
     [watchedDiscountProductPercents],
   );
+  const discountProductValueTypesWatch = useMemo(
+    () => watchedDiscountProductValueTypes || {},
+    [watchedDiscountProductValueTypes],
+  );
+  const discountProductAmountsWatch = useMemo(
+    () => watchedDiscountProductAmounts || {},
+    [watchedDiscountProductAmounts],
+  );
   const appliedDiscountPercent = discountEnabledWatch
     ? Math.min(100, Math.max(0, discountPercentWatch))
+    : 0;
+  const appliedDiscountAmount = discountEnabledWatch
+    ? Math.max(0, Math.round(discountAmountWatch))
     : 0;
 
   const productDiscountPercentMap = useMemo(() => {
@@ -125,19 +157,80 @@ export default function QuickSalesPage() {
     );
     return Object.fromEntries(entries) as Record<string, number>;
   }, [discountProductPercentsWatch]);
+  const productDiscountAmountMap = useMemo(() => {
+    const entries = Object.entries(discountProductAmountsWatch).map(
+      ([productId, amount]) => [
+        productId,
+        Math.max(0, Math.round(Number(amount || 0))),
+      ],
+    );
+    return Object.fromEntries(entries) as Record<string, number>;
+  }, [discountProductAmountsWatch]);
+  const productDiscountValueTypeMap = useMemo(() => {
+    const entries = Object.entries(discountProductValueTypesWatch).map(
+      ([productId, valueType]) => [
+        productId,
+        valueType === "amount" ? "amount" : "percent",
+      ],
+    );
+    return Object.fromEntries(entries) as Record<
+      string,
+      "percent" | "amount"
+    >;
+  }, [discountProductValueTypesWatch]);
+
+  const getCartLineSubtotal = useCallback((item: CartItem) => {
+    const effectiveDiscountPercent = getEffectiveDiscountPercent({
+      discountPercent: item.product.discount_percent,
+      discountStartAt: item.product.discount_start_at,
+      discountEndAt: item.product.discount_end_at,
+    });
+    const unitPrice = calculateDiscountedPrice(
+      item.product.price,
+      effectiveDiscountPercent,
+    );
+
+    return unitPrice * item.quantity;
+  }, []);
 
   const discountedProductCount = useMemo(
     () =>
-      cart.filter(
-        (item) => (productDiscountPercentMap[item.product.id] || 0) > 0,
-      ).length,
-    [cart, productDiscountPercentMap],
+      cart.filter((item) => {
+        const productId = item.product.id;
+        const valueType = productDiscountValueTypeMap[productId] || "percent";
+
+        if (valueType === "amount") {
+          return Math.min(
+            getCartLineSubtotal(item),
+            productDiscountAmountMap[productId] || 0,
+          ) > 0;
+        }
+
+        return (productDiscountPercentMap[productId] || 0) > 0;
+      }).length,
+    [
+      cart,
+      getCartLineSubtotal,
+      productDiscountAmountMap,
+      productDiscountPercentMap,
+      productDiscountValueTypeMap,
+    ],
   );
 
   useEffect(() => {
     const cartIds = new Set(cart.map((item) => item.product.id));
     const nextPercents = Object.fromEntries(
       Object.entries(discountProductPercentsWatch).filter(([productId]) =>
+        cartIds.has(productId),
+      ),
+    );
+    const nextValueTypes = Object.fromEntries(
+      Object.entries(discountProductValueTypesWatch).filter(([productId]) =>
+        cartIds.has(productId),
+      ),
+    );
+    const nextAmounts = Object.fromEntries(
+      Object.entries(discountProductAmountsWatch).filter(([productId]) =>
         cartIds.has(productId),
       ),
     );
@@ -148,7 +241,25 @@ export default function QuickSalesPage() {
     ) {
       form.setFieldValue("discountProductPercents", nextPercents);
     }
-  }, [cart, discountProductPercentsWatch, form]);
+    if (
+      Object.keys(nextValueTypes).length !==
+      Object.keys(discountProductValueTypesWatch).length
+    ) {
+      form.setFieldValue("discountProductValueTypes", nextValueTypes);
+    }
+    if (
+      Object.keys(nextAmounts).length !==
+      Object.keys(discountProductAmountsWatch).length
+    ) {
+      form.setFieldValue("discountProductAmounts", nextAmounts);
+    }
+  }, [
+    cart,
+    discountProductAmountsWatch,
+    discountProductPercentsWatch,
+    discountProductValueTypesWatch,
+    form,
+  ]);
 
   const fetchProducts = useCallback(
     async (query: string, signal?: AbortSignal) => {
@@ -284,33 +395,52 @@ export default function QuickSalesPage() {
           effectiveDiscountPercent,
         );
 
+        const lineSubtotal = unitPrice * item.quantity;
+        const productId = item.product.id;
+        const productDiscountValueType =
+          productDiscountValueTypeMap[productId] || "percent";
+        const lineDiscountAmount =
+          productDiscountValueType === "amount"
+            ? Math.min(lineSubtotal, productDiscountAmountMap[productId] || 0)
+            : Math.round(
+                lineSubtotal *
+                  ((productDiscountPercentMap[productId] || 0) / 100),
+              );
+
         return {
           itemCount: summary.itemCount + item.quantity,
-          subtotal: summary.subtotal + unitPrice * item.quantity,
-          discountAmount:
-            summary.discountAmount +
-            Math.round(
-              unitPrice *
-                item.quantity *
-                ((discountModeWatch === "order_total"
-                  ? appliedDiscountPercent
-                  : productDiscountPercentMap[item.product.id] || 0) /
-                  100),
-            ),
+          subtotal: summary.subtotal + lineSubtotal,
+          productDiscountAmount: summary.productDiscountAmount + lineDiscountAmount,
         };
       },
-      { itemCount: 0, subtotal: 0, discountAmount: 0 },
+      { itemCount: 0, subtotal: 0, productDiscountAmount: 0 },
     );
+    const orderDiscountAmount =
+      discountEnabledWatch && discountModeWatch === "order_total"
+        ? discountValueTypeWatch === "amount"
+          ? Math.min(base.subtotal, appliedDiscountAmount)
+          : Math.round(base.subtotal * (appliedDiscountPercent / 100))
+        : 0;
+    const discountAmount =
+      discountEnabledWatch && discountModeWatch === "product_items"
+        ? base.productDiscountAmount
+        : orderDiscountAmount;
 
     return {
       ...base,
-      finalTotal: Math.max(0, base.subtotal - base.discountAmount),
+      discountAmount,
+      finalTotal: Math.max(0, base.subtotal - discountAmount),
     };
   }, [
     cart,
+    appliedDiscountAmount,
     appliedDiscountPercent,
+    discountEnabledWatch,
     discountModeWatch,
+    discountValueTypeWatch,
+    productDiscountAmountMap,
     productDiscountPercentMap,
+    productDiscountValueTypeMap,
   ]);
 
   const handleSubmit = async (values: QuickSalesForm) => {
@@ -324,14 +454,33 @@ export default function QuickSalesPage() {
       const manualProductDiscounts =
         discountEnabledWatch && discountModeWatch === "product_items"
           ? cart
-              .map((item) => ({
-                productId: item.product.id,
-                percent: Math.min(
-                  100,
-                  Math.max(0, productDiscountPercentMap[item.product.id] || 0),
-                ),
-              }))
-              .filter((item) => item.percent > 0)
+              .map((item) => {
+                const productId = item.product.id;
+                const valueType =
+                  productDiscountValueTypeMap[productId] || "percent";
+                const percent =
+                  valueType === "percent"
+                    ? Math.min(
+                        100,
+                        Math.max(0, productDiscountPercentMap[productId] || 0),
+                      )
+                    : 0;
+                const amount =
+                  valueType === "amount"
+                    ? Math.min(
+                        getCartLineSubtotal(item),
+                        productDiscountAmountMap[productId] || 0,
+                      )
+                    : 0;
+
+                return {
+                  productId,
+                  valueType,
+                  percent,
+                  amount,
+                };
+              })
+              .filter((item) => item.percent > 0 || item.amount > 0)
           : [];
 
       const result = await createOrder({
@@ -345,8 +494,17 @@ export default function QuickSalesPage() {
         checkoutMethod: "cod",
         paymentMethod: "cod",
         manualDiscountPercent:
-          discountEnabledWatch && discountModeWatch === "order_total"
+          discountEnabledWatch &&
+          discountModeWatch === "order_total" &&
+          discountValueTypeWatch === "percent"
             ? appliedDiscountPercent
+            : 0,
+        manualDiscountValueType: discountValueTypeWatch,
+        manualDiscountAmount:
+          discountEnabledWatch &&
+          discountModeWatch === "order_total" &&
+          discountValueTypeWatch === "amount"
+            ? cartSummary.discountAmount
             : 0,
         manualDiscountMode: discountModeWatch,
         manualProductDiscounts,
@@ -722,8 +880,12 @@ export default function QuickSalesPage() {
                 customerAddress: "Mua tại quầy",
                 discountEnabled: false,
                 discountPercent: 0,
+                discountValueType: "percent",
+                discountAmount: 0,
                 discountMode: "order_total",
+                discountProductValueTypes: {},
                 discountProductPercents: {},
+                discountProductAmounts: {},
               }}
             >
               <Form.Item
@@ -773,11 +935,11 @@ export default function QuickSalesPage() {
                       <Select
                         options={[
                           {
-                            label: "Giảm theo tổng order",
+                            label: "Giảm theo tổng đơn",
                             value: "order_total",
                           },
                           {
-                            label: "Giảm theo từng sản phẩm trong giỏ",
+                            label: "Giảm theo từng sản phẩm",
                             value: "product_items",
                           },
                         ]}
@@ -785,74 +947,162 @@ export default function QuickSalesPage() {
                     </Form.Item>
 
                     {discountModeWatch === "order_total" && (
-                      <Form.Item
-                        name="discountPercent"
-                        label="Giảm giá (%)"
-                        rules={[
-                          {
-                            type: "number",
-                            min: 0,
-                            max: 100,
-                            message: "Giảm giá từ 0-100%",
-                          },
-                        ]}
-                        tooltip="Nếu nhập > 0 thì sẽ trừ trực tiếp vào tổng đơn tại quầy."
-                      >
-                        <InputNumber
-                          min={0}
-                          max={100}
-                          precision={0}
-                          step={1}
-                          style={{ width: "100%" }}
-                        />
-                      </Form.Item>
+                      <>
+                        <Form.Item
+                          name="discountValueType"
+                          label="Đơn vị giảm"
+                        >
+                          <Select
+                            options={[
+                              { label: "Theo phần trăm (%)", value: "percent" },
+                              { label: "Theo số tiền (VNĐ)", value: "amount" },
+                            ]}
+                          />
+                        </Form.Item>
+
+                        {discountValueTypeWatch === "percent" ? (
+                          <Form.Item
+                            name="discountPercent"
+                            label="Giảm giá (%)"
+                            rules={[
+                              {
+                                type: "number",
+                                min: 0,
+                                max: 100,
+                                message: "Giảm giá từ 0-100%",
+                              },
+                            ]}
+                            tooltip="Nếu nhập > 0 thì sẽ trừ trực tiếp vào tổng đơn tại quầy."
+                          >
+                            <InputNumber
+                              min={0}
+                              max={100}
+                              precision={0}
+                              step={1}
+                              style={{ width: "100%" }}
+                            />
+                          </Form.Item>
+                        ) : (
+                          <Form.Item
+                            name="discountAmount"
+                            label="Số tiền giảm (VNĐ)"
+                            rules={[
+                              {
+                                type: "number",
+                                min: 0,
+                                message: "Số tiền giảm không được âm",
+                              },
+                            ]}
+                            tooltip="Nếu nhập lớn hơn tạm tính, hệ thống sẽ tự giảm tối đa bằng tạm tính."
+                          >
+                            <InputNumber
+                              min={0}
+                              max={cartSummary.subtotal}
+                              precision={0}
+                              step={1000}
+                              style={{ width: "100%" }}
+                            />
+                          </Form.Item>
+                        )}
+                      </>
                     )}
 
                     {discountModeWatch === "product_items" && (
                       <div style={{ display: "grid", gap: 8 }}>
                         {cart.length === 0 ? (
                           <Text type="secondary">
-                            Thêm sản phẩm vào giỏ để nhập % giảm riêng.
+                            Thêm sản phẩm vào giỏ để nhập giảm giá riêng.
                           </Text>
                         ) : (
-                          cart.map((item) => (
-                            <div
-                              key={`discount-${item.product.id}`}
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 120px",
-                                gap: 8,
-                                alignItems: "center",
-                              }}
-                            >
-                              <Text>{item.product.name}</Text>
-                              <Form.Item style={{ marginBottom: 0 }}>
-                                <Space.Compact style={{ width: "100%" }}>
-                                  <Form.Item
-                                    name={[
-                                      "discountProductPercents",
-                                      item.product.id,
+                          cart.map((item) => {
+                            const productId = item.product.id;
+                            const productDiscountValueType =
+                              productDiscountValueTypeMap[productId] ||
+                              "percent";
+                            const lineSubtotal = getCartLineSubtotal(item);
+
+                            return (
+                              <div
+                                key={`discount-${productId}`}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "minmax(0, 1fr) 112px 150px",
+                                  gap: 8,
+                                  alignItems: "center",
+                                }}
+                              >
+                                <div style={{ minWidth: 0 }}>
+                                  <Text>{item.product.name}</Text>
+                                  <div>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      Dòng: {formatCurrency(lineSubtotal)}
+                                    </Text>
+                                  </div>
+                                </div>
+
+                                <Form.Item
+                                  name={[
+                                    "discountProductValueTypes",
+                                    productId,
+                                  ]}
+                                  initialValue="percent"
+                                  style={{ marginBottom: 0 }}
+                                >
+                                  <Select
+                                    options={[
+                                      { label: "%", value: "percent" },
+                                      { label: "VNĐ", value: "amount" },
                                     ]}
-                                    noStyle
-                                  >
-                                    <InputNumber
-                                      min={0}
-                                      max={100}
-                                      precision={0}
-                                      step={1}
-                                      placeholder="0"
-                                      style={{ width: "100%" }}
-                                    />
-                                  </Form.Item>
-                                  <Input
-                                    value="%"
-                                    readOnly
-                                    style={{ width: 44, textAlign: "center" }}
                                   />
-                                </Space.Compact>
-                              </Form.Item>
-                            </div>
-                          ))
+                                </Form.Item>
+
+                                <Form.Item style={{ marginBottom: 0 }}>
+                                  <Space.Compact style={{ width: "100%" }}>
+                                    <Form.Item
+                                      name={
+                                        productDiscountValueType === "amount"
+                                          ? [
+                                              "discountProductAmounts",
+                                              productId,
+                                            ]
+                                          : [
+                                              "discountProductPercents",
+                                              productId,
+                                            ]
+                                      }
+                                      noStyle
+                                    >
+                                      <InputNumber
+                                        min={0}
+                                        max={
+                                          productDiscountValueType === "amount"
+                                            ? lineSubtotal
+                                            : 100
+                                        }
+                                        precision={0}
+                                        step={
+                                          productDiscountValueType === "amount"
+                                            ? 1000
+                                            : 1
+                                        }
+                                        placeholder="0"
+                                        style={{ width: "100%" }}
+                                      />
+                                    </Form.Item>
+                                    <Input
+                                      value={
+                                        productDiscountValueType === "amount"
+                                          ? "đ"
+                                          : "%"
+                                      }
+                                      readOnly
+                                      style={{ width: 44, textAlign: "center" }}
+                                    />
+                                  </Space.Compact>
+                                </Form.Item>
+                              </div>
+                            );
+                          })
                         )}
                       </div>
                     )}
@@ -895,8 +1145,14 @@ export default function QuickSalesPage() {
                   <Text type="secondary">
                     -{formatCurrency(cartSummary.discountAmount)}
                     {discountModeWatch === "order_total" &&
+                    discountValueTypeWatch === "percent" &&
                     appliedDiscountPercent > 0
                       ? ` (${appliedDiscountPercent}%)`
+                      : ""}
+                    {discountModeWatch === "order_total" &&
+                    discountValueTypeWatch === "amount" &&
+                    appliedDiscountAmount > 0
+                      ? ` (${formatCurrency(cartSummary.discountAmount)})`
                       : ""}
                   </Text>
                 </div>
