@@ -34,6 +34,12 @@ const staticRoutes: MetadataRoute.Sitemap = [
     priority: 0.8,
   },
   {
+    url: buildCanonical("/priority-customers"),
+    lastModified: new Date(),
+    changeFrequency: "monthly",
+    priority: 0.7,
+  },
+  {
     url: buildCanonical("/about"),
     lastModified: new Date(),
     changeFrequency: "monthly",
@@ -68,13 +74,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .select("id, updated_at")
       .eq("is_active", true)
       .order("updated_at", { ascending: false })
-      .limit(200),
+      .limit(1000),
     supabase
       .from("nutrition_articles")
       .select("slug, updated_at, published_at")
       .eq("status", "published")
       .order("published_at", { ascending: false })
-      .limit(200),
+      .limit(1000),
   ]);
 
   const productRoutes = ((products || []) as SitemapProductRow[]).map(

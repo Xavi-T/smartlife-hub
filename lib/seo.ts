@@ -61,3 +61,56 @@ export function getDefaultSocialImage(alt = APP_CONFIG.shopTagline) {
     alt: `${APP_CONFIG.shopName} - ${alt}`,
   };
 }
+
+export function buildBreadcrumbJsonLd(
+  items: Array<{ name: string; path?: string; url?: string }>,
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url || buildCanonical(item.path || "/"),
+    })),
+  };
+}
+
+export function buildSiteJsonLd() {
+  const sameAs = Object.values(APP_CONFIG.socials).filter(Boolean);
+
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "HealthAndBeautyBusiness",
+      "@id": `${SITE_URL}/#organization`,
+      name: APP_CONFIG.shopName,
+      url: SITE_URL,
+      logo: toAbsoluteUrl(APP_CONFIG.defaultLogo),
+      image: toAbsoluteUrl(APP_CONFIG.defaultLogo),
+      description: DEFAULT_SEO_DESCRIPTION,
+      telephone: APP_CONFIG.shopPhone,
+      email: APP_CONFIG.shopEmail,
+      taxID: APP_CONFIG.taxCode,
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: APP_CONFIG.shopAddress,
+        addressLocality: "Hải Phòng",
+        addressCountry: "VN",
+      },
+      sameAs,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: APP_CONFIG.shopName,
+      url: SITE_URL,
+      publisher: {
+        "@id": `${SITE_URL}/#organization`,
+      },
+      inLanguage: "vi-VN",
+    },
+  ];
+}

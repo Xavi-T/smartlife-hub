@@ -5,11 +5,13 @@ import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { FaviconSync } from "@/components/home/FaviconSync";
 import { PublicSiteWidgets } from "@/components/home/PublicSiteWidgets";
 import { APP_CONFIG } from "@/lib/appConfig";
+import { JsonLd } from "@/components/seo/JsonLd";
 import {
   DEFAULT_OG_IMAGE,
   DEFAULT_SEO_DESCRIPTION,
   SEO_KEYWORDS,
   SITE_URL,
+  buildSiteJsonLd,
 } from "@/lib/seo";
 import { TitleSync } from "@/components/seo/TitleSync";
 import "./globals.css";
@@ -76,6 +78,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className="antialiased">
+        <JsonLd data={buildSiteJsonLd()} />
         <AntdRegistry>
           {children}
           <PublicSiteWidgets />

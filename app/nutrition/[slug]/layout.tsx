@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { APP_CONFIG } from "@/lib/appConfig";
+import { JsonLd } from "@/components/seo/JsonLd";
 import type { Database } from "@/types/database";
 import {
   DEFAULT_SEO_DESCRIPTION,
+  SITE_URL,
+  buildBreadcrumbJsonLd,
   buildCanonical,
   buildPageTitle,
   getDefaultSocialImage,
@@ -23,7 +26,15 @@ interface ArticleSeoRow {
   excerpt: string | null;
   content: string | null;
   cover_image_url: string | null;
+  author_name: string | null;
   status: string;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  nutrition_categories?: {
+    name: string;
+    slug: string;
+  } | null;
 }
 
 async function getArticleSeo(slug: string) {
@@ -38,13 +49,63 @@ async function getArticleSeo(slug: string) {
 
   const { data, error } = await supabase
     .from("nutrition_articles")
-    .select("title, slug, excerpt, content, cover_image_url, status")
+    .select(
+      "title, slug, excerpt, content, cover_image_url, author_name, status, published_at, created_at, updated_at, nutrition_categories(name, slug)",
+    )
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
 
   if (error) return null;
-  return data as ArticleSeoRow | null;
+  return data as unknown as ArticleSeoRow | null;
+}
+
+function getArticleDescription(article: ArticleSeoRow) {
+  return truncateDescription(
+    article.excerpt ||
+      stripHtml(article.content || "") ||
+      DEFAULT_SEO_DESCRIPTION,
+  );
+}
+
+function getArticleSocialImage(article: ArticleSeoRow) {
+  return article.cover_image_url
+    ? {
+        url: toAbsoluteUrl(article.cover_image_url),
+        width: 1200,
+        height: 630,
+        alt: article.title,
+      }
+    : getDefaultSocialImage(article.title);
+}
+
+function buildArticleJsonLd(
+  article: ArticleSeoRow,
+  canonical: string,
+  description: string,
+  imageUrl: string,
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "@id": `${canonical}#article`,
+    headline: article.title,
+    description,
+    image: [imageUrl],
+    mainEntityOfPage: canonical,
+    datePublished: article.published_at || article.created_at,
+    dateModified: article.updated_at,
+    author: {
+      "@type": "Person",
+      name: article.author_name || APP_CONFIG.shopName,
+    },
+    publisher: {
+      "@id": `${SITE_URL}/#organization`,
+      name: APP_CONFIG.shopName,
+    },
+    inLanguage: "vi-VN",
+    articleSection: article.nutrition_categories?.name || "Dinh dưỡng",
+  };
 }
 
 export async function generateMetadata({
@@ -81,20 +142,9 @@ export async function generateMetadata({
     };
   }
 
-  const description = truncateDescription(
-    article.excerpt ||
-      stripHtml(article.content || "") ||
-      DEFAULT_SEO_DESCRIPTION,
-  );
+  const description = getArticleDescription(article);
   const title = buildPageTitle(article.title);
-  const socialImage = article.cover_image_url
-    ? {
-        url: toAbsoluteUrl(article.cover_image_url),
-        width: 1200,
-        height: 630,
-        alt: article.title,
-      }
-    : getDefaultSocialImage(article.title);
+  const socialImage = getArticleSocialImage(article);
 
   return {
     title: { absolute: title },
@@ -120,6 +170,42 @@ export async function generateMetadata({
 
 export default function NutritionArticleLayout({
   children,
+  params,
 }: NutritionArticleLayoutProps) {
-  return children;
+  return (
+    <NutritionArticleStructuredData params={params}>
+      {children}
+    </NutritionArticleStructuredData>
+  );
+}
+
+async function NutritionArticleStructuredData({
+  children,
+  params,
+}: NutritionArticleLayoutProps) {
+  const { slug } = await params;
+  const article = await getArticleSeo(slug);
+
+  if (!article) {
+    return children;
+  }
+
+  const canonical = buildCanonical(`/nutrition/${article.slug}`);
+  const description = getArticleDescription(article);
+  const socialImage = getArticleSocialImage(article);
+  const structuredData = [
+    buildBreadcrumbJsonLd([
+      { name: "Trang chủ", path: "/" },
+      { name: "Dinh dưỡng", path: "/nutrition" },
+      { name: article.title, url: canonical },
+    ]),
+    buildArticleJsonLd(article, canonical, description, socialImage.url),
+  ];
+
+  return (
+    <>
+      <JsonLd data={structuredData} />
+      {children}
+    </>
+  );
 }

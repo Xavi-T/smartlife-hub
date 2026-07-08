@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { APP_CONFIG } from "@/lib/appConfig";
+import { JsonLd } from "@/components/seo/JsonLd";
 import type { Database } from "@/types/database";
 import {
   DEFAULT_SEO_DESCRIPTION,
+  SITE_URL,
+  buildBreadcrumbJsonLd,
   buildCanonical,
   buildPageTitle,
   getDefaultSocialImage,
@@ -15,18 +18,22 @@ import { normalizeHtmlContent } from "@/lib/htmlContent";
 
 interface ProductMetadataLayoutProps {
   children: React.ReactNode;
-}
-
-interface ProductMetadataParams {
   params: Promise<{ id: string }>;
 }
+
+type ProductMetadataParams = Pick<ProductMetadataLayoutProps, "params">;
 
 interface ProductMetadataRow {
   id: string;
   name: string;
   description: string | null;
   image_url: string | null;
+  price: number;
+  stock_quantity: number;
+  category: string;
+  price_on_request: boolean;
   is_active: boolean;
+  updated_at: string;
 }
 
 interface ProductMediaRow {
@@ -49,7 +56,9 @@ async function getProductMetadata(id: string) {
 
   const { data: productData, error: productError } = await supabase
     .from("products")
-    .select("id, name, description, image_url, is_active")
+    .select(
+      "id, name, description, image_url, price, stock_quantity, category, price_on_request, is_active, updated_at",
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -111,6 +120,49 @@ async function getProductMetadata(id: string) {
     name: product.name,
     description,
     imageUrl: toAbsoluteUrl(imageUrl),
+    price: Number(product.price || 0),
+    stockQuantity: Number(product.stock_quantity || 0),
+    category: product.category,
+    priceOnRequest: Boolean(product.price_on_request),
+    updatedAt: product.updated_at,
+  };
+}
+
+type ProductSeo = NonNullable<Awaited<ReturnType<typeof getProductMetadata>>>;
+
+function buildProductJsonLd(product: ProductSeo, canonical: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "@id": `${canonical}#product`,
+    name: product.name,
+    description: product.description,
+    image: [product.imageUrl],
+    sku: product.id,
+    category: product.category,
+    brand: {
+      "@type": "Brand",
+      name: APP_CONFIG.shopName,
+    },
+    url: canonical,
+    dateModified: product.updatedAt,
+    offers: product.priceOnRequest
+      ? undefined
+      : {
+          "@type": "Offer",
+          url: canonical,
+          priceCurrency: "VND",
+          price: product.price,
+          availability:
+            product.stockQuantity > 0
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          itemCondition: "https://schema.org/NewCondition",
+          seller: {
+            "@id": `${SITE_URL}/#organization`,
+            name: APP_CONFIG.shopName,
+          },
+        },
   };
 }
 
@@ -188,6 +240,38 @@ export async function generateMetadata({
 
 export default function ProductMetadataLayout({
   children,
+  params,
 }: ProductMetadataLayoutProps) {
-  return children;
+  return (
+    <ProductStructuredData params={params}>{children}</ProductStructuredData>
+  );
+}
+
+async function ProductStructuredData({
+  children,
+  params,
+}: ProductMetadataLayoutProps) {
+  const { id } = await params;
+  const productMeta = await getProductMetadata(id);
+
+  if (!productMeta) {
+    return children;
+  }
+
+  const canonical = buildCanonical(`/products/${id}`);
+  const structuredData = [
+    buildBreadcrumbJsonLd([
+      { name: "Trang chủ", path: "/" },
+      { name: "Sản phẩm", path: "/" },
+      { name: productMeta.name, url: canonical },
+    ]),
+    buildProductJsonLd(productMeta, canonical),
+  ];
+
+  return (
+    <>
+      <JsonLd data={structuredData} />
+      {children}
+    </>
+  );
 }
