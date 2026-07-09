@@ -2,7 +2,7 @@ export const APP_CONFIG = {
   shopName: "SmartLife Hub",
   shopTagline: "Giải pháp dinh dưỡng cho tương lai khoẻ",
   shopAddress: "142 Đ. Tô Hiến Thành, P. Nguyễn, Đại Năng, TP. Hải Phòng",
-  shopPhone: "0838 709 126",
+  shopPhone: "0983.982.601 - 0968.390.201",
   taxCode: "030076008780",
   shopEmail: "smartlifehub.work@gmail.com",
   shopWebsite: "https://smartlife-hub.shop",

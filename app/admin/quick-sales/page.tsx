@@ -54,10 +54,7 @@ interface QuickSalesForm {
   discountValueType?: "percent" | "amount";
   discountAmount?: number;
   discountMode?: "order_total" | "product_items";
-  discountProductValueTypes?: Record<
-    string,
-    "percent" | "amount" | undefined
-  >;
+  discountProductValueTypes?: Record<string, "percent" | "amount" | undefined>;
   discountProductPercents?: Record<string, number | undefined>;
   discountProductAmounts?: Record<string, number | undefined>;
 }
@@ -106,7 +103,9 @@ export default function QuickSalesPage() {
   const discountPercentWatch = Number(
     Form.useWatch("discountPercent", form) || 0,
   );
-  const discountAmountWatch = Number(Form.useWatch("discountAmount", form) || 0);
+  const discountAmountWatch = Number(
+    Form.useWatch("discountAmount", form) || 0,
+  );
   const discountValueTypeWatch =
     (Form.useWatch("discountValueType", form) as
       | "percent"
@@ -173,10 +172,7 @@ export default function QuickSalesPage() {
         valueType === "amount" ? "amount" : "percent",
       ],
     );
-    return Object.fromEntries(entries) as Record<
-      string,
-      "percent" | "amount"
-    >;
+    return Object.fromEntries(entries) as Record<string, "percent" | "amount">;
   }, [discountProductValueTypesWatch]);
 
   const getCartLineSubtotal = useCallback((item: CartItem) => {
@@ -200,10 +196,12 @@ export default function QuickSalesPage() {
         const valueType = productDiscountValueTypeMap[productId] || "percent";
 
         if (valueType === "amount") {
-          return Math.min(
-            getCartLineSubtotal(item),
-            productDiscountAmountMap[productId] || 0,
-          ) > 0;
+          return (
+            Math.min(
+              getCartLineSubtotal(item),
+              productDiscountAmountMap[productId] || 0,
+            ) > 0
+          );
         }
 
         return (productDiscountPercentMap[productId] || 0) > 0;
@@ -410,7 +408,8 @@ export default function QuickSalesPage() {
         return {
           itemCount: summary.itemCount + item.quantity,
           subtotal: summary.subtotal + lineSubtotal,
-          productDiscountAmount: summary.productDiscountAmount + lineDiscountAmount,
+          productDiscountAmount:
+            summary.productDiscountAmount + lineDiscountAmount,
         };
       },
       { itemCount: 0, subtotal: 0, productDiscountAmount: 0 },
@@ -567,6 +566,7 @@ export default function QuickSalesPage() {
           {
             orderId: order.id,
             orderDate: new Date(order.created_at).toLocaleString("vi-VN"),
+            purchaseMethod: "counter",
             customerName: getDisplayCustomerName({
               name: order.customer_name,
               phone: order.customer_phone,
@@ -948,10 +948,7 @@ export default function QuickSalesPage() {
 
                     {discountModeWatch === "order_total" && (
                       <>
-                        <Form.Item
-                          name="discountValueType"
-                          label="Đơn vị giảm"
-                        >
+                        <Form.Item name="discountValueType" label="Đơn vị giảm">
                           <Select
                             options={[
                               { label: "Theo phần trăm (%)", value: "percent" },
@@ -1026,7 +1023,8 @@ export default function QuickSalesPage() {
                                 key={`discount-${productId}`}
                                 style={{
                                   display: "grid",
-                                  gridTemplateColumns: "minmax(0, 1fr) 112px 150px",
+                                  gridTemplateColumns:
+                                    "minmax(0, 1fr) 112px 150px",
                                   gap: 8,
                                   alignItems: "center",
                                 }}
@@ -1034,7 +1032,10 @@ export default function QuickSalesPage() {
                                 <div style={{ minWidth: 0 }}>
                                   <Text>{item.product.name}</Text>
                                   <div>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                    <Text
+                                      type="secondary"
+                                      style={{ fontSize: 12 }}
+                                    >
                                       Dòng: {formatCurrency(lineSubtotal)}
                                     </Text>
                                   </div>

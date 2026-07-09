@@ -33,6 +33,12 @@ type OrdersMutationTable = {
       }>;
     };
   };
+  update(payload: unknown): {
+    eq(
+      column: string,
+      value: string,
+    ): PromiseLike<{ error: SupabaseMutationError | null }>;
+  };
   delete(): {
     eq(
       column: string,
@@ -40,7 +46,10 @@ type OrdersMutationTable = {
     ): PromiseLike<{ error: SupabaseMutationError | null }>;
   };
   select(columns: string): {
-    eq(column: string, value: string): {
+    eq(
+      column: string,
+      value: string,
+    ): {
       single(): PromiseLike<{
         data: { id: string; total_amount: number } | null;
         error: SupabaseMutationError | null;
@@ -162,8 +171,7 @@ function allocateDiscountAcrossUnits(
   });
 
   let remaining =
-    totalDiscount -
-    rawAllocations.reduce((sum, item) => sum + item.amount, 0);
+    totalDiscount - rawAllocations.reduce((sum, item) => sum + item.amount, 0);
   const sortedByRemainder = [...rawAllocations].sort((first, second) => {
     if (second.remainder !== first.remainder) {
       return second.remainder - first.remainder;
@@ -287,6 +295,50 @@ function buildProductDiscountOrderItems(
   );
 
   return [...percentDiscountItems, ...amountDiscountItems];
+}
+
+function calculateOrderGrossAmount(lines: PreparedOrderLine[]): number {
+  return lines.reduce(
+    (sum, line) => sum + line.baseUnitPrice * line.quantity,
+    0,
+  );
+}
+
+function calculateOrderFinalAmount(
+  orderItems: OrderItemInsertPayload[],
+): number {
+  return orderItems.reduce(
+    (sum, item) => sum + normalizeMoneyAmount(item.subtotal),
+    0,
+  );
+}
+
+function buildDiscountLabel(params: {
+  manualDiscountMode: "order_total" | "product_items";
+  manualDiscountValueType: ManualDiscountValueType;
+  manualDiscountPercent: number;
+  manualDiscountAmount: number;
+  positiveProductDiscountCount: number;
+}): string | null {
+  const {
+    manualDiscountMode,
+    manualDiscountValueType,
+    manualDiscountPercent,
+    manualDiscountAmount,
+    positiveProductDiscountCount,
+  } = params;
+
+  if (manualDiscountMode === "product_items") {
+    return positiveProductDiscountCount > 0
+      ? `Giảm giá theo từng sản phẩm (${positiveProductDiscountCount} sản phẩm)`
+      : null;
+  }
+
+  if (manualDiscountValueType === "amount") {
+    return manualDiscountAmount > 0 ? "Giảm giá theo tổng đơn" : null;
+  }
+
+  return manualDiscountPercent > 0 ? "Giảm giá theo tổng đơn" : null;
 }
 
 async function createOrderDirectly(params: {
@@ -433,10 +485,10 @@ async function createOrderDirectly(params: {
 
   const { data: createdWithPayment, error: createWithPaymentError } =
     await mutationDb
-    .from("orders")
-    .insert(orderInsertWithPayment)
-    .select("id")
-    .single();
+      .from("orders")
+      .insert(orderInsertWithPayment)
+      .select("id")
+      .single();
 
   if (!createWithPaymentError && createdWithPayment?.id) {
     orderId = createdWithPayment.id;
@@ -486,8 +538,9 @@ async function createOrderDirectly(params: {
   const safeCustomerDiscount = normalizePercent(customerDiscountPercent);
   const safeManualDiscount = normalizePercent(manualDiscountPercent);
   const safeManualDiscountAmount = normalizeMoneyAmount(manualDiscountAmount);
-  const safeManualDiscountValueType =
-    normalizeManualDiscountValueType(manualDiscountValueType);
+  const safeManualDiscountValueType = normalizeManualDiscountValueType(
+    manualDiscountValueType,
+  );
   const preparedLines: PreparedOrderLine[] = items.map((item) => {
     const product = productMap.get(item.product_id)!;
     const selectedVariant = item.variant_id
@@ -527,6 +580,29 @@ async function createOrderDirectly(params: {
             buildPercentDiscountOrderItem(orderId, line, safeManualDiscount),
           );
 
+  const grossAmount = calculateOrderGrossAmount(preparedLines);
+  const finalAmount = calculateOrderFinalAmount(orderItemsPayload);
+  const discountAmount = Math.max(0, grossAmount - finalAmount);
+  const positiveProductDiscountCount = Array.from(
+    manualProductDiscountMap.values(),
+  ).filter((item) => item.percent > 0 || item.amount > 0).length;
+  const discountLabel = buildDiscountLabel({
+    manualDiscountMode,
+    manualDiscountValueType: safeManualDiscountValueType,
+    manualDiscountPercent: safeManualDiscount,
+    manualDiscountAmount: safeManualDiscountAmount,
+    positiveProductDiscountCount,
+  });
+  const finalNotes = [
+    notes.trim(),
+    discountAmount > 0 ? discountLabel : null,
+    discountAmount > 0
+      ? `Số tiền giảm: ${discountAmount.toLocaleString("vi-VN")}đ`
+      : null,
+  ]
+    .filter((line): line is string => Boolean(line && line.trim()))
+    .join("\n");
+
   const { error: orderItemsError } = await mutationDb
     .from("order_items")
     .insert(orderItemsPayload);
@@ -537,6 +613,20 @@ async function createOrderDirectly(params: {
       success: false,
       message: `Không thể tạo chi tiết đơn hàng: ${orderItemsError.message}`,
     };
+  }
+
+  if (discountAmount > 0 && finalNotes !== notes) {
+    const { error: updateNotesError } = await mutationDb
+      .from("orders")
+      .update({ notes: finalNotes })
+      .eq("id", orderId);
+
+    if (updateNotesError) {
+      console.warn(
+        "Không thể cập nhật ghi chú giảm giá cho đơn hàng:",
+        updateNotesError,
+      );
+    }
   }
 
   const { data: finalOrder, error: finalOrderError } = await mutationDb
@@ -555,6 +645,9 @@ async function createOrderDirectly(params: {
   return {
     success: true,
     orderId: finalOrder.id,
+    grossAmount,
+    discountAmount,
+    discountLabel,
     totalAmount: Number(finalOrder.total_amount || 0),
     message: "Tạo đơn hàng thành công",
   };
@@ -755,38 +848,6 @@ export async function createOrder(
 
     if (request.customer.notes?.trim()) {
       extraNotes.unshift(request.customer.notes.trim());
-    }
-
-    const positiveProductDiscountCount = manualProductDiscounts.filter(
-      (item) => item.percent > 0 || item.amount > 0,
-    ).length;
-    const hasOrderPercentDiscount =
-      manualDiscountMode === "order_total" &&
-      manualDiscountValueType === "percent" &&
-      manualDiscountPercent > 0;
-    const hasOrderAmountDiscount =
-      manualDiscountMode === "order_total" &&
-      manualDiscountValueType === "amount" &&
-      manualDiscountAmount > 0;
-    if (
-      hasOrderPercentDiscount ||
-      hasOrderAmountDiscount ||
-      (manualDiscountMode === "product_items" &&
-        positiveProductDiscountCount > 0)
-    ) {
-      if (manualDiscountMode === "product_items") {
-        extraNotes.unshift(
-          `Giảm giá theo từng sản phẩm (${positiveProductDiscountCount} sản phẩm)`,
-        );
-      } else if (manualDiscountValueType === "amount") {
-        extraNotes.unshift(
-          `Giảm giá theo tổng đơn: ${manualDiscountAmount.toLocaleString(
-            "vi-VN",
-          )}đ`,
-        );
-      } else {
-        extraNotes.unshift(`Giảm giá theo tổng đơn: ${manualDiscountPercent}%`);
-      }
     }
 
     const finalNotes = extraNotes.join("\n");

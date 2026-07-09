@@ -244,6 +244,8 @@ export default function OrdersPage() {
           {
             orderId: order.id,
             orderDate: new Date(order.created_at).toLocaleString("vi-VN"),
+            purchaseMethod:
+              order.order_type === "counter" ? "counter" : "online",
             customerName: getDisplayCustomerName({
               name: order.customer_name,
               phone: order.customer_phone,
@@ -526,43 +528,43 @@ export default function OrdersPage() {
 
         return (
           <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<PrinterOutlined />}
-            onClick={() => handleExportInvoice(record)}
-          >
-            Xuất hóa đơn
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleOrderClick(record)}
-          >
-            Chi tiết
-          </Button>
-          <Dropdown
-            menu={{
-              items: statusItems,
-              onClick: ({ key }) =>
-                handleStatusChange(record, key as Order["status"]),
-            }}
-            trigger={["click"]}
-          >
             <Button
+              type="link"
               size="small"
-              icon={<EditOutlined />}
-              loading={updatingOrderId === record.id}
-              disabled={
-                updatingOrderId === record.id ||
-                record.status === "cancelled" ||
-                statusItems.length === 0
-              }
+              icon={<PrinterOutlined />}
+              onClick={() => handleExportInvoice(record)}
             >
-              Sửa
+              Xuất hóa đơn
             </Button>
-          </Dropdown>
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleOrderClick(record)}
+            >
+              Chi tiết
+            </Button>
+            <Dropdown
+              menu={{
+                items: statusItems,
+                onClick: ({ key }) =>
+                  handleStatusChange(record, key as Order["status"]),
+              }}
+              trigger={["click"]}
+            >
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                loading={updatingOrderId === record.id}
+                disabled={
+                  updatingOrderId === record.id ||
+                  record.status === "cancelled" ||
+                  statusItems.length === 0
+                }
+              >
+                Sửa
+              </Button>
+            </Dropdown>
           </Space>
         );
       },

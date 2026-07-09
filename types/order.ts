@@ -40,6 +40,9 @@ export interface CreateOrderRequest {
 export interface CreateOrderResponse {
   success: boolean;
   orderId?: string;
+  grossAmount?: number;
+  discountAmount?: number;
+  discountLabel?: string | null;
   totalAmount?: number;
   message: string;
 }

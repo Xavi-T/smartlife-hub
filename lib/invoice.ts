@@ -14,7 +14,11 @@ export interface InvoicePayload {
   customerName: string;
   customerPhone: string;
   customerAddress?: string | null;
+  purchaseMethod?: "counter" | "online";
   notes?: string | null;
+  grossAmount?: number;
+  discountAmount?: number;
+  discountLabel?: string;
   totalAmount: number;
   items: InvoiceLineItem[];
 }
@@ -32,13 +36,93 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function normalizeMoney(value: unknown): number {
+  return Math.max(0, Math.round(Number(value || 0)));
+}
+
+function parseVietnameseMoney(value: string): number {
+  return normalizeMoney(value.replace(/[^\d]/g, ""));
+}
+
+function inferDiscountFromNotes(notes: string, totalAmount: number): number {
+  const explicitAmountMatch = notes.match(/số tiền giảm:\s*([\d.,\s]+)\s*đ/i);
+  if (explicitAmountMatch?.[1]) {
+    return parseVietnameseMoney(explicitAmountMatch[1]);
+  }
+
+  const amountMatch = notes.match(/giảm giá[^\n:]*:[^\n]*?([\d.,\s]+)\s*đ/i);
+  if (amountMatch?.[1]) {
+    return parseVietnameseMoney(amountMatch[1]);
+  }
+
+  const percentMatch = notes.match(/giảm giá theo tổng đơn:\s*([\d.,]+)\s*%/i);
+  if (percentMatch?.[1]) {
+    const percent = Math.min(
+      99.99,
+      Math.max(0, Number(percentMatch[1].replace(",", "."))),
+    );
+    if (percent > 0 && totalAmount > 0) {
+      const grossAmount = Math.round(totalAmount / (1 - percent / 100));
+      return Math.max(0, grossAmount - totalAmount);
+    }
+  }
+
+  return 0;
+}
+
+function getDiscountLabel(notes: string, fallback?: string | null): string {
+  if (fallback) return fallback;
+  const discountLine = notes
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => /^giảm giá/i.test(line));
+
+  return discountLine || "Giảm giá";
+}
+
+function isCounterPurchase(payload: InvoicePayload): boolean {
+  return (
+    payload.purchaseMethod === "counter" ||
+    (payload.customerAddress || "").trim().toLowerCase() === "mua tại quầy"
+  );
+}
+
 export function buildInvoiceHtml(
   payload: InvoicePayload,
   options: InvoiceVatOptions = {},
 ): string {
-  const vatPercent = Math.min(100, Math.max(0, Number(options.vatPercent || 0)));
-  const vatAmount = Math.round(payload.totalAmount * (vatPercent / 100));
-  const netAmount = Math.max(0, payload.totalAmount - vatAmount);
+  const totalAmount = normalizeMoney(payload.totalAmount);
+  const itemTotal = payload.items.reduce(
+    (sum, item) => sum + normalizeMoney(item.subtotal),
+    0,
+  );
+  const notesRaw = payload.notes || "";
+  const explicitDiscountAmount = normalizeMoney(payload.discountAmount);
+  const inferredDiscountAmount =
+    explicitDiscountAmount > 0
+      ? explicitDiscountAmount
+      : inferDiscountFromNotes(notesRaw, totalAmount);
+  const fallbackGrossAmount =
+    inferredDiscountAmount > 0
+      ? totalAmount + inferredDiscountAmount
+      : Math.max(totalAmount, itemTotal);
+  const grossAmount = Math.max(
+    totalAmount,
+    normalizeMoney(payload.grossAmount) || fallbackGrossAmount,
+  );
+  const discountAmount =
+    inferredDiscountAmount > 0
+      ? Math.min(grossAmount, inferredDiscountAmount)
+      : Math.max(0, grossAmount - totalAmount);
+  const discountLabel = escapeHtml(
+    getDiscountLabel(notesRaw, payload.discountLabel),
+  );
+  const vatPercent = Math.min(
+    100,
+    Math.max(0, Number(options.vatPercent || 0)),
+  );
+  const vatAmount = Math.round(totalAmount * (vatPercent / 100));
+  const netAmount = Math.max(0, totalAmount - vatAmount);
 
   const rowsHtml = payload.items
     .map((item, index) => {
@@ -56,10 +140,14 @@ export function buildInvoiceHtml(
     })
     .join("");
 
-  const notes = escapeHtml(payload.notes || "");
+  const notes = escapeHtml(notesRaw);
   const customerName = escapeHtml(payload.customerName || "-");
   const customerPhone = escapeHtml(payload.customerPhone || "-");
-  const customerAddress = escapeHtml(payload.customerAddress || "-");
+  const counterPurchase = isCounterPurchase(payload);
+  const customerInfoLabel = counterPurchase ? "Hình thức mua" : "Địa chỉ";
+  const customerInfoValue = escapeHtml(
+    counterPurchase ? "Mua tại quầy" : payload.customerAddress || "-",
+  );
   const shopName = escapeHtml(APP_CONFIG.shopName);
   const shopAddress = escapeHtml(APP_CONFIG.shopAddress);
   const shopPhone = escapeHtml(APP_CONFIG.shopPhone);
@@ -230,7 +318,7 @@ export function buildInvoiceHtml(
                 <div class="section-title">Thông tin khách hàng</div>
                 <div class="line"><strong>Họ tên:</strong> ${customerName}</div>
                 <div class="line"><strong>Điện thoại:</strong> ${customerPhone}</div>
-                <div class="line"><strong>Địa chỉ:</strong> ${customerAddress}</div>
+                <div class="line"><strong>${customerInfoLabel}:</strong> ${customerInfoValue}</div>
               </div>
             </div>
 
@@ -252,8 +340,24 @@ export function buildInvoiceHtml(
             <div class="summary">
               <div class="summary-row">
                 <span>Tạm tính</span>
-                <strong>${formatCurrency(payload.totalAmount)}</strong>
+                <strong>${formatCurrency(grossAmount)}</strong>
               </div>
+              ${
+                discountAmount > 0
+                  ? `<div class="summary-row">
+                <span>${discountLabel}</span>
+                <strong>-${formatCurrency(discountAmount)}</strong>
+              </div>`
+                  : ""
+              }
+              ${
+                discountAmount > 0
+                  ? `<div class="summary-row">
+                <span>Sau giảm giá</span>
+                <strong>${formatCurrency(totalAmount)}</strong>
+              </div>`
+                  : ""
+              }
               <div class="summary-row">
                 <span>Khấu trừ VAT (${vatPercent}%)</span>
                 <strong>-${formatCurrency(vatAmount)}</strong>
