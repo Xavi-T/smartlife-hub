@@ -21,6 +21,54 @@ import {
 } from "@/lib/customerIdentity";
 import { formatCurrency } from "@/lib/utils";
 
+function normalizeMoney(value: unknown): number {
+  return Math.max(0, Math.round(Number(value || 0)));
+}
+
+function parseVietnameseMoney(value: string): number {
+  return normalizeMoney(value.replace(/[^\d]/g, ""));
+}
+
+function parseDiscountInfo(notes: string | null, totalAmount: number) {
+  const rawNotes = notes || "";
+  const lines = rawNotes
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const explicitAmountLine = lines.find((line) => /^số tiền giảm:/i.test(line));
+  const explicitAmount = explicitAmountLine
+    ? parseVietnameseMoney(explicitAmountLine)
+    : 0;
+
+  const labelLine = lines.find((line) => /^giảm giá/i.test(line)) || null;
+  const percentMatch = rawNotes.match(
+    /giảm giá theo tổng đơn:\s*([\d.,]+)\s*%/i,
+  );
+  const percent = percentMatch?.[1]
+    ? Math.min(99.99, Math.max(0, Number(percentMatch[1].replace(",", "."))))
+    : 0;
+
+  const discountAmount =
+    explicitAmount > 0
+      ? explicitAmount
+      : percent > 0 && totalAmount > 0
+        ? Math.max(
+            0,
+            Math.round(totalAmount / (1 - percent / 100)) - totalAmount,
+          )
+        : 0;
+
+  const grossAmount = discountAmount > 0 ? totalAmount + discountAmount : 0;
+
+  return {
+    label: labelLine,
+    discountAmount,
+    grossAmount,
+    hasDiscount: Boolean(labelLine) || explicitAmount > 0 || percent > 0,
+  };
+}
+
 interface OrderItem {
   id: string;
   quantity: number;
@@ -153,6 +201,8 @@ export function OrderDetailModal({
 
   if (!order) return null;
 
+  const discountInfo = parseDiscountInfo(order.notes, order.total_amount);
+
   return (
     <Modal
       title={
@@ -199,7 +249,9 @@ export function OrderDetailModal({
                   {new Date(order.created_at).toLocaleString("vi-VN")}
                 </Descriptions.Item>
                 <Descriptions.Item label="Loại đơn">
-                  <Tag color={order.order_type === "counter" ? "purple" : "blue"}>
+                  <Tag
+                    color={order.order_type === "counter" ? "purple" : "blue"}
+                  >
                     {order.order_type === "counter"
                       ? "Mua tại quầy"
                       : "Khách online"}
@@ -223,6 +275,35 @@ export function OrderDetailModal({
             </Card>
           </Col>
         </Row>
+
+        {discountInfo.hasDiscount && (
+          <Card title="Chiết khấu" size="small">
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="Hình thức">
+                {discountInfo.label || "Giảm giá"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số tiền giảm">
+                <Typography.Text strong style={{ color: "#fa8c16" }}>
+                  {discountInfo.discountAmount > 0
+                    ? `-${formatCurrency(discountInfo.discountAmount)}`
+                    : "Chưa xác định"}
+                </Typography.Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Tổng trước giảm">
+                <Typography.Text strong>
+                  {discountInfo.grossAmount > 0
+                    ? formatCurrency(discountInfo.grossAmount)
+                    : "Chưa xác định"}
+                </Typography.Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Sau giảm">
+                <Typography.Text strong style={{ color: "#1677ff" }}>
+                  {formatCurrency(order.total_amount)}
+                </Typography.Text>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+        )}
 
         {order.notes && (
           <Alert
