@@ -29,6 +29,64 @@ function parseVietnameseMoney(value: string): number {
   return normalizeMoney(value.replace(/[^\d]/g, ""));
 }
 
+function formatSignedCurrency(amount: number): string {
+  if (amount <= 0) return formatCurrency(0);
+  return `-${formatCurrency(amount)}`;
+}
+
+function allocateDiscountAcrossRows(
+  discountAmount: number,
+  rowTotals: number[],
+): number[] {
+  const totalBeforeDiscount = rowTotals.reduce((sum, value) => sum + value, 0);
+  const totalDiscount = Math.min(
+    normalizeMoney(discountAmount),
+    totalBeforeDiscount,
+  );
+
+  if (totalDiscount <= 0 || totalBeforeDiscount <= 0) {
+    return rowTotals.map(() => 0);
+  }
+
+  const allocations = rowTotals.map((rowTotal) => {
+    const exactShare = (totalDiscount * rowTotal) / totalBeforeDiscount;
+    const amount = Math.min(rowTotal, Math.floor(exactShare));
+
+    return {
+      rowTotal,
+      amount,
+      remainder: exactShare - amount,
+    };
+  });
+
+  let remaining =
+    totalDiscount - allocations.reduce((sum, item) => sum + item.amount, 0);
+
+  while (remaining > 0) {
+    let changed = false;
+    const sorted = [...allocations].sort((first, second) => {
+      if (second.remainder !== first.remainder) {
+        return second.remainder - first.remainder;
+      }
+
+      return second.rowTotal - first.rowTotal;
+    });
+
+    for (const item of sorted) {
+      if (remaining <= 0) break;
+      if (item.amount >= item.rowTotal) continue;
+
+      item.amount += 1;
+      remaining -= 1;
+      changed = true;
+    }
+
+    if (!changed) break;
+  }
+
+  return allocations.map((item) => item.amount);
+}
+
 function parseDiscountInfo(notes: string | null, totalAmount: number) {
   const rawNotes = notes || "";
   const lines = rawNotes
@@ -67,6 +125,22 @@ function parseDiscountInfo(notes: string | null, totalAmount: number) {
     grossAmount,
     hasDiscount: Boolean(labelLine) || explicitAmount > 0 || percent > 0,
   };
+}
+
+function getDisplayNotes(notes: string | null): string | null {
+  const lines = (notes || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !/^hình thức đặt hàng:/i.test(line) &&
+        !/^thanh toán:/i.test(line) &&
+        !/^giảm giá theo/i.test(line) &&
+        !/^số tiền giảm:/i.test(line),
+    );
+
+  return lines.length > 0 ? lines.join("\n") : null;
 }
 
 interface OrderItem {
@@ -186,14 +260,26 @@ export function OrderDetailModal({
       render: (value: number) => formatCurrency(value),
     },
     {
-      title: "Thành tiền",
+      title: "Giảm giá",
       dataIndex: "subtotal",
-      key: "subtotal",
+      key: "discount",
       width: 160,
       align: "right",
-      render: (value: number) => (
+      render: (_, item: OrderItem) => (
+        <Typography.Text strong style={{ color: "#fa8c16" }}>
+          {formatSignedCurrency(item.discountAmount || 0)}
+        </Typography.Text>
+      ),
+    },
+    {
+      title: "Thanh toán",
+      dataIndex: "paymentAmount",
+      key: "paymentAmount",
+      width: 160,
+      align: "right",
+      render: (_, item: OrderItem) => (
         <Typography.Text strong style={{ color: "#1677ff" }}>
-          {formatCurrency(value)}
+          {formatCurrency(item.paymentAmount || item.subtotal)}
         </Typography.Text>
       ),
     },
@@ -202,6 +288,16 @@ export function OrderDetailModal({
   if (!order) return null;
 
   const discountInfo = parseDiscountInfo(order.notes, order.total_amount);
+  const displayNotes = getDisplayNotes(order.notes);
+  const rowDiscounts = allocateDiscountAcrossRows(
+    discountInfo.discountAmount,
+    order.order_items.map((item) => item.subtotal),
+  );
+  const tableData = order.order_items.map((item, index) => ({
+    ...item,
+    discountAmount: rowDiscounts[index] || 0,
+    paymentAmount: Math.max(0, item.subtotal - (rowDiscounts[index] || 0)),
+  }));
 
   return (
     <Modal
@@ -266,7 +362,7 @@ export function OrderDetailModal({
                     {statusLabels[order.status as keyof typeof statusLabels]}
                   </Tag>
                 </Descriptions.Item>
-                <Descriptions.Item label="Tổng tiền">
+                <Descriptions.Item label="Thanh toán">
                   <Typography.Text strong style={{ color: "#1677ff" }}>
                     {formatCurrency(order.total_amount)}
                   </Typography.Text>
@@ -305,12 +401,12 @@ export function OrderDetailModal({
           </Card>
         )}
 
-        {order.notes && (
+        {displayNotes && (
           <Alert
             type="warning"
             showIcon
             title="Ghi chú"
-            description={order.notes}
+            description={displayNotes}
           />
         )}
 
@@ -363,19 +459,47 @@ export function OrderDetailModal({
           <Table
             rowKey="id"
             columns={columns}
-            dataSource={order.order_items}
+            dataSource={tableData}
             pagination={false}
             summary={() => (
-              <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={3}>
-                  <Typography.Text strong>Tổng cộng</Typography.Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={1} align="right">
-                  <Typography.Text strong style={{ color: "#1677ff" }}>
-                    {formatCurrency(order.total_amount)}
-                  </Typography.Text>
-                </Table.Summary.Cell>
-              </Table.Summary.Row>
+              <>
+                <Table.Summary.Row>
+                  <Table.Summary.Cell index={0} colSpan={4}>
+                    <Typography.Text strong>Tạm tính</Typography.Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={1} align="right">
+                    <Typography.Text strong>
+                      {formatCurrency(
+                        discountInfo.grossAmount || order.total_amount,
+                      )}
+                    </Typography.Text>
+                  </Table.Summary.Cell>
+                </Table.Summary.Row>
+                {discountInfo.discountAmount > 0 && (
+                  <Table.Summary.Row>
+                    <Table.Summary.Cell index={0} colSpan={4}>
+                      <Typography.Text strong>
+                        {discountInfo.label || "Giảm giá"}
+                      </Typography.Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={1} align="right">
+                      <Typography.Text strong style={{ color: "#fa8c16" }}>
+                        {formatSignedCurrency(discountInfo.discountAmount)}
+                      </Typography.Text>
+                    </Table.Summary.Cell>
+                  </Table.Summary.Row>
+                )}
+                <Table.Summary.Row>
+                  <Table.Summary.Cell index={0} colSpan={4}>
+                    <Typography.Text strong>Thanh toán</Typography.Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={1} align="right">
+                    <Typography.Text strong style={{ color: "#1677ff" }}>
+                      {formatCurrency(order.total_amount)}
+                    </Typography.Text>
+                  </Table.Summary.Cell>
+                </Table.Summary.Row>
+              </>
             )}
           />
         </Card>

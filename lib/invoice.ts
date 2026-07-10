@@ -40,6 +40,62 @@ function normalizeMoney(value: unknown): number {
   return Math.max(0, Math.round(Number(value || 0)));
 }
 
+function formatSignedCurrency(amount: number): string {
+  if (amount <= 0) return formatCurrency(0);
+  return `-${formatCurrency(amount)}`;
+}
+
+function allocateDiscountAcrossRows(
+  discountAmount: number,
+  rowTotals: number[],
+): number[] {
+  const totalBeforeDiscount = rowTotals.reduce((sum, value) => sum + value, 0);
+  const totalDiscount = Math.min(
+    normalizeMoney(discountAmount),
+    totalBeforeDiscount,
+  );
+
+  if (totalDiscount <= 0 || totalBeforeDiscount <= 0) {
+    return rowTotals.map(() => 0);
+  }
+
+  const allocations = rowTotals.map((rowTotal) => {
+    const exactShare = (totalDiscount * rowTotal) / totalBeforeDiscount;
+    return {
+      rowTotal,
+      amount: Math.min(rowTotal, Math.floor(exactShare)),
+      remainder: exactShare - Math.floor(exactShare),
+    };
+  });
+
+  let remaining =
+    totalDiscount - allocations.reduce((sum, item) => sum + item.amount, 0);
+
+  while (remaining > 0) {
+    let changed = false;
+    const sorted = [...allocations].sort((first, second) => {
+      if (second.remainder !== first.remainder) {
+        return second.remainder - first.remainder;
+      }
+
+      return second.rowTotal - first.rowTotal;
+    });
+
+    for (const item of sorted) {
+      if (remaining <= 0) break;
+      if (item.amount >= item.rowTotal) continue;
+
+      item.amount += 1;
+      remaining -= 1;
+      changed = true;
+    }
+
+    if (!changed) break;
+  }
+
+  return allocations.map((item) => item.amount);
+}
+
 function parseVietnameseMoney(value: string): number {
   return normalizeMoney(value.replace(/[^\d]/g, ""));
 }
@@ -78,6 +134,22 @@ function getDiscountLabel(notes: string, fallback?: string | null): string {
     .find((line) => /^giảm giá/i.test(line));
 
   return discountLine || "Giảm giá";
+}
+
+function getDisplayNotes(notes: string | null): string | null {
+  const lines = (notes || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !/^hình thức đặt hàng:/i.test(line) &&
+        !/^thanh toán:/i.test(line) &&
+        !/^giảm giá theo/i.test(line) &&
+        !/^số tiền giảm:/i.test(line),
+    );
+
+  return lines.length > 0 ? lines.join("\n") : null;
 }
 
 function isCounterPurchase(payload: InvoicePayload): boolean {
@@ -123,10 +195,17 @@ export function buildInvoiceHtml(
   );
   const vatAmount = Math.round(totalAmount * (vatPercent / 100));
   const netAmount = Math.max(0, totalAmount - vatAmount);
+  const lineDiscounts = allocateDiscountAcrossRows(
+    discountAmount,
+    payload.items.map((item) => normalizeMoney(item.subtotal)),
+  );
 
   const rowsHtml = payload.items
     .map((item, index) => {
       const productName = escapeHtml(item.name || "Sản phẩm");
+      const rowSubtotal = normalizeMoney(item.subtotal);
+      const rowDiscount = lineDiscounts[index] || 0;
+      const rowPayment = Math.max(0, rowSubtotal - rowDiscount);
 
       return `
         <tr>
@@ -134,13 +213,15 @@ export function buildInvoiceHtml(
           <td>${productName}</td>
           <td class="c-right">${item.quantity}</td>
           <td class="c-right">${formatCurrency(item.unitPrice)}</td>
-          <td class="c-right">${formatCurrency(item.subtotal)}</td>
+          <td class="c-right">${formatSignedCurrency(rowDiscount)}</td>
+          <td class="c-right">${formatCurrency(rowPayment)}</td>
         </tr>
       `;
     })
     .join("");
 
   const notes = escapeHtml(notesRaw);
+  const displayNotes = getDisplayNotes(notesRaw);
   const customerName = escapeHtml(payload.customerName || "-");
   const customerPhone = escapeHtml(payload.customerPhone || "-");
   const counterPurchase = isCounterPurchase(payload);
@@ -328,8 +409,9 @@ export function buildInvoiceHtml(
                   <th style="width:52px;">STT</th>
                   <th>Sản phẩm</th>
                   <th style="width:80px;" class="c-right">SL</th>
-                  <th style="width:150px;" class="c-right">Đơn giá</th>
-                  <th style="width:170px;" class="c-right">Thành tiền</th>
+                  <th style="width:140px;" class="c-right">Đơn giá</th>
+                  <th style="width:140px;" class="c-right">Giảm giá</th>
+                  <th style="width:160px;" class="c-right">Thanh toán</th>
                 </tr>
               </thead>
               <tbody>
@@ -346,7 +428,7 @@ export function buildInvoiceHtml(
                 discountAmount > 0
                   ? `<div class="summary-row">
                 <span>${discountLabel}</span>
-                <strong>-${formatCurrency(discountAmount)}</strong>
+                <strong>${formatSignedCurrency(discountAmount)}</strong>
               </div>`
                   : ""
               }
@@ -360,7 +442,7 @@ export function buildInvoiceHtml(
               }
               <div class="summary-row">
                 <span>Khấu trừ VAT (${vatPercent}%)</span>
-                <strong>-${formatCurrency(vatAmount)}</strong>
+                <strong>${formatSignedCurrency(vatAmount)}</strong>
               </div>
               <div class="summary-row summary-total">
                 <span>Thanh toán</span>
@@ -368,7 +450,7 @@ export function buildInvoiceHtml(
               </div>
             </div>
 
-            ${notes ? `<div class="notes"><strong>Ghi chú:</strong> ${notes}</div>` : ""}
+            ${displayNotes ? `<div class="notes"><strong>Ghi chú:</strong> ${escapeHtml(displayNotes)}</div>` : ""}
 
             <div class="footer">
               <div class="sign-box">
