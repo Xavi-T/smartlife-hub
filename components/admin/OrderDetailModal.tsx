@@ -156,6 +156,11 @@ interface OrderItem {
   };
 }
 
+interface OrderItemRow extends OrderItem {
+  discountAmount: number;
+  paymentAmount: number;
+}
+
 interface Order {
   id: string;
   customer_name: string;
@@ -203,7 +208,7 @@ export function OrderDetailModal({
     cancelled: "Đã hủy",
   } as const;
 
-  const columns: ColumnsType<OrderItem> = [
+  const columns: ColumnsType<OrderItemRow> = [
     {
       title: "Sản phẩm",
       dataIndex: "products",
@@ -265,7 +270,7 @@ export function OrderDetailModal({
       key: "discount",
       width: 160,
       align: "right",
-      render: (_, item: OrderItem) => (
+      render: (_, item: OrderItemRow) => (
         <Typography.Text strong style={{ color: "#fa8c16" }}>
           {formatSignedCurrency(item.discountAmount || 0)}
         </Typography.Text>
@@ -277,7 +282,7 @@ export function OrderDetailModal({
       key: "paymentAmount",
       width: 160,
       align: "right",
-      render: (_, item: OrderItem) => (
+      render: (_, item: OrderItemRow) => (
         <Typography.Text strong style={{ color: "#1677ff" }}>
           {formatCurrency(item.paymentAmount || item.subtotal)}
         </Typography.Text>
@@ -293,7 +298,7 @@ export function OrderDetailModal({
     discountInfo.discountAmount,
     order.order_items.map((item) => item.subtotal),
   );
-  const tableData = order.order_items.map((item, index) => ({
+  const tableData: OrderItemRow[] = order.order_items.map((item, index) => ({
     ...item,
     discountAmount: rowDiscounts[index] || 0,
     paymentAmount: Math.max(0, item.subtotal - (rowDiscounts[index] || 0)),
