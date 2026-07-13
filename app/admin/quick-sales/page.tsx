@@ -460,7 +460,9 @@ export default function QuickSalesPage() {
   }, [form]);
 
   const handleApplyVoucher = async () => {
-    const code = String(voucherCodeWatch || "").trim().toUpperCase();
+    const code = String(voucherCodeWatch || "")
+      .trim()
+      .toUpperCase();
     const customerPhone = String(customerPhoneWatch || "").trim();
 
     if (!code) {
@@ -575,7 +577,9 @@ export default function QuickSalesPage() {
             ? cartSummary.discountAmount
             : 0,
         manualDiscountMode: discountModeWatch,
-        manualProductDiscounts: appliedVoucherCode ? [] : manualProductDiscounts,
+        manualProductDiscounts: appliedVoucherCode
+          ? []
+          : manualProductDiscounts,
         items: cart.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -989,10 +993,15 @@ export default function QuickSalesPage() {
                       }
                     }}
                   />
-                  <Button loading={isCheckingVoucher} onClick={handleApplyVoucher}>
+                  <Button
+                    loading={isCheckingVoucher}
+                    onClick={handleApplyVoucher}
+                  >
                     Áp dụng
                   </Button>
-                  {appliedVoucherCode && <Button onClick={clearVoucher}>Xóa</Button>}
+                  {appliedVoucherCode && (
+                    <Button onClick={clearVoucher}>Xóa</Button>
+                  )}
                 </Space.Compact>
               </Form.Item>
 

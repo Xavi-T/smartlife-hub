@@ -63,22 +63,26 @@ export async function GET() {
 
     const sb = createAdminReportClient() as any;
 
-    const [segmentsResult, customersResult, transactionsResult, vouchersResult] =
-      await Promise.all([
-        sb.from("customer_segment_settings").select("segment_key, segment_label"),
-        sb
-          .from("priority_customers")
-          .select("customer_phone, customer_segment")
-          .eq("is_active", true),
-        sb
-          .from("customer_point_transactions")
-          .select("customer_phone, direction, points"),
-        sb
-          .from("customer_vouchers")
-          .select(
-            "customer_phone, status, used_order_id, used_discount_amount, created_at",
-          ),
-      ]);
+    const [
+      segmentsResult,
+      customersResult,
+      transactionsResult,
+      vouchersResult,
+    ] = await Promise.all([
+      sb.from("customer_segment_settings").select("segment_key, segment_label"),
+      sb
+        .from("priority_customers")
+        .select("customer_phone, customer_segment")
+        .eq("is_active", true),
+      sb
+        .from("customer_point_transactions")
+        .select("customer_phone, direction, points"),
+      sb
+        .from("customer_vouchers")
+        .select(
+          "customer_phone, status, used_order_id, used_discount_amount, created_at",
+        ),
+    ]);
 
     if (segmentsResult.error) throw segmentsResult.error;
     if (customersResult.error) throw customersResult.error;
@@ -94,7 +98,10 @@ export async function GET() {
     const rows = new Map<string, SegmentReportRow>();
     const getRow = (segmentKey: string) => {
       if (!rows.has(segmentKey)) {
-        rows.set(segmentKey, emptyRow(segmentKey, segmentLabels.get(segmentKey)));
+        rows.set(
+          segmentKey,
+          emptyRow(segmentKey, segmentLabels.get(segmentKey)),
+        );
       }
       return rows.get(segmentKey)!;
     };
@@ -118,7 +125,10 @@ export async function GET() {
     const usedOrderIds = Array.from(
       new Set(
         (vouchersResult.data || [])
-          .filter((voucher: any) => voucher.status === "used" && voucher.used_order_id)
+          .filter(
+            (voucher: any) =>
+              voucher.status === "used" && voucher.used_order_id,
+          )
           .map((voucher: any) => voucher.used_order_id),
       ),
     );
@@ -142,7 +152,8 @@ export async function GET() {
         row.vouchersUsed += 1;
         row.voucherDiscountAmount += toNumber(voucher.used_discount_amount);
         if (voucher.used_order_id) {
-          row.voucherRevenue += orderRevenueById.get(voucher.used_order_id) || 0;
+          row.voucherRevenue +=
+            orderRevenueById.get(voucher.used_order_id) || 0;
         }
       }
     }
@@ -178,8 +189,7 @@ export async function GET() {
     console.error("Error loading marketing reports:", error);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Không thể tải báo cáo",
+        error: error instanceof Error ? error.message : "Không thể tải báo cáo",
       },
       { status: 500 },
     );

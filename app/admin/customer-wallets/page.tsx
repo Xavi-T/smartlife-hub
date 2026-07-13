@@ -72,7 +72,8 @@ function normalizePhone(value: string): string {
 }
 
 function formatVoucherValue(voucher: CustomerVoucher): string {
-  if (voucher.voucher_type === "percent") return `${Number(voucher.voucher_value || 0)}%`;
+  if (voucher.voucher_type === "percent")
+    return `${Number(voucher.voucher_value || 0)}%`;
   return `${Number(voucher.voucher_value || 0).toLocaleString("vi-VN")}đ`;
 }
 
@@ -97,9 +98,12 @@ export default function CustomerWalletsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/customer-wallets/${cleanPhone}`, {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/admin/customer-wallets/${cleanPhone}`,
+        {
+          cache: "no-store",
+        },
+      );
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Không thể tải ví điểm");
@@ -107,7 +111,9 @@ export default function CustomerWalletsPage() {
       setPhone(cleanPhone);
       setData(result);
     } catch (error: unknown) {
-      messageApi.error(error instanceof Error ? error.message : "Không thể tải dữ liệu");
+      messageApi.error(
+        error instanceof Error ? error.message : "Không thể tải dữ liệu",
+      );
     } finally {
       setLoading(false);
     }
@@ -117,11 +123,14 @@ export default function CustomerWalletsPage() {
     if (!normalizedPhone) return;
     setRedeeming(true);
     try {
-      const response = await fetch(`/api/admin/customer-wallets/${normalizedPhone}/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+      const response = await fetch(
+        `/api/admin/customer-wallets/${normalizedPhone}/redeem`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        },
+      );
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Không thể đổi điểm");
@@ -131,7 +140,9 @@ export default function CustomerWalletsPage() {
       redeemForm.resetFields();
       await loadWallet(normalizedPhone);
     } catch (error: unknown) {
-      messageApi.error(error instanceof Error ? error.message : "Không thể đổi điểm");
+      messageApi.error(
+        error instanceof Error ? error.message : "Không thể đổi điểm",
+      );
     } finally {
       setRedeeming(false);
     }
@@ -164,8 +175,12 @@ export default function CustomerWalletsPage() {
       key: "points",
       width: 120,
       render: (value: number, record) => (
-        <Typography.Text strong style={{ color: record.direction === "earn" ? "#52c41a" : "#cf1322" }}>
-          {record.direction === "earn" ? "+" : "-"}{Number(value || 0).toLocaleString("vi-VN")}
+        <Typography.Text
+          strong
+          style={{ color: record.direction === "earn" ? "#52c41a" : "#cf1322" }}
+        >
+          {record.direction === "earn" ? "+" : "-"}
+          {Number(value || 0).toLocaleString("vi-VN")}
         </Typography.Text>
       ),
     },
@@ -191,7 +206,11 @@ export default function CustomerWalletsPage() {
       render: (value: string) => (
         <Space>
           <Typography.Text code>{value}</Typography.Text>
-          <Button size="small" icon={<CopyOutlined />} onClick={() => copyVoucher(value)} />
+          <Button
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={() => copyVoucher(value)}
+          />
         </Space>
       ),
     },
@@ -207,14 +226,19 @@ export default function CustomerWalletsPage() {
       key: "status",
       width: 120,
       render: (value: CustomerVoucher["status"]) =>
-        value === "active" ? <Tag color="success">Có thể dùng</Tag> : <Tag>{value}</Tag>,
+        value === "active" ? (
+          <Tag color="success">Có thể dùng</Tag>
+        ) : (
+          <Tag>{value}</Tag>
+        ),
     },
     {
       title: "Hạn dùng",
       dataIndex: "expires_at",
       key: "expires_at",
       width: 180,
-      render: (value: string | null) => value ? new Date(value).toLocaleString("vi-VN") : "Không giới hạn",
+      render: (value: string | null) =>
+        value ? new Date(value).toLocaleString("vi-VN") : "Không giới hạn",
     },
   ];
 
@@ -232,11 +256,24 @@ export default function CustomerWalletsPage() {
         </div>
 
         <Card>
-          <Form form={form} layout="inline" onFinish={(values) => loadWallet(values.phone)}>
-            <Form.Item name="phone" rules={[{ required: true, message: "Nhập SĐT" }]} style={{ minWidth: 280 }}>
+          <Form
+            form={form}
+            layout="inline"
+            onFinish={(values) => loadWallet(values.phone)}
+          >
+            <Form.Item
+              name="phone"
+              rules={[{ required: true, message: "Nhập SĐT" }]}
+              style={{ minWidth: 280 }}
+            >
               <Input placeholder="Nhập số điện thoại khách hàng" />
             </Form.Item>
-            <Button type="primary" htmlType="submit" icon={<SearchOutlined />} loading={loading}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              icon={<SearchOutlined />}
+              loading={loading}
+            >
               Tra cứu
             </Button>
           </Form>
@@ -251,17 +288,26 @@ export default function CustomerWalletsPage() {
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={8}>
                 <Card>
-                  <Statistic title="Điểm hiện tại" value={data.wallet.total_points} />
+                  <Statistic
+                    title="Điểm hiện tại"
+                    value={data.wallet.total_points}
+                  />
                 </Card>
               </Col>
               <Col xs={24} sm={8}>
                 <Card>
-                  <Statistic title="Tổng điểm đã tích" value={data.wallet.lifetime_earned_points} />
+                  <Statistic
+                    title="Tổng điểm đã tích"
+                    value={data.wallet.lifetime_earned_points}
+                  />
                 </Card>
               </Col>
               <Col xs={24} sm={8}>
                 <Card>
-                  <Statistic title="Tổng điểm đã đổi" value={data.wallet.lifetime_redeemed_points} />
+                  <Statistic
+                    title="Tổng điểm đã đổi"
+                    value={data.wallet.lifetime_redeemed_points}
+                  />
                 </Card>
               </Col>
             </Row>
@@ -287,7 +333,12 @@ export default function CustomerWalletsPage() {
                   message="Chưa có chiến dịch đổi điểm lấy voucher đang bật."
                 />
               )}
-              <Table rowKey="id" columns={voucherColumns} dataSource={data.vouchers} pagination={{ pageSize: 5 }} />
+              <Table
+                rowKey="id"
+                columns={voucherColumns}
+                dataSource={data.vouchers}
+                pagination={{ pageSize: 5 }}
+              />
             </Card>
 
             <Card title="Lịch sử điểm">

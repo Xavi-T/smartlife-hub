@@ -73,13 +73,15 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const transitionClient =
-      sb as unknown as TransitionOrderStatusRpcClient;
+    const transitionClient = sb as unknown as TransitionOrderStatusRpcClient;
     const { data: transitionData, error: transitionError } =
       await transitionClient.rpc("transition_order_status", {
         p_order_id: orderId,
         p_new_status: normalizedNewStatus,
-        p_note: String(statusNote || "").trim().slice(0, 1200) || null,
+        p_note:
+          String(statusNote || "")
+            .trim()
+            .slice(0, 1200) || null,
         p_changed_by: user.email || user.id,
       });
 
@@ -90,7 +92,8 @@ export async function PATCH(request: NextRequest) {
         {
           error: isMissingFunction
             ? "Chưa cài đặt migration order_workflow_schema.sql trên Supabase"
-            : transitionError.message || "Không thể cập nhật trạng thái đơn hàng",
+            : transitionError.message ||
+              "Không thể cập nhật trạng thái đơn hàng",
         },
         { status: isMissingFunction ? 500 : 400 },
       );

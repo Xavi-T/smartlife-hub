@@ -69,7 +69,9 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "Không thể đổi điểm lấy voucher",
+          error instanceof Error
+            ? error.message
+            : "Không thể đổi điểm lấy voucher",
       },
       { status: 400 },
     );

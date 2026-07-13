@@ -28,7 +28,9 @@ export async function POST(request: NextRequest) {
       orderAmount?: number;
     };
 
-    const voucherCode = String(body.voucherCode || "").trim().toUpperCase();
+    const voucherCode = String(body.voucherCode || "")
+      .trim()
+      .toUpperCase();
     const customerPhone = String(body.customerPhone || "").trim();
     const orderAmount = Math.max(0, Math.round(Number(body.orderAmount || 0)));
 
@@ -63,9 +65,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Không thể kiểm tra voucher",
+          error instanceof Error ? error.message : "Không thể kiểm tra voucher",
       },
       { status: 400 },
     );

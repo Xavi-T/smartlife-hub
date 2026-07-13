@@ -106,7 +106,9 @@ export default function CheckoutPage() {
   };
 
   const handleApplyVoucher = async () => {
-    const code = String(voucherCode || "").trim().toUpperCase();
+    const code = String(voucherCode || "")
+      .trim()
+      .toUpperCase();
     if (!code) {
       messageApi.warning("Vui lòng nhập mã voucher");
       return;
@@ -403,7 +405,10 @@ export default function CheckoutPage() {
                         }
                       }}
                     />
-                    <Button loading={isCheckingVoucher} onClick={handleApplyVoucher}>
+                    <Button
+                      loading={isCheckingVoucher}
+                      onClick={handleApplyVoucher}
+                    >
                       Áp dụng
                     </Button>
                     {appliedVoucherCode && (
@@ -636,7 +641,9 @@ export default function CheckoutPage() {
                   <div
                     style={{ display: "flex", justifyContent: "space-between" }}
                   >
-                    <Typography.Text>Voucher {appliedVoucherCode}</Typography.Text>
+                    <Typography.Text>
+                      Voucher {appliedVoucherCode}
+                    </Typography.Text>
                     <Typography.Text strong style={{ color: "#cf1322" }}>
                       -{formatCurrency(voucherDiscountAmount)}
                     </Typography.Text>

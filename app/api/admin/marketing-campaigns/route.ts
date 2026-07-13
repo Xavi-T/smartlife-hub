@@ -42,12 +42,21 @@ function toSafeNumber(value: unknown): number {
   return numeric;
 }
 
-function buildCampaignConfig(payload: Record<string, unknown>): Record<string, unknown> {
+function buildCampaignConfig(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
   return {
-    pointsEarnRatePer1000: Math.max(0, toSafeNumber(payload.pointsEarnRatePer1000)),
+    pointsEarnRatePer1000: Math.max(
+      0,
+      toSafeNumber(payload.pointsEarnRatePer1000),
+    ),
     pointsCost: Math.max(0, Math.round(toSafeNumber(payload.pointsCost))),
     voucherType:
-      payload.voucherType === "amount" ? "amount" : payload.voucherType === "percent" ? "percent" : null,
+      payload.voucherType === "amount"
+        ? "amount"
+        : payload.voucherType === "percent"
+          ? "percent"
+          : null,
     voucherValue: Math.max(0, toSafeNumber(payload.voucherValue)),
     maxDiscountAmount: Math.max(0, toSafeNumber(payload.maxDiscountAmount)),
     minOrderAmount: Math.max(0, toSafeNumber(payload.minOrderAmount)),
@@ -158,8 +167,12 @@ export async function POST(request: NextRequest) {
     const campaignType = normalizeCampaignType(body.campaignType);
     const isActive = body.isActive !== false;
     const isUnlimitedTime = body.isUnlimitedTime === true;
-    const startAt = isUnlimitedTime ? null : String(body.startAt || "").trim() || null;
-    const endAt = isUnlimitedTime ? null : String(body.endAt || "").trim() || null;
+    const startAt = isUnlimitedTime
+      ? null
+      : String(body.startAt || "").trim() || null;
+    const endAt = isUnlimitedTime
+      ? null
+      : String(body.endAt || "").trim() || null;
     const config = buildCampaignConfig(body);
 
     const validationError = validateCampaignInput({

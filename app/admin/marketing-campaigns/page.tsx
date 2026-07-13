@@ -129,7 +129,9 @@ export default function MarketingCampaignsPage() {
   const [saving, setSaving] = useState(false);
   const [reportLoading, setReportLoading] = useState(true);
   const [segmentReports, setSegmentReports] = useState<SegmentReportRow[]>([]);
-  const [reportTotals, setReportTotals] = useState<SegmentReportTotals | null>(null);
+  const [reportTotals, setReportTotals] = useState<SegmentReportTotals | null>(
+    null,
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] =
     useState<MarketingCampaign | null>(null);
@@ -220,17 +222,13 @@ export default function MarketingCampaignsPage() {
       description: campaign.description || undefined,
       isActive: campaign.is_active,
       isUnlimitedTime: campaign.is_unlimited_time,
-      startAt: campaign.start_at
-        ? campaign.start_at.slice(0, 16)
-        : undefined,
+      startAt: campaign.start_at ? campaign.start_at.slice(0, 16) : undefined,
       endAt: campaign.end_at ? campaign.end_at.slice(0, 16) : undefined,
       priority: campaign.priority,
       pointsEarnRatePer1000: campaign.config?.pointsEarnRatePer1000,
       pointsCost: campaign.config?.pointsCost,
       voucherType:
-        campaign.config?.voucherType === "percent"
-          ? "percent"
-          : "amount",
+        campaign.config?.voucherType === "percent" ? "percent" : "amount",
       voucherValue: campaign.config?.voucherValue,
       maxDiscountAmount: campaign.config?.maxDiscountAmount,
       minOrderAmount: campaign.config?.minOrderAmount,
@@ -328,7 +326,9 @@ export default function MarketingCampaignsPage() {
       title: "Nhóm khách",
       dataIndex: "segmentLabel",
       key: "segmentLabel",
-      render: (value: string) => <Typography.Text strong>{value}</Typography.Text>,
+      render: (value: string) => (
+        <Typography.Text strong>{value}</Typography.Text>
+      ),
     },
     {
       title: "KH ưu tiên",
@@ -355,21 +355,24 @@ export default function MarketingCampaignsPage() {
       title: "Voucher phát/dùng",
       key: "voucherUsage",
       align: "right",
-      render: (_value, record) => `${record.vouchersIssued}/${record.vouchersUsed}`,
+      render: (_value, record) =>
+        `${record.vouchersIssued}/${record.vouchersUsed}`,
     },
     {
       title: "Doanh thu voucher",
       dataIndex: "voucherRevenue",
       key: "voucherRevenue",
       align: "right",
-      render: (value: number) => `${Number(value || 0).toLocaleString("vi-VN")}đ`,
+      render: (value: number) =>
+        `${Number(value || 0).toLocaleString("vi-VN")}đ`,
     },
     {
       title: "Chiết khấu voucher",
       dataIndex: "voucherDiscountAmount",
       key: "voucherDiscountAmount",
       align: "right",
-      render: (value: number) => `${Number(value || 0).toLocaleString("vi-VN")}đ`,
+      render: (value: number) =>
+        `${Number(value || 0).toLocaleString("vi-VN")}đ`,
     },
   ];
 
@@ -573,7 +576,9 @@ export default function MarketingCampaignsPage() {
               <Form.Item
                 name="name"
                 label="Tên chiến dịch"
-                rules={[{ required: true, message: "Vui lòng nhập tên chiến dịch" }]}
+                rules={[
+                  { required: true, message: "Vui lòng nhập tên chiến dịch" },
+                ]}
               >
                 <Input placeholder="Ví dụ: Mẹ bỉm tích điểm tháng khai trương" />
               </Form.Item>
@@ -590,7 +595,9 @@ export default function MarketingCampaignsPage() {
               <Form.Item
                 name="campaignType"
                 label="Loại chiến dịch"
-                rules={[{ required: true, message: "Vui lòng chọn loại chiến dịch" }]}
+                rules={[
+                  { required: true, message: "Vui lòng chọn loại chiến dịch" },
+                ]}
               >
                 <Select
                   options={[
@@ -637,7 +644,12 @@ export default function MarketingCampaignsPage() {
                 rules={
                   isUnlimitedTime
                     ? []
-                    : [{ required: true, message: "Vui lòng nhập thời gian bắt đầu" }]
+                    : [
+                        {
+                          required: true,
+                          message: "Vui lòng nhập thời gian bắt đầu",
+                        },
+                      ]
                 }
               >
                 <Input type="datetime-local" disabled={isUnlimitedTime} />
@@ -650,7 +662,12 @@ export default function MarketingCampaignsPage() {
                 rules={
                   isUnlimitedTime
                     ? []
-                    : [{ required: true, message: "Vui lòng nhập thời gian kết thúc" }]
+                    : [
+                        {
+                          required: true,
+                          message: "Vui lòng nhập thời gian kết thúc",
+                        },
+                      ]
                 }
               >
                 <Input type="datetime-local" disabled={isUnlimitedTime} />
@@ -659,10 +676,17 @@ export default function MarketingCampaignsPage() {
           </Row>
 
           <Form.Item name="description" label="Mô tả chiến dịch">
-            <Input.TextArea rows={2} placeholder="Mô tả ngắn mục tiêu chiến dịch" />
+            <Input.TextArea
+              rows={2}
+              placeholder="Mô tả ngắn mục tiêu chiến dịch"
+            />
           </Form.Item>
 
-          <Card size="small" title="Cấu hình phần thưởng" style={{ marginBottom: 12 }}>
+          <Card
+            size="small"
+            title="Cấu hình phần thưởng"
+            style={{ marginBottom: 12 }}
+          >
             {selectedCampaignType === "points_earn" && (
               <Form.Item
                 name="pointsEarnRatePer1000"
@@ -681,7 +705,9 @@ export default function MarketingCampaignsPage() {
                   <Form.Item
                     name="pointsCost"
                     label="Điểm cần đổi"
-                    rules={[{ required: true, message: "Vui lòng nhập điểm cần đổi" }]}
+                    rules={[
+                      { required: true, message: "Vui lòng nhập điểm cần đổi" },
+                    ]}
                   >
                     <InputNumber min={1} style={{ width: "100%" }} />
                   </Form.Item>
@@ -690,7 +716,9 @@ export default function MarketingCampaignsPage() {
                   <Form.Item
                     name="voucherType"
                     label="Loại voucher"
-                    rules={[{ required: true, message: "Vui lòng chọn loại voucher" }]}
+                    rules={[
+                      { required: true, message: "Vui lòng chọn loại voucher" },
+                    ]}
                   >
                     <Select
                       options={[
@@ -704,7 +732,12 @@ export default function MarketingCampaignsPage() {
                   <Form.Item
                     name="voucherValue"
                     label="Giá trị voucher"
-                    rules={[{ required: true, message: "Vui lòng nhập giá trị voucher" }]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập giá trị voucher",
+                      },
+                    ]}
                   >
                     <InputNumber min={1} style={{ width: "100%" }} />
                   </Form.Item>
@@ -721,7 +754,11 @@ export default function MarketingCampaignsPage() {
                 </Col>
                 <Col xs={24} md={8}>
                   <Form.Item name="expiresInDays" label="Hạn voucher (ngày)">
-                    <InputNumber min={0} style={{ width: "100%" }} placeholder="0 = không hạn" />
+                    <InputNumber
+                      min={0}
+                      style={{ width: "100%" }}
+                      placeholder="0 = không hạn"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -733,7 +770,9 @@ export default function MarketingCampaignsPage() {
                   <Form.Item
                     name="giftName"
                     label="Tên quà tặng"
-                    rules={[{ required: true, message: "Vui lòng nhập tên quà tặng" }]}
+                    rules={[
+                      { required: true, message: "Vui lòng nhập tên quà tặng" },
+                    ]}
                   >
                     <Input placeholder="Ví dụ: Sample BioGaia mini" />
                   </Form.Item>

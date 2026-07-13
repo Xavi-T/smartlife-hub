@@ -548,7 +548,9 @@ async function createOrderDirectly(params: {
   const safeManualDiscountValueType = normalizeManualDiscountValueType(
     manualDiscountValueType,
   );
-  const normalizedVoucherCode = String(voucherCode || "").trim().toUpperCase();
+  const normalizedVoucherCode = String(voucherCode || "")
+    .trim()
+    .toUpperCase();
   const preparedLines: PreparedOrderLine[] = items.map((item) => {
     const product = productMap.get(item.product_id)!;
     const selectedVariant = item.variant_id
@@ -571,13 +573,11 @@ async function createOrderDirectly(params: {
   });
 
   const grossAmount = calculateOrderGrossAmount(preparedLines);
-  let appliedVoucher:
-    | {
-        id: string;
-        code: string;
-        discountAmount: number;
-      }
-    | null = null;
+  let appliedVoucher: {
+    id: string;
+    code: string;
+    discountAmount: number;
+  } | null = null;
 
   if (normalizedVoucherCode) {
     const voucherPreview = await previewVoucherDiscount({
@@ -602,21 +602,21 @@ async function createOrderDirectly(params: {
           appliedVoucher.discountAmount,
         )
       : manualDiscountMode === "order_total" &&
-    safeManualDiscountValueType === "amount"
-      ? buildAmountDiscountOrderItems(
-          orderId,
-          preparedLines,
-          safeManualDiscountAmount,
-        )
-      : manualDiscountMode === "product_items"
-        ? buildProductDiscountOrderItems(
+          safeManualDiscountValueType === "amount"
+        ? buildAmountDiscountOrderItems(
             orderId,
             preparedLines,
-            manualProductDiscountMap,
+            safeManualDiscountAmount,
           )
-        : preparedLines.map((line) =>
-            buildPercentDiscountOrderItem(orderId, line, safeManualDiscount),
-          );
+        : manualDiscountMode === "product_items"
+          ? buildProductDiscountOrderItems(
+              orderId,
+              preparedLines,
+              manualProductDiscountMap,
+            )
+          : preparedLines.map((line) =>
+              buildPercentDiscountOrderItem(orderId, line, safeManualDiscount),
+            );
 
   const finalAmount = calculateOrderFinalAmount(orderItemsPayload);
   const discountAmount = Math.max(0, grossAmount - finalAmount);
@@ -829,7 +829,9 @@ export async function createOrder(
 
     if (
       normalizedVoucherCode &&
-      (hasOrderPercentDiscount || hasOrderAmountDiscount || hasProductLineDiscount)
+      (hasOrderPercentDiscount ||
+        hasOrderAmountDiscount ||
+        hasProductLineDiscount)
     ) {
       return {
         success: false,
@@ -963,7 +965,11 @@ export async function createOrder(
       request.items.length,
     );
 
-    if (isCounterSale && createResult.totalAmount && createResult.totalAmount > 0) {
+    if (
+      isCounterSale &&
+      createResult.totalAmount &&
+      createResult.totalAmount > 0
+    ) {
       try {
         const pointResult = await awardPointsForOrder({
           sb: orderWriteClient,
@@ -975,7 +981,10 @@ export async function createOrder(
         createResult.earnedPoints = pointResult.earnedPoints;
         createResult.currentPointBalance = pointResult.currentPointBalance;
       } catch (pointError) {
-        console.warn("Không thể cộng điểm tự động cho đơn tại quầy:", pointError);
+        console.warn(
+          "Không thể cộng điểm tự động cho đơn tại quầy:",
+          pointError,
+        );
       }
     }
 

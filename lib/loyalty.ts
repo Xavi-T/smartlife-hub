@@ -310,8 +310,7 @@ export async function redeemPointsToVoucher(params: {
 
   const config = (campaign.config || {}) as Record<string, unknown>;
   const pointsCost = Math.max(1, Math.round(toNumber(config.pointsCost)));
-  const voucherType =
-    config.voucherType === "percent" ? "percent" : "amount";
+  const voucherType = config.voucherType === "percent" ? "percent" : "amount";
   const voucherValue = Math.max(1, toNumber(config.voucherValue));
   const maxDiscountAmount = Math.max(0, toNumber(config.maxDiscountAmount));
   const expiresInDays = Math.max(0, Math.round(toNumber(config.expiresInDays)));
@@ -400,7 +399,9 @@ export async function previewVoucherDiscount(params: {
   const { sb, voucherCode, customerPhone, orderAmount } = params;
   const adminClient = sb as unknown as any;
 
-  const normalizedCode = String(voucherCode || "").trim().toUpperCase();
+  const normalizedCode = String(voucherCode || "")
+    .trim()
+    .toUpperCase();
   if (!normalizedCode) {
     throw new Error("Vui lòng nhập mã voucher");
   }

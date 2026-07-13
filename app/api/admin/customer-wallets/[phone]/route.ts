@@ -82,9 +82,8 @@ export async function GET(
 
     if (campaignError) throw campaignError;
 
-    const activeRedeemCampaigns = (Array.isArray(redeemCampaigns)
-      ? redeemCampaigns
-      : []
+    const activeRedeemCampaigns = (
+      Array.isArray(redeemCampaigns) ? redeemCampaigns : []
     ).filter((campaign: any) => {
       if (campaign.is_unlimited_time) return true;
       if (!campaign.start_at || !campaign.end_at) return false;
@@ -107,8 +106,7 @@ export async function GET(
     console.error("Error loading customer wallet:", error);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Không thể tải ví điểm",
+        error: error instanceof Error ? error.message : "Không thể tải ví điểm",
       },
       { status: 500 },
     );
