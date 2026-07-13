@@ -23,6 +23,7 @@ import {
   UserOutlined,
   TeamOutlined,
   CrownOutlined,
+  GiftOutlined,
   InboxOutlined,
   AppstoreOutlined,
   PictureOutlined,
@@ -99,6 +100,16 @@ const menuItems: MenuProps["items"] = [
     key: "/admin/priority-customers",
     icon: <CrownOutlined />,
     label: "Khách hàng ưu tiên",
+  },
+  {
+    key: "/admin/marketing-campaigns",
+    icon: <GiftOutlined />,
+    label: "Chiến dịch marketing",
+  },
+  {
+    key: "/admin/customer-wallets",
+    icon: <GiftOutlined />,
+    label: "Ví điểm khách hàng",
   },
   {
     type: "divider",

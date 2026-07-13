@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -49,6 +50,7 @@ interface QuickSalesForm {
   customerPhone?: string;
   customerAddress?: string;
   notes?: string;
+  voucherCode?: string;
   discountEnabled?: boolean;
   discountPercent?: number;
   discountValueType?: "percent" | "amount";
@@ -99,6 +101,11 @@ export default function QuickSalesPage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoadingRecentOrders, setIsLoadingRecentOrders] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingVoucher, setIsCheckingVoucher] = useState(false);
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState("");
+  const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0);
+  const customerPhoneWatch = Form.useWatch("customerPhone", form) || "";
+  const voucherCodeWatch = Form.useWatch("voucherCode", form) || "";
   const discountEnabledWatch = Boolean(Form.useWatch("discountEnabled", form));
   const discountPercentWatch = Number(
     Form.useWatch("discountPercent", form) || 0,
@@ -428,7 +435,10 @@ export default function QuickSalesPage() {
     return {
       ...base,
       discountAmount,
-      finalTotal: Math.max(0, base.subtotal - discountAmount),
+      finalTotal: Math.max(
+        0,
+        base.subtotal - discountAmount - voucherDiscountAmount,
+      ),
     };
   }, [
     cart,
@@ -440,7 +450,63 @@ export default function QuickSalesPage() {
     productDiscountAmountMap,
     productDiscountPercentMap,
     productDiscountValueTypeMap,
+    voucherDiscountAmount,
   ]);
+
+  const clearVoucher = useCallback(() => {
+    setAppliedVoucherCode("");
+    setVoucherDiscountAmount(0);
+    form.setFieldValue("voucherCode", undefined);
+  }, [form]);
+
+  const handleApplyVoucher = async () => {
+    const code = String(voucherCodeWatch || "").trim().toUpperCase();
+    const customerPhone = String(customerPhoneWatch || "").trim();
+
+    if (!code) {
+      messageApi.warning("Vui lòng nhập mã voucher");
+      return;
+    }
+
+    if (!customerPhone) {
+      messageApi.warning("Vui lòng nhập SĐT khách hàng để kiểm tra voucher");
+      return;
+    }
+
+    if (discountEnabledWatch && cartSummary.discountAmount > 0) {
+      messageApi.warning("Voucher không dùng chung với giảm giá thủ công");
+      return;
+    }
+
+    setIsCheckingVoucher(true);
+    try {
+      const response = await fetch("/api/vouchers/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voucherCode: code,
+          customerPhone,
+          orderAmount: cartSummary.subtotal,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Voucher không hợp lệ");
+      }
+      setAppliedVoucherCode(code);
+      setVoucherDiscountAmount(Number(result.discountAmount || 0));
+      form.setFieldValue("voucherCode", code);
+      messageApi.success("Đã áp dụng voucher");
+    } catch (error) {
+      setAppliedVoucherCode("");
+      setVoucherDiscountAmount(0);
+      messageApi.error(
+        error instanceof Error ? error.message : "Không thể áp dụng voucher",
+      );
+    } finally {
+      setIsCheckingVoucher(false);
+    }
+  };
 
   const handleSubmit = async (values: QuickSalesForm) => {
     if (cart.length === 0) {
@@ -492,7 +558,9 @@ export default function QuickSalesPage() {
         isCounterSale: true,
         checkoutMethod: "cod",
         paymentMethod: "cod",
+        voucherCode: appliedVoucherCode || undefined,
         manualDiscountPercent:
+          !appliedVoucherCode &&
           discountEnabledWatch &&
           discountModeWatch === "order_total" &&
           discountValueTypeWatch === "percent"
@@ -500,13 +568,14 @@ export default function QuickSalesPage() {
             : 0,
         manualDiscountValueType: discountValueTypeWatch,
         manualDiscountAmount:
+          !appliedVoucherCode &&
           discountEnabledWatch &&
           discountModeWatch === "order_total" &&
           discountValueTypeWatch === "amount"
             ? cartSummary.discountAmount
             : 0,
         manualDiscountMode: discountModeWatch,
-        manualProductDiscounts,
+        manualProductDiscounts: appliedVoucherCode ? [] : manualProductDiscounts,
         items: cart.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -522,6 +591,7 @@ export default function QuickSalesPage() {
       );
 
       form.resetFields();
+      clearVoucher();
       setCart([]);
       setSearchQuery("");
 
@@ -908,6 +978,34 @@ export default function QuickSalesPage() {
                 <Input placeholder="Nhập số điện thoại" />
               </Form.Item>
 
+              <Form.Item name="voucherCode" label="Mã voucher">
+                <Space.Compact style={{ width: "100%" }}>
+                  <Input
+                    placeholder="Nhập voucher đổi từ điểm"
+                    onChange={() => {
+                      if (appliedVoucherCode) {
+                        setAppliedVoucherCode("");
+                        setVoucherDiscountAmount(0);
+                      }
+                    }}
+                  />
+                  <Button loading={isCheckingVoucher} onClick={handleApplyVoucher}>
+                    Áp dụng
+                  </Button>
+                  {appliedVoucherCode && <Button onClick={clearVoucher}>Xóa</Button>}
+                </Space.Compact>
+              </Form.Item>
+
+              {appliedVoucherCode && (
+                <Alert
+                  type="success"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message={`Đã áp dụng voucher ${appliedVoucherCode}`}
+                  description="Voucher không dùng chung với giảm giá thủ công."
+                />
+              )}
+
               <Form.Item name="customerAddress" label="Địa chỉ">
                 <Input placeholder="Mua tại quầy" />
               </Form.Item>
@@ -926,7 +1024,11 @@ export default function QuickSalesPage() {
                   valuePropName="checked"
                   style={{ marginBottom: discountEnabledWatch ? 12 : 0 }}
                 >
-                  <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+                  <Switch
+                    checkedChildren="Bật"
+                    unCheckedChildren="Tắt"
+                    disabled={Boolean(appliedVoucherCode)}
+                  />
                 </Form.Item>
 
                 {discountEnabledWatch && (
@@ -1157,6 +1259,20 @@ export default function QuickSalesPage() {
                       : ""}
                   </Text>
                 </div>
+                {voucherDiscountAmount > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Text type="secondary">Voucher {appliedVoucherCode}</Text>
+                    <Text type="secondary">
+                      -{formatCurrency(voucherDiscountAmount)}
+                    </Text>
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",

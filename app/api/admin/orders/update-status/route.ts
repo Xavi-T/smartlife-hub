@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { AuditLogger } from "@/lib/auditLogger";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase-admin";
+import {
+  awardPointsForOrder,
+  reversePointsForCancelledOrder,
+} from "@/lib/loyalty";
 
 type OrderStatus =
   | "pending"
@@ -102,11 +106,51 @@ export async function PATCH(request: NextRequest) {
     const updatedOrder = transitionData as unknown as {
       id: string;
       customer_name: string;
+      customer_phone?: string;
+      total_amount?: number;
       status: OrderStatus;
       previous_status: OrderStatus;
       stock_restored: boolean;
       [key: string]: unknown;
     };
+
+    const orderPhone = String(updatedOrder.customer_phone || "").trim();
+    const orderAmount = Number(updatedOrder.total_amount || 0);
+
+    if (
+      updatedOrder.previous_status !== "completed" &&
+      normalizedNewStatus === "completed" &&
+      orderPhone
+    ) {
+      try {
+        await awardPointsForOrder({
+          sb,
+          orderId,
+          customerPhone: orderPhone,
+          totalAmount: orderAmount,
+          createdBy: user.email || user.id,
+        });
+      } catch (pointError) {
+        console.warn("Không thể cộng điểm khi hoàn thành đơn:", pointError);
+      }
+    }
+
+    if (
+      updatedOrder.previous_status === "completed" &&
+      normalizedNewStatus === "cancelled" &&
+      orderPhone
+    ) {
+      try {
+        await reversePointsForCancelledOrder({
+          sb,
+          orderId,
+          customerPhone: orderPhone,
+          createdBy: user.email || user.id,
+        });
+      } catch (pointError) {
+        console.warn("Không thể trừ điểm khi hủy đơn hoàn thành:", pointError);
+      }
+    }
 
     // Log audit event
     await AuditLogger.orderStatusChanged(

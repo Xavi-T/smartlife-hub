@@ -12,6 +12,11 @@ import {
 } from "@/lib/customerIdentity";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import {
+  awardPointsForOrder,
+  consumeVoucherForOrder,
+  previewVoucherDiscount,
+} from "@/lib/loyalty";
 import type {
   CreateOrderRequest,
   CreateOrderResponse,
@@ -347,6 +352,7 @@ async function createOrderDirectly(params: {
   customerPhone: string;
   customerAddress: string;
   notes: string;
+  voucherCode?: string;
   checkoutMethod: CheckoutMethod;
   paymentMethod: PaymentMethod;
   isCounterSale?: boolean;
@@ -364,6 +370,7 @@ async function createOrderDirectly(params: {
     customerPhone,
     customerAddress,
     notes,
+    voucherCode = "",
     checkoutMethod,
     paymentMethod,
     isCounterSale = false,
@@ -541,6 +548,7 @@ async function createOrderDirectly(params: {
   const safeManualDiscountValueType = normalizeManualDiscountValueType(
     manualDiscountValueType,
   );
+  const normalizedVoucherCode = String(voucherCode || "").trim().toUpperCase();
   const preparedLines: PreparedOrderLine[] = items.map((item) => {
     const product = productMap.get(item.product_id)!;
     const selectedVariant = item.variant_id
@@ -562,8 +570,38 @@ async function createOrderDirectly(params: {
     };
   });
 
+  const grossAmount = calculateOrderGrossAmount(preparedLines);
+  let appliedVoucher:
+    | {
+        id: string;
+        code: string;
+        discountAmount: number;
+      }
+    | null = null;
+
+  if (normalizedVoucherCode) {
+    const voucherPreview = await previewVoucherDiscount({
+      sb: db,
+      voucherCode: normalizedVoucherCode,
+      customerPhone,
+      orderAmount: grossAmount,
+    });
+
+    appliedVoucher = {
+      id: voucherPreview.voucher.id,
+      code: voucherPreview.voucher.voucher_code,
+      discountAmount: voucherPreview.discountAmount,
+    };
+  }
+
   const orderItemsPayload =
-    manualDiscountMode === "order_total" &&
+    appliedVoucher && appliedVoucher.discountAmount > 0
+      ? buildAmountDiscountOrderItems(
+          orderId,
+          preparedLines,
+          appliedVoucher.discountAmount,
+        )
+      : manualDiscountMode === "order_total" &&
     safeManualDiscountValueType === "amount"
       ? buildAmountDiscountOrderItems(
           orderId,
@@ -580,7 +618,6 @@ async function createOrderDirectly(params: {
             buildPercentDiscountOrderItem(orderId, line, safeManualDiscount),
           );
 
-  const grossAmount = calculateOrderGrossAmount(preparedLines);
   const finalAmount = calculateOrderFinalAmount(orderItemsPayload);
   const discountAmount = Math.max(0, grossAmount - finalAmount);
   const positiveProductDiscountCount = Array.from(
@@ -593,9 +630,13 @@ async function createOrderDirectly(params: {
     manualDiscountAmount: safeManualDiscountAmount,
     positiveProductDiscountCount,
   });
+  const finalDiscountLabel =
+    appliedVoucher && appliedVoucher.discountAmount > 0
+      ? `Voucher ${appliedVoucher.code}`
+      : discountLabel;
   const finalNotes = [
     notes.trim(),
-    discountAmount > 0 ? discountLabel : null,
+    discountAmount > 0 ? finalDiscountLabel : null,
     discountAmount > 0
       ? `Số tiền giảm: ${discountAmount.toLocaleString("vi-VN")}đ`
       : null,
@@ -642,12 +683,27 @@ async function createOrderDirectly(params: {
     };
   }
 
+  if (appliedVoucher && appliedVoucher.discountAmount > 0) {
+    try {
+      await consumeVoucherForOrder({
+        sb: db,
+        voucherId: appliedVoucher.id,
+        orderId: finalOrder.id,
+        discountAmount: appliedVoucher.discountAmount,
+      });
+    } catch (consumeError) {
+      console.warn("Không thể đánh dấu voucher đã sử dụng:", consumeError);
+    }
+  }
+
   return {
     success: true,
     orderId: finalOrder.id,
+    appliedVoucherCode: appliedVoucher?.code || null,
+    appliedVoucherDiscountAmount: appliedVoucher?.discountAmount || 0,
     grossAmount,
     discountAmount,
-    discountLabel,
+    discountLabel: finalDiscountLabel,
     totalAmount: Number(finalOrder.total_amount || 0),
     message: "Tạo đơn hàng thành công",
   };
@@ -717,6 +773,9 @@ export async function createOrder(
       request.manualDiscountAmount,
     );
     const manualDiscountMode = request.manualDiscountMode || "order_total";
+    const normalizedVoucherCode = String(request.voucherCode || "")
+      .trim()
+      .toUpperCase();
     const manualProductDiscounts = Array.from(
       new Map(
         (request.manualProductDiscounts || [])
@@ -754,6 +813,29 @@ export async function createOrder(
             "Sản phẩm giảm giá không hợp lệ. Vui lòng chọn sản phẩm có trong giỏ hàng.",
         };
       }
+    }
+
+    const hasOrderPercentDiscount =
+      manualDiscountMode === "order_total" &&
+      manualDiscountValueType === "percent" &&
+      manualDiscountPercent > 0;
+    const hasOrderAmountDiscount =
+      manualDiscountMode === "order_total" &&
+      manualDiscountValueType === "amount" &&
+      manualDiscountAmount > 0;
+    const hasProductLineDiscount = manualProductDiscounts.some(
+      (item) => item.percent > 0 || item.amount > 0,
+    );
+
+    if (
+      normalizedVoucherCode &&
+      (hasOrderPercentDiscount || hasOrderAmountDiscount || hasProductLineDiscount)
+    ) {
+      return {
+        success: false,
+        message:
+          "Voucher không thể dùng đồng thời với giảm giá thủ công. Vui lòng chọn một hình thức giảm giá.",
+      };
     }
 
     // Validate input
@@ -858,6 +940,7 @@ export async function createOrder(
       customerPhone,
       customerAddress: resolvedAddress,
       notes: finalNotes,
+      voucherCode: normalizedVoucherCode,
       checkoutMethod,
       paymentMethod,
       isCounterSale,
@@ -879,6 +962,22 @@ export async function createOrder(
       createResult.totalAmount || 0,
       request.items.length,
     );
+
+    if (isCounterSale && createResult.totalAmount && createResult.totalAmount > 0) {
+      try {
+        const pointResult = await awardPointsForOrder({
+          sb: orderWriteClient,
+          orderId: createResult.orderId,
+          customerPhone,
+          totalAmount: Number(createResult.totalAmount || 0),
+          createdBy: "system",
+        });
+        createResult.earnedPoints = pointResult.earnedPoints;
+        createResult.currentPointBalance = pointResult.currentPointBalance;
+      } catch (pointError) {
+        console.warn("Không thể cộng điểm tự động cho đơn tại quầy:", pointError);
+      }
+    }
 
     if (!isCounterSale) {
       try {

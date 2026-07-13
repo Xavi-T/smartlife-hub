@@ -32,6 +32,7 @@ interface CheckoutFormValues {
   phone: string;
   address?: string;
   notes?: string;
+  voucherCode?: string;
   checkoutMethod: CheckoutMethod;
 }
 
@@ -42,6 +43,9 @@ export default function CheckoutPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, isLoaded } =
     useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingVoucher, setIsCheckingVoucher] = useState(false);
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState("");
+  const [voucherDiscountAmount, setVoucherDiscountAmount] = useState(0);
   const hasTrackedBeginCheckout = useRef(false);
 
   const examplePhone = useMemo(
@@ -52,11 +56,13 @@ export default function CheckoutPage() {
   const checkoutMethod = Form.useWatch("checkoutMethod", form) || "cod";
   const customerName = Form.useWatch("name", form) || "";
   const customerPhone = Form.useWatch("phone", form) || "";
+  const voucherCode = Form.useWatch("voucherCode", form) || "";
   const totalPrice = useMemo(
     () =>
       cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
     [cart],
   );
+  const finalTotalPrice = Math.max(0, totalPrice - voucherDiscountAmount);
 
   const splitProductAndVariant = (cartProductId: string) => {
     const [productId, variantId] = String(cartProductId || "").split("::");
@@ -79,12 +85,12 @@ export default function CheckoutPage() {
     return buildVietQrUrl({
       bankName: APP_CONFIG.bank.name,
       accountNo: APP_CONFIG.bank.accountNumber,
-      amount: Math.round(totalPrice),
+      amount: Math.round(finalTotalPrice),
       addInfo: transferContent,
       accountName: APP_CONFIG.bank.accountName,
       template: "compact2",
     }).qr_url;
-  }, [totalPrice, transferContent]);
+  }, [finalTotalPrice, transferContent]);
 
   const handleCopy = async (value: string, label: string) => {
     try {
@@ -97,6 +103,51 @@ export default function CheckoutPage() {
     } catch {
       messageApi.error("Không thể copy, vui lòng thử lại");
     }
+  };
+
+  const handleApplyVoucher = async () => {
+    const code = String(voucherCode || "").trim().toUpperCase();
+    if (!code) {
+      messageApi.warning("Vui lòng nhập mã voucher");
+      return;
+    }
+
+    setIsCheckingVoucher(true);
+    try {
+      const response = await fetch("/api/vouchers/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voucherCode: code,
+          customerPhone,
+          orderAmount: totalPrice,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Voucher không hợp lệ");
+      }
+
+      setAppliedVoucherCode(code);
+      setVoucherDiscountAmount(Number(result.discountAmount || 0));
+      form.setFieldValue("voucherCode", code);
+      messageApi.success("Đã áp dụng voucher");
+    } catch (error) {
+      setAppliedVoucherCode("");
+      setVoucherDiscountAmount(0);
+      messageApi.error(
+        error instanceof Error ? error.message : "Không thể áp dụng voucher",
+      );
+    } finally {
+      setIsCheckingVoucher(false);
+    }
+  };
+
+  const handleClearVoucher = () => {
+    setAppliedVoucherCode("");
+    setVoucherDiscountAmount(0);
+    form.setFieldValue("voucherCode", undefined);
   };
 
   useEffect(() => {
@@ -162,6 +213,7 @@ export default function CheckoutPage() {
         checkoutMethod: values.checkoutMethod,
         paymentMethod:
           values.checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod",
+        voucherCode: appliedVoucherCode || undefined,
         items: cart.map((item) => ({
           product_id: splitProductAndVariant(item.product.id).productId,
           variant_id: splitProductAndVariant(item.product.id).variantId,
@@ -172,7 +224,7 @@ export default function CheckoutPage() {
       if (result.success) {
         trackPurchase({
           transactionId: result.orderId || `order-${Date.now()}`,
-          value: Number(result.totalAmount || totalPrice),
+          value: Number(result.totalAmount || finalTotalPrice),
           paymentType: values.checkoutMethod,
           items: cart,
         });
@@ -214,7 +266,7 @@ export default function CheckoutPage() {
         <div className="py-8">
           <Typography.Title
             level={1}
-            className="sl-section-title !mb-2 !text-[30px] sm:!text-[40px]"
+            className="sl-section-title mb-2! text-[30px]! sm:text-[40px]!"
           >
             Thanh toán đơn hàng
           </Typography.Title>
@@ -339,6 +391,36 @@ export default function CheckoutPage() {
                 >
                   <Input placeholder={examplePhone} />
                 </Form.Item>
+
+                <Form.Item label="Mã voucher" name="voucherCode">
+                  <Space.Compact style={{ width: "100%" }}>
+                    <Input
+                      placeholder="Nhập mã voucher nếu có"
+                      onChange={() => {
+                        if (appliedVoucherCode) {
+                          setAppliedVoucherCode("");
+                          setVoucherDiscountAmount(0);
+                        }
+                      }}
+                    />
+                    <Button loading={isCheckingVoucher} onClick={handleApplyVoucher}>
+                      Áp dụng
+                    </Button>
+                    {appliedVoucherCode && (
+                      <Button onClick={handleClearVoucher}>Xóa</Button>
+                    )}
+                  </Space.Compact>
+                </Form.Item>
+
+                {appliedVoucherCode && (
+                  <Alert
+                    type="success"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message={`Đã áp dụng voucher ${appliedVoucherCode}`}
+                    description={`Giảm ${formatCurrency(voucherDiscountAmount)} cho đơn hàng này.`}
+                  />
+                )}
 
                 <Form.Item
                   label="Hình thức đặt hàng"
@@ -550,6 +632,16 @@ export default function CheckoutPage() {
                     Miễn phí
                   </Typography.Text>
                 </div>
+                {voucherDiscountAmount > 0 && (
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between" }}
+                  >
+                    <Typography.Text>Voucher {appliedVoucherCode}</Typography.Text>
+                    <Typography.Text strong style={{ color: "#cf1322" }}>
+                      -{formatCurrency(voucherDiscountAmount)}
+                    </Typography.Text>
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -558,9 +650,9 @@ export default function CheckoutPage() {
                     paddingTop: 10,
                   }}
                 >
-                  <Typography.Text strong>Tổng tạm tính</Typography.Text>
+                  <Typography.Text strong>Tổng thanh toán</Typography.Text>
                   <Typography.Text strong style={{ color: "#1677ff" }}>
-                    {formatCurrency(totalPrice)}
+                    {formatCurrency(finalTotalPrice)}
                   </Typography.Text>
                 </div>
                 <Alert

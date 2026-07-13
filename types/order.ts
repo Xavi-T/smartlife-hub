@@ -30,6 +30,7 @@ export interface CreateOrderRequest {
   checkoutMethod?: CheckoutMethod;
   paymentMethod?: PaymentMethod;
   isCounterSale?: boolean;
+  voucherCode?: string;
   manualDiscountPercent?: number;
   manualDiscountValueType?: ManualDiscountValueType;
   manualDiscountAmount?: number;
@@ -40,9 +41,13 @@ export interface CreateOrderRequest {
 export interface CreateOrderResponse {
   success: boolean;
   orderId?: string;
+  appliedVoucherCode?: string | null;
+  appliedVoucherDiscountAmount?: number;
   grossAmount?: number;
   discountAmount?: number;
   discountLabel?: string | null;
   totalAmount?: number;
+  earnedPoints?: number;
+  currentPointBalance?: number;
   message: string;
 }
