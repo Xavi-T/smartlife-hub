@@ -75,7 +75,7 @@ interface Order {
   status: OrderStatus;
   order_type?: "online" | "counter";
   checkout_method?: "cod" | "bank_transfer";
-  payment_method?: "cod" | "bank_transfer";
+  payment_method?: "cod" | "bank_transfer" | "cash";
   payment_confirmed?: boolean;
   payment_confirmed_at?: string | null;
   notes: string | null;
@@ -429,6 +429,10 @@ export default function OrdersPage() {
       width: 220,
       render: (_: unknown, record: Order) => {
         const isBankTransfer = record.payment_method === "bank_transfer";
+
+        if (record.payment_method === "cash") {
+          return <Tag color="success">Tiền mặt</Tag>;
+        }
 
         if (!isBankTransfer) {
           return <Tag color="default">COD</Tag>;

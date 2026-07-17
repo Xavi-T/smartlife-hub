@@ -213,8 +213,7 @@ export default function CheckoutPage() {
           notes: values.notes,
         },
         checkoutMethod: values.checkoutMethod,
-        paymentMethod:
-          values.checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod",
+        paymentMethod: "bank_transfer",
         voucherCode: appliedVoucherCode || undefined,
         items: cart.map((item) => ({
           product_id: splitProductAndVariant(item.product.id).productId,

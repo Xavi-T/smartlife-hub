@@ -56,7 +56,7 @@ interface OrderView {
   status: OrderStatus;
   order_type?: "online" | "counter";
   checkout_method?: "cod" | "bank_transfer";
-  payment_method?: "cod" | "bank_transfer";
+  payment_method?: "cod" | "bank_transfer" | "cash";
   payment_confirmed?: boolean;
   payment_confirmed_at?: string | null;
   notes: string | null;
@@ -68,10 +68,8 @@ interface OrderView {
 function getStatusMeta(status: OrderStatus) {
   if (status === "pending") return { label: "Chờ xác nhận", color: "gold" };
   if (status === "confirmed") return { label: "Đã xác nhận", color: "blue" };
-  if (status === "shipping")
-    return { label: "Đang vận chuyển", color: "cyan" };
-  if (status === "completed")
-    return { label: "Đã hoàn thành", color: "green" };
+  if (status === "shipping") return { label: "Đang vận chuyển", color: "cyan" };
+  if (status === "completed") return { label: "Đã hoàn thành", color: "green" };
   return { label: "Đã hủy", color: "red" };
 }
 
@@ -91,7 +89,11 @@ function getTimelineCurrent(order: OrderView): number {
   return 0;
 }
 
-function getHistoryNote(order: OrderView, status: OrderStatus, fallback: string) {
+function getHistoryNote(
+  order: OrderView,
+  status: OrderStatus,
+  fallback: string,
+) {
   const history = [...(order.order_status_history || [])]
     .filter((item) => item.status === status)
     .sort(
@@ -139,11 +141,7 @@ function getDeliveryStepItems(order: OrderView) {
     },
     {
       title: "Đã hoàn thành",
-      content: getHistoryNote(
-        order,
-        "completed",
-        "Khách hàng đã nhận hàng.",
-      ),
+      content: getHistoryNote(order, "completed", "Khách hàng đã nhận hàng."),
     },
   ];
 }
@@ -168,6 +166,13 @@ function getPaymentMeta(order: OrderView): {
       label: "Đang chờ xác nhận thanh toán chuyển khoản",
       color: "processing",
       detail: "Hệ thống sẽ xác nhận sau khi cửa hàng kiểm tra giao dịch.",
+    };
+  }
+
+  if (order.payment_method === "cash") {
+    return {
+      label: "Đã thanh toán tiền mặt",
+      color: "success",
     };
   }
 
@@ -353,9 +358,7 @@ function OrderTrackingContent() {
                 ),
                 children: (
                   <div>
-                    <Typography.Text
-                      style={{ display: "block", fontSize: 14 }}
-                    >
+                    <Typography.Text style={{ display: "block", fontSize: 14 }}>
                       Người nhận: {order.customer_name} - {order.customer_phone}
                     </Typography.Text>
                     <Typography.Text
@@ -369,7 +372,10 @@ function OrderTrackingContent() {
                     </Typography.Text>
 
                     <div style={{ marginBottom: 12 }}>
-                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 13 }}
+                      >
                         Thanh toán:
                       </Typography.Text>
                       <div style={{ marginTop: 4 }}>
@@ -378,7 +384,11 @@ function OrderTrackingContent() {
                       {paymentMeta.detail && (
                         <Typography.Text
                           type="secondary"
-                          style={{ display: "block", marginTop: 4, fontSize: 12 }}
+                          style={{
+                            display: "block",
+                            marginTop: 4,
+                            fontSize: 12,
+                          }}
                         >
                           {paymentMeta.detail}
                         </Typography.Text>
@@ -479,7 +489,8 @@ function OrderTrackingContent() {
                           }}
                         >
                           <Typography.Text style={{ fontSize: 14 }}>
-                            {item.products?.name || "Sản phẩm"} × {item.quantity}
+                            {item.products?.name || "Sản phẩm"} ×{" "}
+                            {item.quantity}
                           </Typography.Text>
                           <Typography.Text style={{ fontSize: 14 }}>
                             {formatCurrency(item.subtotal)}
@@ -499,7 +510,10 @@ function OrderTrackingContent() {
                       <Typography.Text strong style={{ fontSize: 15 }}>
                         Tổng thanh toán
                       </Typography.Text>
-                      <Typography.Text strong style={{ color: "#1677ff", fontSize: 16 }}>
+                      <Typography.Text
+                        strong
+                        style={{ color: "#1677ff", fontSize: 16 }}
+                      >
                         {formatCurrency(order.total_amount)}
                       </Typography.Text>
                     </div>

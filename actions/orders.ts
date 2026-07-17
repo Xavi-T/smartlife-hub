@@ -477,13 +477,16 @@ async function createOrderDirectly(params: {
     ...baseOrderInsert,
     checkout_method: checkoutMethod,
     payment_method: paymentMethod,
-    payment_confirmed: isCounterSale || paymentMethod === "cod",
+    payment_confirmed:
+      isCounterSale || paymentMethod === "cod" || paymentMethod === "cash",
     payment_confirmed_at:
-      isCounterSale || paymentMethod === "cod"
+      isCounterSale || paymentMethod === "cod" || paymentMethod === "cash"
         ? new Date().toISOString()
         : null,
     payment_confirmed_by:
-      isCounterSale || paymentMethod === "cod" ? "system" : null,
+      isCounterSale || paymentMethod === "cod" || paymentMethod === "cash"
+        ? "system"
+        : null,
   };
 
   let orderId: string | null = null;
@@ -732,11 +735,10 @@ export async function createOrder(
       };
     }
 
+    const isCounterSale = Boolean(request.isCounterSale);
     const checkoutMethod: CheckoutMethod = request.checkoutMethod || "cod";
     const paymentMethod: PaymentMethod =
-      request.paymentMethod ||
-      (checkoutMethod === "bank_transfer" ? "bank_transfer" : "cod");
-    const isCounterSale = Boolean(request.isCounterSale);
+      request.paymentMethod || (isCounterSale ? "cash" : "bank_transfer");
 
     if (isCounterSale) {
       const authClient = await createServerSupabaseClient();
@@ -917,7 +919,7 @@ export async function createOrder(
     const extraNotes = isCounterSale
       ? [
           "Hình thức đặt hàng: Bán tại quầy",
-          "Thanh toán: Đã thanh toán tại quầy",
+          `Thanh toán: ${paymentMethod === "bank_transfer" ? "Chuyển khoản" : "Tiền mặt"}`,
         ]
       : [
           `Hình thức đặt hàng: ${
@@ -926,7 +928,9 @@ export async function createOrder(
           `Thanh toán: ${
             paymentMethod === "bank_transfer"
               ? "Chuyển khoản"
-              : "Thanh toán khi nhận hàng (COD)"
+              : paymentMethod === "cash"
+                ? "Tiền mặt"
+                : "Thanh toán khi nhận hàng (COD)"
           }`,
         ];
 

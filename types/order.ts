@@ -13,7 +13,7 @@ export interface CustomerInfo {
 
 export type CheckoutMethod = "cod" | "bank_transfer";
 
-export type PaymentMethod = "cod" | "bank_transfer";
+export type PaymentMethod = "cod" | "bank_transfer" | "cash";
 
 export type ManualDiscountValueType = "percent" | "amount";
 

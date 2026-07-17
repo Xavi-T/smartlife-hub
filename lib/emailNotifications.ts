@@ -56,9 +56,9 @@ function resolveCheckoutMethodLabel(value: CheckoutMethod): string {
 }
 
 function resolvePaymentMethodLabel(value: PaymentMethod): string {
-  return value === "bank_transfer"
-    ? "Chuyển khoản"
-    : "Thanh toán khi nhận hàng";
+  if (value === "bank_transfer") return "Chuyển khoản";
+  if (value === "cash") return "Tiền mặt";
+  return "Thanh toán khi nhận hàng";
 }
 
 function isEmailNotificationConfigured(): boolean {

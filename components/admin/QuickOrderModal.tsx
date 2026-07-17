@@ -11,6 +11,7 @@ import {
   Typography,
   Divider,
   Badge,
+  Select,
   message,
 } from "antd";
 import {
@@ -50,6 +51,7 @@ interface QuickOrderFormValues {
   customerPhone?: string;
   customerAddress?: string;
   notes?: string;
+  paymentMethod?: "cash" | "bank_transfer";
 }
 
 export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
@@ -149,7 +151,7 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
         },
         isCounterSale: true,
         checkoutMethod: "cod",
-        paymentMethod: "cod",
+        paymentMethod: values.paymentMethod || "cash",
         items: cart.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -354,7 +356,10 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
               form={form}
               layout="vertical"
               onFinish={handleSubmit}
-              initialValues={{ customerAddress: "Mua tại quầy" }}
+              initialValues={{
+                customerAddress: "Mua tại quầy",
+                paymentMethod: "cash",
+              }}
             >
               <Form.Item name="customerName" label="Họ tên (không bắt buộc)">
                 <Input placeholder="Để trống nếu là khách lẻ" />
@@ -375,6 +380,24 @@ export function QuickOrderModal({ isOpen, onClose }: QuickOrderModalProps) {
 
               <Form.Item name="customerAddress" label="Địa chỉ">
                 <TextArea rows={3} placeholder="Mua tại quầy" />
+              </Form.Item>
+
+              <Form.Item
+                name="paymentMethod"
+                label="Hình thức thanh toán"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn hình thức thanh toán",
+                  },
+                ]}
+              >
+                <Select
+                  options={[
+                    { label: "Tiền mặt", value: "cash" },
+                    { label: "Chuyển khoản", value: "bank_transfer" },
+                  ]}
+                />
               </Form.Item>
 
               <Form.Item name="notes" label="Ghi chú">

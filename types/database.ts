@@ -86,7 +86,7 @@ export interface Order {
   status: OrderStatus;
   order_type?: OrderType;
   checkout_method?: "cod" | "bank_transfer";
-  payment_method?: "cod" | "bank_transfer";
+  payment_method?: "cod" | "bank_transfer" | "cash";
   payment_confirmed?: boolean;
   payment_confirmed_at?: string | null;
   payment_confirmed_by?: string | null;
@@ -320,7 +320,9 @@ export interface Database {
       product_variants: {
         Row: ProductVariant;
         Insert: Omit<ProductVariant, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<ProductVariant, "id" | "created_at" | "updated_at">>;
+        Update: Partial<
+          Omit<ProductVariant, "id" | "created_at" | "updated_at">
+        >;
         Relationships: [];
       };
       customer_segment_settings: {

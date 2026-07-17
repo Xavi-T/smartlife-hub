@@ -50,6 +50,7 @@ interface QuickSalesForm {
   customerPhone?: string;
   customerAddress?: string;
   notes?: string;
+  paymentMethod?: "cash" | "bank_transfer";
   voucherCode?: string;
   discountEnabled?: boolean;
   discountPercent?: number;
@@ -82,6 +83,7 @@ interface RecentOrder {
   customer_phone: string;
   customer_address: string;
   total_amount: number;
+  payment_method?: "cash" | "bank_transfer" | "cod" | null;
   notes: string | null;
   created_at: string;
   order_items: RecentOrderItem[];
@@ -559,7 +561,7 @@ export default function QuickSalesPage() {
         },
         isCounterSale: true,
         checkoutMethod: "cod",
-        paymentMethod: "cod",
+        paymentMethod: values.paymentMethod || "cash",
         voucherCode: appliedVoucherCode || undefined,
         manualDiscountPercent:
           !appliedVoucherCode &&
@@ -952,6 +954,7 @@ export default function QuickSalesPage() {
               onFinish={handleSubmit}
               initialValues={{
                 customerAddress: "Mua tại quầy",
+                paymentMethod: "cash",
                 discountEnabled: false,
                 discountPercent: 0,
                 discountValueType: "percent",
@@ -1017,6 +1020,24 @@ export default function QuickSalesPage() {
 
               <Form.Item name="customerAddress" label="Địa chỉ">
                 <Input placeholder="Mua tại quầy" />
+              </Form.Item>
+
+              <Form.Item
+                name="paymentMethod"
+                label="Hình thức thanh toán"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn hình thức thanh toán",
+                  },
+                ]}
+              >
+                <Select
+                  options={[
+                    { label: "Tiền mặt", value: "cash" },
+                    { label: "Chuyển khoản", value: "bank_transfer" },
+                  ]}
+                />
               </Form.Item>
 
               <div
@@ -1370,6 +1391,17 @@ export default function QuickSalesPage() {
                       <Text strong style={{ color: "#1677ff" }}>
                         {formatCurrency(order.total_amount)}
                       </Text>
+                      <Tag
+                        color={
+                          order.payment_method === "bank_transfer"
+                            ? "green"
+                            : "default"
+                        }
+                      >
+                        {order.payment_method === "bank_transfer"
+                          ? "Chuyển khoản"
+                          : "Tiền mặt"}
+                      </Tag>
                     </Space>
 
                     <Button
