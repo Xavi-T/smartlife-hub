@@ -63,12 +63,20 @@ export async function POST(request: Request) {
 
   const payload = await request.json().catch(() => null);
   const userId = String(payload?.userId || "").trim();
+  const customPassword = String(payload?.password || "");
 
   if (!userId) {
     return NextResponse.json({ error: "Thiếu userId" }, { status: 400 });
   }
 
-  const temporaryPassword = generateTemporaryPassword();
+  if (customPassword && customPassword.length < 8) {
+    return NextResponse.json(
+      { error: "Mật khẩu phải có ít nhất 8 ký tự" },
+      { status: 400 },
+    );
+  }
+
+  const temporaryPassword = customPassword || generateTemporaryPassword();
 
   const { error } = await serviceClient.auth.admin.updateUserById(userId, {
     password: temporaryPassword,

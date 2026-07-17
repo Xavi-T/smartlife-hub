@@ -50,6 +50,11 @@ interface UpdateUserForm {
   role: AppRole;
 }
 
+interface ResetPasswordForm {
+  mode: "generate" | "custom";
+  password?: string;
+}
+
 const roleColorMap: Record<AppRole, string> = {
   admin: "red",
   manager: "gold",
@@ -65,6 +70,7 @@ const roleLabelMap: Record<AppRole, string> = {
 export default function AdminUsersPage() {
   const [form] = Form.useForm<CreateUserForm>();
   const [editForm] = Form.useForm<UpdateUserForm>();
+  const [resetPasswordForm] = Form.useForm<ResetPasswordForm>();
   const [messageApi, contextHolder] = message.useMessage();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -72,12 +78,16 @@ export default function AdminUsersPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] =
+    useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [resettingUser, setResettingUser] = useState<UserRow | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string>("");
+  const resetPasswordMode = Form.useWatch("mode", resetPasswordForm);
 
   const fetchUsers = async (refresh = false) => {
     try {
@@ -143,15 +153,30 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleResetPassword = async (user: UserRow) => {
+  const openResetPasswordModal = (user: UserRow) => {
+    setResettingUser(user);
+    resetPasswordForm.resetFields();
+    resetPasswordForm.setFieldsValue({ mode: "generate" });
+    setIsResetPasswordModalOpen(true);
+  };
+
+  const handleResetPassword = async (values: ResetPasswordForm) => {
+    if (!resettingUser) return;
+
     try {
-      setResettingUserId(user.id);
+      setResettingUserId(resettingUser.id);
       const res = await fetch("/api/admin/users/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ userId: user.id }),
+        body: JSON.stringify({
+          userId: resettingUser.id,
+          password:
+            values.mode === "custom"
+              ? String(values.password || "")
+              : undefined,
+        }),
       });
 
       const data = await res.json();
@@ -160,11 +185,15 @@ export default function AdminUsersPage() {
       }
 
       Modal.info({
-        title: "Mật khẩu tạm thời",
+        title:
+          values.mode === "custom"
+            ? "Đã cập nhật mật khẩu"
+            : "Mật khẩu tạm thời",
         content: (
           <Space orientation="vertical" size={8}>
             <Typography.Text>
-              Tài khoản: <Typography.Text strong>{user.email}</Typography.Text>
+              Tài khoản:{" "}
+              <Typography.Text strong>{resettingUser.email}</Typography.Text>
             </Typography.Text>
             <Typography.Text copyable strong>
               {data.temporaryPassword}
@@ -176,6 +205,9 @@ export default function AdminUsersPage() {
           </Space>
         ),
       });
+      setIsResetPasswordModalOpen(false);
+      setResettingUser(null);
+      resetPasswordForm.resetFields();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Không thể reset mật khẩu";
@@ -307,20 +339,14 @@ export default function AdminUsersPage() {
               Sửa
             </Button>
 
-            <Popconfirm
-              title="Reset mật khẩu tài khoản này?"
-              okText="Reset"
-              cancelText="Hủy"
-              onConfirm={() => handleResetPassword(row)}
+            <Button
+              icon={<KeyOutlined />}
+              loading={resettingUserId === row.id}
+              size="small"
+              onClick={() => openResetPasswordModal(row)}
             >
-              <Button
-                icon={<KeyOutlined />}
-                loading={resettingUserId === row.id}
-                size="small"
-              >
-                Reset pass
-              </Button>
-            </Popconfirm>
+              Reset pass
+            </Button>
 
             <Popconfirm
               title="Xóa tài khoản này?"
@@ -498,6 +524,70 @@ export default function AdminUsersPage() {
               ]}
             />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Đặt lại mật khẩu"
+        open={isResetPasswordModalOpen}
+        forceRender
+        onCancel={() => {
+          if (resettingUserId) return;
+          setIsResetPasswordModalOpen(false);
+          setResettingUser(null);
+          resetPasswordForm.resetFields();
+        }}
+        okText="Cập nhật mật khẩu"
+        cancelText="Hủy"
+        okButtonProps={{
+          loading: Boolean(resettingUserId),
+          onClick: () => resetPasswordForm.submit(),
+        }}
+        destroyOnHidden
+      >
+        <Form
+          form={resetPasswordForm}
+          layout="vertical"
+          onFinish={handleResetPassword}
+          initialValues={{ mode: "generate" }}
+        >
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={
+              resettingUser
+                ? `Tài khoản: ${resettingUser.email}`
+                : "Chọn cách đặt lại mật khẩu"
+            }
+            description="Admin có thể để hệ thống tự sinh mật khẩu mạnh hoặc tự nhập mật khẩu mới cho người dùng."
+          />
+
+          <Form.Item
+            name="mode"
+            label="Cách tạo mật khẩu"
+            rules={[{ required: true, message: "Vui lòng chọn cách tạo" }]}
+          >
+            <Select
+              options={[
+                { label: "Tự động sinh mật khẩu", value: "generate" },
+                { label: "Admin tự nhập mật khẩu", value: "custom" },
+              ]}
+            />
+          </Form.Item>
+
+          {resetPasswordMode === "custom" && (
+            <Form.Item
+              name="password"
+              label="Mật khẩu mới"
+              rules={[
+                { required: true, message: "Vui lòng nhập mật khẩu mới" },
+                { min: 8, message: "Mật khẩu tối thiểu 8 ký tự" },
+              ]}
+            >
+              <Input.Password placeholder="Nhập mật khẩu mới cho người dùng" />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
     </div>
